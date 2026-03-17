@@ -7,12 +7,21 @@ import os
 import json
 import re
 import time
+import httplib2
 from pathlib import Path
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from google_auth_httplib2 import AuthorizedHttp
+
+
+def _build_service(name: str, version: str, creds: Credentials):
+    """Construit un service Google API avec SSL désactivé (environnement serveur)."""
+    http = httplib2.Http(disable_ssl_certificate_validation=True)
+    authed = AuthorizedHttp(creds, http=http)
+    return build(name, version, http=authed)
 from googleapiclient.errors import HttpError
 
 from config import (
@@ -153,7 +162,7 @@ def upload_single_file(local_path: str, filename: str | None = None) -> dict | N
     """
     try:
         creds         = get_credentials()
-        drive_service = build("drive", "v3", credentials=creds)
+        drive_service = _build_service("drive", "v3", creds)
 
         name = filename or Path(local_path).name
         file_metadata = {"name": name, "parents": [DRIVE_FOLDER_ID]}
@@ -228,7 +237,7 @@ def sync_leads_to_sheet() -> int:
 
     try:
         creds          = get_credentials()
-        sheets_service = build("sheets", "v4", credentials=creds)
+        sheets_service = _build_service("sheets", "v4", creds)
 
         # Lire les URLs déjà présentes dans le Sheet pour dédoublonner
         existing_urls: set[str] = set()
@@ -300,8 +309,8 @@ def sync_leads_to_sheet() -> int:
 
 def main():
     creds         = get_credentials()
-    drive_service = build("drive", "v3", credentials=creds)
-    sheets_service = build("sheets", "v4", credentials=creds)
+    drive_service = _build_service("drive", "v3", creds)
+    sheets_service = _build_service("sheets", "v4", creds)
 
     uploaded = upload_images_to_drive(drive_service)
     save_upload_manifest(uploaded)
