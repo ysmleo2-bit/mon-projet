@@ -28,17 +28,20 @@ $PIP install -r requirements.txt -q
 
 # Vérifie ngrok
 if ! command -v ngrok &> /dev/null; then
-    echo -e "${YELLOW}! ngrok non installé — installation...${NC}"
-    if command -v brew &> /dev/null; then
-        brew install ngrok
-    elif command -v apt-get &> /dev/null; then
-        curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-        echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-        sudo apt-get update -q && sudo apt-get install ngrok -q
+    echo -e "${YELLOW}! ngrok non installé — téléchargement...${NC}"
+    ARCH=$(uname -m)
+    OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+    if [ "$ARCH" = "arm64" ]; then
+        NGROK_ZIP="ngrok-v3-stable-${OS}-arm64.zip"
     else
-        echo -e "${RED}Installe ngrok manuellement : https://ngrok.com/download${NC}"
-        exit 1
+        NGROK_ZIP="ngrok-v3-stable-${OS}-amd64.zip"
     fi
+    curl -sL "https://bin.equinox.io/c/bNyj1mQVY4c/${NGROK_ZIP}" -o /tmp/ngrok.zip
+    unzip -q /tmp/ngrok.zip -d /tmp/
+    sudo mv /tmp/ngrok /usr/local/bin/ngrok
+    sudo chmod +x /usr/local/bin/ngrok
+    rm /tmp/ngrok.zip
+    echo -e "${GREEN}✓ ngrok installé${NC}"
 fi
 
 # Tue les processus existants sur le port 5000
