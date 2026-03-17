@@ -45,15 +45,15 @@ if ! command -v ngrok &> /dev/null; then
 fi
 
 # Tue les processus existants sur le port 5000
-if lsof -i :5000 -t &>/dev/null; then
-    echo "⚡ Libération du port 5000..."
-    kill $(lsof -i :5000 -t) 2>/dev/null || true
+if lsof -i :5001 -t &>/dev/null; then
+    echo "⚡ Libération du port 5001..."
+    kill $(lsof -i :5001 -t) 2>/dev/null || true
     sleep 1
 fi
 
 # Démarre ngrok en arrière-plan
 echo -e "🌐 Démarrage du tunnel ngrok..."
-ngrok http 5000 --log=stdout > /tmp/ngrok.log 2>&1 &
+ngrok http 5001 --log=stdout > /tmp/ngrok.log 2>&1 &
 NGROK_PID=$!
 
 # Attend que ngrok soit prêt
