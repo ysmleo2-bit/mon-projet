@@ -45,7 +45,10 @@ def get_credentials() -> Credentials:
         creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            import requests
+            session = requests.Session()
+            session.verify = False
+            creds.refresh(Request(session=session))
         else:
             flow = InstalledAppFlow.from_client_secrets_file(CREDS_PATH, SCOPES)
             try:
