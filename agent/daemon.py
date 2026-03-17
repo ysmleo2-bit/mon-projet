@@ -4,24 +4,19 @@ Daemon 24/7 — cœur de l'automatisation Setting / Léo Ollivier
 Planning des tâches quotidiennes :
   06:30  — Découverte de nouveaux groupes (lundi uniquement)
   07:00  — Scraping quotidien des groupes actifs
-  08:00  — Analyse + mise à jour des profils (si nouveaux scrapes)
+  08:00  — Analyse + mise à jour des profils
   09:00  — Génération des posts du jour (1 par groupe)
-  10:00  — Vague de publication MATIN (groupes emploi/reconversion)
+  10:00  — Rapport matin Telegram + vague publication MATIN
   14:00  — Scan leads matin
-  19:00  — Vague de publication SOIR (groupes étudiants/mamans)
-  21:00  — Scan leads soir + rapport hebdomadaire (vendredi uniquement)
-  23:30  — Nettoyage et préparation du lendemain
-
-Le daemon tourne en boucle infinie et gère :
-  - La reprise automatique après erreur
-  - Le statut en temps réel dans data/daemon_status.json
-  - Les logs complets dans data/daemon.log
-  - Les alertes sur objectif leads (30/semaine)
+  19:00  — Vague de publication SOIR
+  21:00  — Scan leads soir + rapport soir Telegram
+  21:30  — Rapport hebdomadaire Telegram (vendredi uniquement)
 
 Lancement :
-  python daemon.py            # Mode production (tourne indéfiniment)
-  python daemon.py --test     # Mode test (lance toutes les tâches une fois)
-  python daemon.py --task scrape   # Lance une tâche précise
+  python daemon.py            # Production (tourne indéfiniment)
+  python daemon.py --test     # Mode test (une passe complète)
+  python daemon.py --task scrape
+  python daemon.py --task telegram_test
 """
 
 import asyncio
@@ -29,15 +24,14 @@ import json
 import logging
 import os
 import sys
-import time
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
 load_dotenv()
 
-# ── Logging ──────────────────────────────────────────────────────────────────
+# ── Logging ───────────────────────────────────────────────────────────────────
 
 Path("data").mkdir(exist_ok=True)
 logging.basicConfig(
@@ -50,11 +44,11 @@ logging.basicConfig(
 )
 log = logging.getLogger("daemon")
 
-STATUS_FILE = Path("data/daemon_status.json")
+STATUS_FILE   = Path("data/daemon_status.json")
 GROUPS_CONFIG = "groups_config.json"
 
 
-# ── Status ────────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _write_status(task: str, state: str, details: str = ""):
     STATUS_FILE.write_text(
@@ -65,6 +59,16 @@ def _write_status(task: str, state: str, details: str = ""):
             "updated_at": datetime.now().isoformat(),
         }, ensure_ascii=False, indent=2),
         encoding="utf-8",
+    )
+
+
+def _tg():
+    """Retourne une instance TelegramReporter prête à l'emploi."""
+    from agent.telegram_reporter import TelegramReporter
+    return TelegramReporter(
+        token=os.environ.get("TELEGRAM_BOT_TOKEN",
+                             "8755703485:AAGNAU0FunCNgI5ECR2thta0qMZGJfOKf-I"),
+        chat_id=os.environ.get("TELEGRAM_CHAT_ID", "2108862908"),
     )
 
 
@@ -84,12 +88,12 @@ def _load_dea() -> str:
         return "Setter — 2-3h/jour — 1500-3000€/mois, sans expérience"
 
 
-# ── Tâches individuelles ──────────────────────────────────────────────────────
+# ── Tâches ────────────────────────────────────────────────────────────────────
 
 async def task_discovery():
-    """Découverte hebdomadaire de nouveaux groupes (lundi)."""
     log.info("=== TÂCHE : Découverte de nouveaux groupes ===")
     _write_status("discovery", "running")
+    added = 0
     try:
         from agent.discovery_agent import DiscoveryAgent
         agent  = DiscoveryAgent(api_key=os.environ.get("ANTHROPIC_API_KEY"))
@@ -97,42 +101,58 @@ async def task_discovery():
         stats  = agent.discovery_stats()
         log.info(f"Découverte terminée : +{added} groupes (total={stats['total_groups']})")
         _write_status("discovery", "done", f"+{added} groupes")
+
+        # Telegram — notifier chaque nouveau groupe
+        if added > 0:
+            tg = _tg()
+            # Récupérer les noms des groupes ajoutés aujourd'hui
+            try:
+                from agent.discovery_agent import _load_log
+                disc_log = _load_log()
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                new_groups = [
+                    g for g in disc_log.get("discovered", [])
+                    if g.get("added_at") == today_str
+                ][-added:]
+                for g in new_groups:
+                    tg.alerte_nouveau_groupe(g["name"], g.get("category", ""))
+            except Exception:
+                pass
+
     except Exception as e:
         log.error(f"Erreur discovery : {e}", exc_info=True)
         _write_status("discovery", "error", str(e))
+        _tg().alerte_erreur("discovery", str(e))
 
 
 async def task_scrape():
-    """Scraping quotidien des groupes pour data fraîche."""
     log.info("=== TÂCHE : Scraping des groupes ===")
     _write_status("scrape", "running")
     try:
         from agent.scraper_agent import ScraperAgent
-        groups  = _load_groups()
-        # Scraper un sous-ensemble chaque jour (rotation)
+        groups     = _load_groups()
         day_offset = datetime.now().timetuple().tm_yday
         chunk_size = min(8, len(groups))
         start      = (day_offset * chunk_size) % max(len(groups), 1)
         chunk      = (groups[start:] + groups[:start])[:chunk_size]
-
-        agent   = ScraperAgent(max_posts_per_group=20)
+        agent      = ScraperAgent(max_posts_per_group=20)
         await agent.connect()
         results = await agent.scrape_groups(chunk)
-        log.info(f"Scraping terminé : {len(results)} groupes scrapés")
+        log.info(f"Scraping terminé : {len(results)} groupes")
         _write_status("scrape", "done", f"{len(results)} groupes")
     except Exception as e:
         log.error(f"Erreur scraping : {e}", exc_info=True)
         _write_status("scrape", "error", str(e))
+        _tg().alerte_erreur("scrape", str(e))
 
 
 def task_analyze():
-    """Analyse des données scrapées — mise à jour des profils."""
     log.info("=== TÂCHE : Analyse + mise à jour profils ===")
     _write_status("analyze", "running")
     try:
         from agent.scraper_agent  import ScraperAgent
         from agent.analyzer_agent import AnalyzerAgent
-        scraped  = ScraperAgent.all_cached()
+        scraped = ScraperAgent.all_cached()
         if not scraped:
             log.info("Aucune donnée scrapée à analyser.")
             _write_status("analyze", "skipped", "no data")
@@ -140,28 +160,25 @@ def task_analyze():
         dea      = _load_dea()
         analyzer = AnalyzerAgent(api_key=os.environ.get("ANTHROPIC_API_KEY"))
         profiles = analyzer.analyze_all(scraped, dea)
-        log.info(f"Analyse terminée : {len(profiles)} profils mis à jour")
+        log.info(f"Analyse terminée : {len(profiles)} profils")
         _write_status("analyze", "done", f"{len(profiles)} profils")
     except Exception as e:
         log.error(f"Erreur analyse : {e}", exc_info=True)
         _write_status("analyze", "error", str(e))
+        _tg().alerte_erreur("analyze", str(e))
 
 
 def task_generate():
-    """Génération des posts du jour pour tous les groupes."""
     log.info("=== TÂCHE : Génération des posts ===")
     _write_status("generate", "running")
     try:
-        from agent.analyzer_agent import AnalyzerAgent
+        from agent.analyzer_agent import AnalyzerAgent, GroupProfile
         from agent.content_agent  import ContentAgent
         from agent.visual_agent   import VisualAgent
-
         dea      = _load_dea()
         profiles = AnalyzerAgent.all_profiles()
         if not profiles:
-            log.warning("Aucun profil de groupe — génération avec profils minimaux")
-            groups = _load_groups()
-            from agent.analyzer_agent import GroupProfile
+            groups   = _load_groups()
             profiles = [
                 GroupProfile(
                     group_id=g["id"], group_name=g.get("name", g["id"]),
@@ -174,86 +191,124 @@ def task_generate():
                     best_post_format="Texte court + CTA",
                 ) for g in groups
             ]
-
         content = ContentAgent(api_key=os.environ.get("ANTHROPIC_API_KEY"))
         visual  = VisualAgent()
         posts   = []
-
         for profile in profiles:
             post = content.generate_post(profile, dea)
             visual.generate(post)
             posts.append(post)
-
         log.info(f"Génération terminée : {len(posts)} posts + visuels")
         _write_status("generate", "done", f"{len(posts)} posts")
     except Exception as e:
         log.error(f"Erreur génération : {e}", exc_info=True)
         _write_status("generate", "error", str(e))
+        _tg().alerte_erreur("generate", str(e))
 
 
 async def task_publish(wave: str = "morning"):
-    """Vague de publication."""
     log.info(f"=== TÂCHE : Publication {wave.upper()} ===")
     _write_status(f"publish_{wave}", "running")
     try:
         from agent.publisher_agent import PublisherAgent
-        dea       = _load_dea()
         publisher = PublisherAgent(
             api_key=os.environ.get("ANTHROPIC_API_KEY"),
             max_per_wave=15,
         )
-        count = await publisher.run_wave(wave=wave, dea=dea)
+        count = await publisher.run_wave(wave=wave, dea=_load_dea())
         log.info(f"Publication {wave} terminée : {count} posts publiés")
         _write_status(f"publish_{wave}", "done", f"{count} publiés")
     except Exception as e:
         log.error(f"Erreur publication {wave} : {e}", exc_info=True)
         _write_status(f"publish_{wave}", "error", str(e))
+        _tg().alerte_erreur(f"publish_{wave}", str(e))
 
 
 async def task_scan_leads():
-    """Scan des commentaires pour trouver les leads."""
     log.info("=== TÂCHE : Scan leads ===")
     _write_status("leads", "running")
+    new_leads = 0
     try:
-        from agent.lead_tracker import LeadTracker
+        from agent.lead_tracker import LeadTracker, weekly_count, WEEKLY_GOAL
         tracker   = LeadTracker()
         new_leads = await tracker.scan_all_groups(hours_back=24)
-        report    = tracker.weekly_report()
-        log.info(f"Scan leads terminé : +{new_leads} nouveaux leads\n{report}")
+        log.info(f"Scan leads terminé : +{new_leads}")
         _write_status("leads", "done", f"+{new_leads}")
+
+        # Alerte objectif atteint
+        wc = weekly_count()
+        if wc >= WEEKLY_GOAL:
+            _tg().alerte_objectif_atteint(wc)
+
     except Exception as e:
         log.error(f"Erreur scan leads : {e}", exc_info=True)
         _write_status("leads", "error", str(e))
+        _tg().alerte_erreur("scan_leads", str(e))
+    return new_leads
+
+
+def task_rapport_matin():
+    """Rapport Telegram du matin (10h) + confirmation démarrage."""
+    log.info("=== RAPPORT MATIN → Telegram ===")
+    try:
+        _tg().rapport_matin()
+    except Exception as e:
+        log.error(f"Erreur rapport matin : {e}", exc_info=True)
+
+
+async def task_rapport_soir():
+    """Rapport Telegram du soir (21h) — bilan complet + visuels."""
+    log.info("=== RAPPORT SOIR → Telegram ===")
+    try:
+        # D'abord scanner les leads de la journée
+        await task_scan_leads()
+        # Puis envoyer le rapport complet avec visuels
+        _tg().rapport_soir()
+    except Exception as e:
+        log.error(f"Erreur rapport soir : {e}", exc_info=True)
+
+
+def task_rapport_hebdo():
+    """Rapport hebdomadaire Telegram (vendredi 21h30)."""
+    log.info("=== RAPPORT HEBDO → Telegram ===")
+    try:
+        from agent.lead_tracker import LeadTracker
+        tracker = LeadTracker()
+        report  = tracker.weekly_report()
+        log.info(report)
+        Path("data/weekly_reports").mkdir(exist_ok=True)
+        fname = f"data/weekly_reports/rapport_{datetime.now().strftime('%Y-W%V')}.txt"
+        Path(fname).write_text(report, encoding="utf-8")
+        _tg().rapport_hebdomadaire()
+    except Exception as e:
+        log.error(f"Erreur rapport hebdo : {e}", exc_info=True)
+
+
+def task_telegram_test():
+    """Teste la connexion Telegram et envoie un message de vérification."""
+    _tg().test()
 
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 class TaskSchedule:
-    """Tâche planifiée avec heure de déclenchement et fréquence."""
     def __init__(self, name: str, hour: int, minute: int, days: str = "daily"):
-        self.name       = name        # nom de la tâche
-        self.hour       = hour
-        self.minute     = minute
-        self.days       = days        # "daily" / "monday" / "friday"
+        self.name     = name
+        self.hour     = hour
+        self.minute   = minute
+        self.days     = days
         self.last_run: datetime | None = None
 
     def should_run(self, now: datetime) -> bool:
-        # Vérifier le jour
         if self.days == "monday" and now.weekday() != 0:
             return False
         if self.days == "friday" and now.weekday() != 4:
             return False
-
-        # Vérifier l'heure (fenêtre de 2 minutes)
         target = now.replace(hour=self.hour, minute=self.minute, second=0, microsecond=0)
-        diff   = abs((now - target).total_seconds())
-        if diff > 120:
+        if abs((now - target).total_seconds()) > 120:
             return False
-
-        # Ne pas relancer si déjà exécutée dans la dernière heure
         if self.last_run and (now - self.last_run).total_seconds() < 3600:
             return False
-
         return True
 
     def mark_run(self, now: datetime):
@@ -261,18 +316,16 @@ class TaskSchedule:
 
 
 SCHEDULE = [
-    # Lundi uniquement
-    TaskSchedule("discovery",      hour=6,  minute=30, days="monday"),
-    # Tous les jours
-    TaskSchedule("scrape",         hour=7,  minute=0,  days="daily"),
-    TaskSchedule("analyze",        hour=8,  minute=0,  days="daily"),
-    TaskSchedule("generate",       hour=9,  minute=0,  days="daily"),
-    TaskSchedule("publish_morning",hour=10, minute=0,  days="daily"),
-    TaskSchedule("leads_morning",  hour=14, minute=0,  days="daily"),
-    TaskSchedule("publish_evening",hour=19, minute=0,  days="daily"),
-    TaskSchedule("leads_evening",  hour=21, minute=0,  days="daily"),
-    # Vendredi uniquement
-    TaskSchedule("weekly_report",  hour=21, minute=30, days="friday"),
+    TaskSchedule("discovery",        hour=6,  minute=30, days="monday"),
+    TaskSchedule("scrape",           hour=7,  minute=0,  days="daily"),
+    TaskSchedule("analyze",          hour=8,  minute=0,  days="daily"),
+    TaskSchedule("generate",         hour=9,  minute=0,  days="daily"),
+    TaskSchedule("rapport_matin",    hour=10, minute=0,  days="daily"),
+    TaskSchedule("publish_morning",  hour=10, minute=5,  days="daily"),
+    TaskSchedule("leads_morning",    hour=14, minute=0,  days="daily"),
+    TaskSchedule("publish_evening",  hour=19, minute=0,  days="daily"),
+    TaskSchedule("rapport_soir",     hour=21, minute=0,  days="daily"),
+    TaskSchedule("rapport_hebdo",    hour=21, minute=30, days="friday"),
 ]
 
 TASK_MAP = {
@@ -283,29 +336,14 @@ TASK_MAP = {
     "publish_morning": lambda: task_publish("morning"),
     "publish_evening": lambda: task_publish("evening"),
     "leads_morning":   task_scan_leads,
-    "leads_evening":   task_scan_leads,
-    "weekly_report":   _weekly_report_task,
+    "rapport_matin":   task_rapport_matin,
+    "rapport_soir":    task_rapport_soir,
+    "rapport_hebdo":   task_rapport_hebdo,
+    "telegram_test":   task_telegram_test,
 }
 
 
-def _weekly_report_task():
-    """Affiche et log le rapport hebdomadaire des leads."""
-    log.info("=== RAPPORT HEBDOMADAIRE ===")
-    try:
-        from agent.lead_tracker import LeadTracker
-        tracker = LeadTracker()
-        report  = tracker.weekly_report()
-        log.info(report)
-        # Sauvegarde dans data/weekly_reports/
-        Path("data/weekly_reports").mkdir(exist_ok=True)
-        filename = f"data/weekly_reports/rapport_{datetime.now().strftime('%Y-W%V')}.txt"
-        Path(filename).write_text(report, encoding="utf-8")
-    except Exception as e:
-        log.error(f"Erreur rapport hebdo : {e}", exc_info=True)
-
-
 async def _run_task(name: str):
-    """Lance une tâche par son nom, sync ou async."""
     func = TASK_MAP.get(name)
     if func is None:
         log.warning(f"Tâche inconnue : {name}")
@@ -317,51 +355,63 @@ async def _run_task(name: str):
             await result
     except Exception as e:
         log.error(f"Tâche {name} échouée : {e}", exc_info=True)
+        try:
+            _tg().alerte_erreur(name, str(e))
+        except Exception:
+            pass
 
 
-# ── Boucle principale 24/7 ────────────────────────────────────────────────────
+# ── Boucle principale ─────────────────────────────────────────────────────────
 
 async def run_daemon():
-    log.info("="*60)
+    log.info("=" * 60)
     log.info("DAEMON SETTING — Démarrage")
     log.info(f"PID : {os.getpid()}")
-    log.info("="*60)
+    log.info("=" * 60)
     _write_status("daemon", "running", "Démarré")
+
+    # Message de démarrage Telegram
+    try:
+        groups = _load_groups()
+        _tg().send(
+            f"🤖 <b>Daemon Setting démarré</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"⏰ {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
+            f"👥 {len(groups)} groupes actifs\n\n"
+            f"Planning du jour :\n"
+            f"  10h00 · Publication matin\n"
+            f"  19h00 · Publication soir\n"
+            f"  21h00 · Rapport + leads\n"
+        )
+    except Exception:
+        pass
 
     while True:
         now = datetime.now()
-
         for sched in SCHEDULE:
             if sched.should_run(now):
                 log.info(f"⏰ Déclenchement : {sched.name} à {now.strftime('%H:%M')}")
                 sched.mark_run(now)
                 await _run_task(sched.name)
-
-        # Mise à jour du statut "alive"
         _write_status("daemon", "running", f"Actif — {now.strftime('%H:%M:%S')}")
-
-        # Attente 60 secondes avant la prochaine vérification
         await asyncio.sleep(60)
 
 
-# ── Mode test (une passe de toutes les tâches) ────────────────────────────────
-
 async def run_test():
-    log.info("=== MODE TEST : lancement de toutes les tâches une fois ===")
-    for name in ["scrape", "analyze", "generate", "publish_morning", "leads_morning"]:
-        log.info(f"\n--- Tâche : {name} ---")
+    log.info("=== MODE TEST ===")
+    await _run_task("telegram_test")
+    for name in ["generate", "rapport_matin", "rapport_soir"]:
+        log.info(f"--- {name} ---")
         await _run_task(name)
         await asyncio.sleep(2)
-    log.info("=== Mode test terminé ===")
+    log.info("=== Test terminé ===")
 
-
-# ── Point d'entrée ────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(description="Daemon 24/7 Setting — Léo Ollivier")
-    parser.add_argument("--test",   action="store_true", help="Mode test (une passe)")
-    parser.add_argument("--task",   type=str, default=None,
-                        help=f"Lancer une tâche précise ({', '.join(TASK_MAP.keys())})")
+    parser.add_argument("--test", action="store_true")
+    parser.add_argument("--task", type=str, default=None,
+                        help=f"Tâches : {', '.join(TASK_MAP.keys())}")
     args = parser.parse_args()
 
     if args.task:
