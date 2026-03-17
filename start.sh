@@ -54,20 +54,20 @@ if ! command -v cloudflared &> /dev/null; then
     echo -e "${GREEN}✓ cloudflared installé${NC}"
 fi
 
-# Tue les processus existants sur le port 5001
-if lsof -i :5001 -t &>/dev/null; then
-    echo "⚡ Libération du port 5001..."
-    kill -9 $(lsof -i :5001 -t) 2>/dev/null || true
+# Tue les processus existants sur le port 5002
+if lsof -i :5002 -t &>/dev/null; then
+    echo "⚡ Libération du port 5002..."
+    kill -9 $(lsof -i :5002 -t) 2>/dev/null || true
     # Attend que le port soit vraiment libéré (max 5s)
     for i in $(seq 1 10); do
-        lsof -i :5001 -t &>/dev/null || break
+        lsof -i :5002 -t &>/dev/null || break
         sleep 0.5
     done
 fi
 
 # Démarre cloudflared en arrière-plan
 echo -e "🌐 Démarrage du tunnel Cloudflare..."
-cloudflared tunnel --url http://localhost:5001 --no-autoupdate > /tmp/cloudflared.log 2>&1 &
+cloudflared tunnel --url http://localhost:5002 --no-autoupdate > /tmp/cloudflared.log 2>&1 &
 CF_PID=$!
 
 # Attend que le tunnel soit prêt et récupère l'URL

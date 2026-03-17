@@ -9,7 +9,7 @@ YELLOW='\033[1;33m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-PORT=${WEBHOOK_PORT:-5001}
+PORT=${WEBHOOK_PORT:-5002}
 BASE="http://localhost:$PORT"
 
 echo ""

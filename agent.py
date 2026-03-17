@@ -88,7 +88,7 @@ def load_config() -> dict:
         "RECAP_HOUR": int(os.getenv("RECAP_HOUR", "9")),
         "RECAP_MINUTE": int(os.getenv("RECAP_MINUTE", "0")),
         "TIMEZONE": os.getenv("TIMEZONE", "Europe/Paris"),
-        "WEBHOOK_PORT": int(os.getenv("WEBHOOK_PORT", "5000")),
+        "WEBHOOK_PORT": int(os.getenv("WEBHOOK_PORT", "5002")),
         "WEBHOOK_SECRET": os.getenv("WEBHOOK_SECRET", ""),
     })
     return config
