@@ -32,28 +32,8 @@ def main():
 
     flow = InstalledAppFlow.from_client_secrets_file(CREDS_PATH, SCOPES)
 
-    # Générer l'URL manuellement
-    auth_url, _ = flow.authorization_url(
-        prompt="consent",
-        access_type="offline",
-        redirect_uri="urn:ietf:wg:oauth:2.0:oob",
-    )
-
-    print("\n" + "="*60)
-    print("AUTHENTIFICATION GOOGLE — ÉTAPE 1")
-    print("="*60)
-    print("Ouvre cette URL dans ton navigateur :\n")
-    print(auth_url)
-    print("\n" + "="*60)
-    print("Après autorisation, Google affiche un code.")
-
-    code = input("\nColle le code ici : ").strip()
-
-    flow.fetch_token(
-        code=code,
-        redirect_uri="urn:ietf:wg:oauth:2.0:oob",
-    )
-    creds = flow.credentials
+    # Sur Mac/Linux avec navigateur : ouvre automatiquement le browser
+    creds = flow.run_local_server(port=8080)
 
     with open(TOKEN_PATH, "w") as f:
         f.write(creds.to_json())
