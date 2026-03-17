@@ -72,70 +72,60 @@ def zapier_event():
         logger.warning(f"Type d'événement manquant dans: {data}")
         return jsonify({"error": "event_type required"}), 400
 
+    # Sauvegarde locale pour le récap quotidien
+    from data_store import save_event
+    save_event(event_type, data)
+
     if _telegram_sender:
         _telegram_sender.send_zapier_event(event_type, data)
 
     return jsonify({"status": "received", "event_type": event_type})
 
 
+def _handle_event(event_type: str):
+    """Traitement commun : sauvegarde locale + notification Telegram."""
+    from data_store import save_event
+    data = request.get_json(force=True) or {}
+    save_event(event_type, data)
+    if _telegram_sender:
+        _telegram_sender.send_zapier_event(event_type, data)
+    return jsonify({"status": "received", "event_type": event_type})
+
+
 @app.route("/zapier/optin", methods=["POST"])
 @_verify_secret
 def zapier_optin():
-    """Endpoint dédié : nouveau prospect opt-in."""
-    data = request.get_json(force=True) or {}
-    if _telegram_sender:
-        _telegram_sender.send_zapier_event("optin", data)
-    return jsonify({"status": "received"})
+    return _handle_event("optin")
 
 
 @app.route("/zapier/booked", methods=["POST"])
 @_verify_secret
 def zapier_booked():
-    """Endpoint dédié : call booké."""
-    data = request.get_json(force=True) or {}
-    if _telegram_sender:
-        _telegram_sender.send_zapier_event("booked", data)
-    return jsonify({"status": "received"})
+    return _handle_event("booked")
 
 
 @app.route("/zapier/show", methods=["POST"])
 @_verify_secret
 def zapier_show():
-    """Endpoint dédié : show confirmé."""
-    data = request.get_json(force=True) or {}
-    if _telegram_sender:
-        _telegram_sender.send_zapier_event("show", data)
-    return jsonify({"status": "received"})
+    return _handle_event("show")
 
 
 @app.route("/zapier/no-show", methods=["POST"])
 @_verify_secret
 def zapier_no_show():
-    """Endpoint dédié : no-show."""
-    data = request.get_json(force=True) or {}
-    if _telegram_sender:
-        _telegram_sender.send_zapier_event("no_show", data)
-    return jsonify({"status": "received"})
+    return _handle_event("no_show")
 
 
 @app.route("/zapier/disqualified", methods=["POST"])
 @_verify_secret
 def zapier_disqualified():
-    """Endpoint dédié : prospect disqualifié."""
-    data = request.get_json(force=True) or {}
-    if _telegram_sender:
-        _telegram_sender.send_zapier_event("disqualified", data)
-    return jsonify({"status": "received"})
+    return _handle_event("disqualified")
 
 
 @app.route("/zapier/closed", methods=["POST"])
 @_verify_secret
 def zapier_closed():
-    """Endpoint dédié : close réalisé."""
-    data = request.get_json(force=True) or {}
-    if _telegram_sender:
-        _telegram_sender.send_zapier_event("closed", data)
-    return jsonify({"status": "received"})
+    return _handle_event("closed")
 
 
 def _guess_event_type(status: str) -> str:

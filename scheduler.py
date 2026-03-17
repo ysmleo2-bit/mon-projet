@@ -54,24 +54,41 @@ class DailyRecapScheduler:
         logger.info("=== Lancement du récap quotidien ===")
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-        try:
-            stats = self.iclosed.get_stats_for_date(yesterday)
-            logger.info(f"Stats récupérées pour {yesterday}: {stats}")
-        except Exception as e:
-            logger.error(f"Erreur récupération stats iClosed: {e}")
-            self.telegram.send_alert(
-                f"Impossible de récupérer les stats iClosed pour {yesterday}.\n"
-                f"Erreur : {e}"
-            )
-            return
+        stats = None
 
-        # Récupère les stats par membre d'équipe
+        # Source 1 : stockage local (événements reçus via webhooks Zapier)
         try:
-            team = self.iclosed.get_team_breakdown(yesterday)
-            stats["team"] = team
+            from data_store import get_stats_for_date, has_data_for_date
+            if has_data_for_date(yesterday):
+                stats = get_stats_for_date(yesterday)
+                logger.info(f"Stats lues depuis stockage local ({stats.get('total_events', 0)} événements)")
+            else:
+                logger.info(f"Aucun événement local pour {yesterday} — tentative source externe")
         except Exception as e:
-            logger.warning(f"Stats équipe indisponibles: {e}")
-            stats["team"] = []
+            logger.warning(f"Erreur stockage local: {e}")
+
+        # Source 2 : Google Sheets / API iClosed (fallback)
+        if stats is None:
+            try:
+                stats = self.iclosed.get_stats_for_date(yesterday)
+                logger.info(f"Stats récupérées depuis source externe pour {yesterday}")
+            except Exception as e:
+                logger.warning(f"Source externe indisponible: {e}")
+
+        # Aucune source disponible : envoie quand même un récap vide avec mention
+        if stats is None:
+            stats = {
+                "date": yesterday,
+                "prospects_optin": 0,
+                "calls_bookes": 0,
+                "shows": 0,
+                "no_shows": 0,
+                "disqualifies": 0,
+                "closes": 0,
+                "team": [],
+                "_no_data": True,
+            }
+            logger.warning("Aucune donnée disponible — récap vide envoyé")
 
         # Envoie le récap
         success = self.telegram.send_daily_recap(stats)
