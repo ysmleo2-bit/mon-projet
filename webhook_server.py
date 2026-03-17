@@ -56,10 +56,10 @@ def zapier_event():
         ... autres champs optionnels
     }
     """
-    if not request.is_json:
-        return jsonify({"error": "JSON required"}), 400
-
-    data = request.get_json()
+    # Accepte JSON, form-data ou raw body (compatibilité Zapier)
+    data = request.get_json(silent=True)
+    if data is None:
+        data = request.form.to_dict() or {}
     logger.info(f"Webhook Zapier reçu: {data}")
 
     event_type = data.get("event_type", "").lower().strip()
@@ -85,7 +85,7 @@ def zapier_event():
 def _handle_event(event_type: str):
     """Traitement commun : sauvegarde locale + notification Telegram."""
     from data_store import save_event
-    data = request.get_json(force=True) or {}
+    data = request.get_json(silent=True) or request.form.to_dict() or {}
     save_event(event_type, data)
     if _telegram_sender:
         _telegram_sender.send_zapier_event(event_type, data)
