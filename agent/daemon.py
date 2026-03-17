@@ -240,6 +240,15 @@ async def task_scan_leads():
         if wc >= WEEKLY_GOAL:
             _tg().alerte_objectif_atteint(wc)
 
+        # Export automatique vers Google Sheet LEADS
+        try:
+            from upload_drive import sync_leads_to_sheet
+            added_to_sheet = sync_leads_to_sheet()
+            if added_to_sheet > 0:
+                log.info(f"[Leads] {added_to_sheet} profils ajoutés dans le Google Sheet.")
+        except Exception as sheet_err:
+            log.warning(f"[Leads] Export Sheet échoué (non bloquant) : {sheet_err}")
+
     except Exception as e:
         log.error(f"Erreur scan leads : {e}", exc_info=True)
         _write_status("leads", "error", str(e))

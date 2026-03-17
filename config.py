@@ -13,6 +13,7 @@ DRIVE_FOLDER_ID    = "1OJvZm6DQ3shilxpWCXoA0TmPIfVIBCco"
 SHEET_TAB_GROUPES  = "GROUPES"
 SHEET_TAB_POSTS    = "POSTS"
 SHEET_TAB_VISUELS  = "VISUELS"
+SHEET_TAB_LEADS    = "LEADS"
 
 # ── Facebook ─────────────────────────────────────────────────────────────────
 FB_PAGE_ID        = "61582709835864"

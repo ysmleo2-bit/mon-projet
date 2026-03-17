@@ -17,7 +17,7 @@ from googleapiclient.errors import HttpError
 
 from config import (
     SPREADSHEET_ID, DRIVE_FOLDER_ID, VISUELS_DIR,
-    SHEET_TAB_VISUELS,
+    SHEET_TAB_VISUELS, SHEET_TAB_LEADS,
 )
 
 SCOPES = [
@@ -189,6 +189,98 @@ def upload_folder_to_drive(folder_path: str) -> list[dict]:
             results.append(result)
         time.sleep(0.5)
     return results
+
+
+# ── Export Leads → Google Sheet ───────────────────────────────────────────────
+
+def sync_leads_to_sheet() -> int:
+    """
+    Exporte tous les leads qualifiés depuis data/leads.json vers l'onglet LEADS
+    du Google Sheet. Chaque ligne = un lead avec son lien de profil Facebook.
+    Dédoublonne automatiquement (ne réécrit pas les leads déjà présents).
+    Retourne le nombre de nouveaux leads ajoutés au Sheet.
+    """
+    import json
+    from pathlib import Path
+
+    leads_path = Path("data/leads.json")
+    if not leads_path.exists():
+        print("[Leads] Aucun fichier data/leads.json trouvé.")
+        return 0
+
+    all_leads = json.loads(leads_path.read_text(encoding="utf-8")).get("leads", [])
+    if not all_leads:
+        print("[Leads] Aucun lead à exporter.")
+        return 0
+
+    try:
+        creds          = get_credentials()
+        sheets_service = build("sheets", "v4", credentials=creds)
+
+        # Lire les URLs déjà présentes dans le Sheet pour dédoublonner
+        existing_urls: set[str] = set()
+        try:
+            result = sheets_service.spreadsheets().values().get(
+                spreadsheetId=SPREADSHEET_ID,
+                range=f"{SHEET_TAB_LEADS}!C2:C",  # colonne Lien profil
+            ).execute()
+            for row in result.get("values", []):
+                if row:
+                    existing_urls.add(row[0].strip())
+        except HttpError:
+            pass  # Onglet vide ou inexistant — on l'initialisera avec les en-têtes
+
+        # Filtrer les nouveaux leads
+        new_leads = [
+            lead for lead in all_leads
+            if lead.get("commenter_url", "").strip() not in existing_urls
+            and lead.get("commenter_url", "").strip()
+        ]
+
+        if not new_leads:
+            print("[Leads] Tous les leads sont déjà dans le Sheet.")
+            return 0
+
+        # Préparer les lignes à ajouter
+        rows = []
+        for lead in new_leads:
+            rows.append([
+                lead.get("detected_at", "")[:10],   # Date (YYYY-MM-DD)
+                lead.get("commenter_name", ""),      # Nom
+                lead.get("commenter_url", ""),       # Lien profil Facebook
+                lead.get("group_id", ""),            # Groupe
+                lead.get("comment_text", "")[:150],  # Commentaire (tronqué)
+                lead.get("status", "nouveau"),       # Statut
+            ])
+
+        # Si le Sheet est vide, ajouter les en-têtes d'abord
+        if not existing_urls:
+            header = [["Date", "Nom", "Lien profil", "Groupe", "Commentaire", "Statut"]]
+            sheets_service.spreadsheets().values().update(
+                spreadsheetId=SPREADSHEET_ID,
+                range=f"{SHEET_TAB_LEADS}!A1",
+                valueInputOption="RAW",
+                body={"values": header},
+            ).execute()
+
+        # Ajouter les nouvelles lignes à la suite
+        sheets_service.spreadsheets().values().append(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"{SHEET_TAB_LEADS}!A1",
+            valueInputOption="RAW",
+            insertDataOption="INSERT_ROWS",
+            body={"values": rows},
+        ).execute()
+
+        print(f"[Leads] ✓ {len(new_leads)} leads ajoutés dans l'onglet '{SHEET_TAB_LEADS}'.")
+        return len(new_leads)
+
+    except HttpError as e:
+        print(f"[Leads] ERREUR Google Sheets : {e}")
+        return 0
+    except Exception as e:
+        print(f"[Leads] ERREUR : {e}")
+        return 0
 
 
 # ── Point d'entrée ────────────────────────────────────────────────────────────
