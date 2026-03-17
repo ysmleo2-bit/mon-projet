@@ -57,8 +57,12 @@ fi
 # Tue les processus existants sur le port 5001
 if lsof -i :5001 -t &>/dev/null; then
     echo "⚡ Libération du port 5001..."
-    kill $(lsof -i :5001 -t) 2>/dev/null || true
-    sleep 1
+    kill -9 $(lsof -i :5001 -t) 2>/dev/null || true
+    # Attend que le port soit vraiment libéré (max 5s)
+    for i in $(seq 1 10); do
+        lsof -i :5001 -t &>/dev/null || break
+        sleep 0.5
+    done
 fi
 
 # Démarre cloudflared en arrière-plan
