@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 
 from agent.scraper_agent  import ScraperAgent
-from agent.analyzer_agent import AnalyzerAgent
+from agent.analyzer_agent import AnalyzerAgent, GroupProfile
 from agent.content_agent  import ContentAgent
 from agent.visual_agent   import VisualAgent
 
@@ -120,8 +120,21 @@ def pipeline_generate_only(api_key: str, days: int = 1):
     profiles = AnalyzerAgent.all_profiles()
 
     if not profiles:
-        print("[ERREUR] Aucun profil de groupe. Lancez d'abord --mode analyze.")
-        return []
+        # Créer des profils minimaux depuis groups_config.json
+        groups = load_groups()
+        print(f"[Generate] Aucun profil — création de {len(groups)} profils minimaux depuis groups_config…")
+        profiles = [
+            GroupProfile(
+                group_id=g["id"], group_name=g.get("name", g["id"]),
+                category=g.get("category", "general"),
+                summary=g.get("description", ""),
+                pain_points=[], engagement_patterns=[],
+                typical_vocabulary=[], typical_objections=[],
+                maturity_level="froid", hook_angles=[],
+                tone_recommendation="Ton direct et accessible.",
+                best_post_format="Texte court + CTA",
+            ) for g in groups
+        ]
 
     print(f"\n[Generate] Génération pour {len(profiles)} groupes ({days} jour(s))…")
     all_posts = []
