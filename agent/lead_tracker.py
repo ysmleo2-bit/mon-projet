@@ -17,6 +17,8 @@ Fonctionnement :
 
 Données sauvegardées dans : data/leads.json
 """
+from __future__ import annotations
+
 
 import asyncio
 import json

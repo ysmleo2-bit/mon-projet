@@ -9,6 +9,8 @@ Chaque visuel est construit à partir du brief fourni par ContentAgent :
 
 Dépendance : Pillow (PIL)
 """
+from __future__ import annotations
+
 
 import os
 import random

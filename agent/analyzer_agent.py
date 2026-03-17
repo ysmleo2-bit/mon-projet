@@ -10,6 +10,8 @@ Analyse le contenu brut scrapé et en extrait :
 
 Utilise Claude Opus 4.6 avec adaptive thinking.
 """
+from __future__ import annotations
+
 
 import json
 import os

@@ -10,6 +10,8 @@ Stratégie :
 
 Objectif : +3 à +10 nouveaux groupes ciblés par semaine.
 """
+from __future__ import annotations
+
 
 import asyncio
 import json

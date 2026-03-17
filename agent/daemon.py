@@ -18,6 +18,8 @@ Lancement :
   python daemon.py --task scrape
   python daemon.py --task telegram_test
 """
+from __future__ import annotations
+
 
 import asyncio
 import json

@@ -14,6 +14,8 @@ Modes :
   --mode daily       : Génère le post du jour + visuel pour chaque groupe
   --mode publish     : Publie les posts générés aujourd'hui
 """
+from __future__ import annotations
+
 
 import asyncio
 import json

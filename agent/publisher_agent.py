@@ -14,6 +14,8 @@ Stratégie de publication :
   - Vague soir  : 19h-21h (groupes étudiants/mamans)
   - Max 2 posts par groupe par jour
 """
+from __future__ import annotations
+
 
 import asyncio
 import json

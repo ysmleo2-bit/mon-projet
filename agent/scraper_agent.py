@@ -10,6 +10,8 @@ Stratégie de collecte :
   - Plaintes récurrentes
   - Témoignages / success stories
 """
+from __future__ import annotations
+
 
 import asyncio
 import json

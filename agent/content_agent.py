@@ -8,6 +8,8 @@ Génère 1 publication Facebook par jour par groupe, personnalisée selon :
 
 Utilise Claude Opus 4.6 avec streaming + adaptive thinking.
 """
+from __future__ import annotations
+
 
 import json
 import os
