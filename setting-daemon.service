@@ -1,0 +1,39 @@
+# Fichier systemd pour maintenir le daemon actif 24/7
+#
+# Installation :
+#   sudo cp setting-daemon.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable setting-daemon
+#   sudo systemctl start setting-daemon
+#
+# Commandes utiles :
+#   sudo systemctl status setting-daemon
+#   sudo journalctl -u setting-daemon -f
+#   sudo systemctl restart setting-daemon
+
+[Unit]
+Description=Setting Daemon 24/7 — Léo Ollivier
+After=network.target graphical-session.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%USER%
+WorkingDirectory=%HOME%/mon-projet
+ExecStart=/usr/bin/python3 %HOME%/mon-projet/daemon.py
+Restart=always
+RestartSec=30
+StandardOutput=append:%HOME%/mon-projet/data/daemon.log
+StandardError=append:%HOME%/mon-projet/data/daemon.log
+
+# Variables d'environnement
+EnvironmentFile=%HOME%/mon-projet/.env
+Environment=DISPLAY=:0
+Environment=PYTHONUNBUFFERED=1
+
+# Redémarrage automatique en cas de crash
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target
