@@ -20,6 +20,9 @@ logs/
 *.log
 agent.log
 
+# Données locales événements Zapier (ne pas versionner)
+data/events_*.json
+
 # OS
 .DS_Store
 Thumbs.db
