@@ -131,6 +131,66 @@ def save_upload_manifest(uploaded: list[dict], path: str = "upload_manifest.json
     print(f"[Manifest] Sauvegardé dans {path}")
 
 
+# ── Upload d'un fichier unique (utilisé par visual_agent) ────────────────────
+
+def upload_single_file(local_path: str, filename: str | None = None) -> dict | None:
+    """
+    Upload un fichier PNG unique vers Drive et retourne son URL publique.
+    Utilisé par visual_agent.py après chaque génération de visuel.
+    """
+    try:
+        creds         = get_credentials()
+        drive_service = build("drive", "v3", credentials=creds)
+
+        name = filename or Path(local_path).name
+        file_metadata = {"name": name, "parents": [DRIVE_FOLDER_ID]}
+        media = MediaFileUpload(local_path, mimetype="image/png", resumable=True)
+
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id,name,webContentLink,webViewLink",
+        ).execute()
+
+        # Rendre public
+        drive_service.permissions().create(
+            fileId=file["id"],
+            body={"type": "anyone", "role": "reader"},
+        ).execute()
+
+        public_url = f"https://drive.google.com/uc?id={file['id']}"
+        view_url   = f"https://drive.google.com/file/d/{file['id']}/view"
+        print(f"  [Drive] ✓ {name} → {view_url}")
+        return {"name": name, "file_id": file["id"], "url": public_url, "view_url": view_url}
+
+    except Exception as e:
+        print(f"  [Drive] ✗ Upload échoué pour {local_path} : {e}")
+        return None
+
+
+# ── Upload d'un dossier entier (visuels générés) ──────────────────────────────
+
+def upload_folder_to_drive(folder_path: str) -> list[dict]:
+    """
+    Upload tous les PNG d'un dossier vers Drive.
+    Retourne la liste des fichiers uploadés avec leurs URLs.
+    """
+    folder = Path(folder_path)
+    png_files = sorted(folder.glob("*.png"))
+    if not png_files:
+        print(f"[Drive] Aucun PNG dans {folder_path}")
+        return []
+
+    print(f"[Drive] Upload de {len(png_files)} visuels…")
+    results = []
+    for png in png_files:
+        result = upload_single_file(str(png))
+        if result:
+            results.append(result)
+        time.sleep(0.5)
+    return results
+
+
 # ── Point d'entrée ────────────────────────────────────────────────────────────
 
 def main():

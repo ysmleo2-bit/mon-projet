@@ -24,6 +24,17 @@ except ImportError:
 
 from agent.content_agent import GeneratedPost
 
+# Upload Drive automatique après génération
+def _try_upload(path: Path) -> str | None:
+    """Upload le visuel vers Drive. Retourne l'URL publique ou None si échec."""
+    try:
+        from upload_drive import upload_single_file
+        result = upload_single_file(str(path))
+        return result.get("view_url") if result else None
+    except Exception as e:
+        print(f"  [Drive] Upload ignoré : {e}")
+        return None
+
 VISUALS_DIR = Path("data/generated_content/visuals")
 VISUALS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -98,6 +109,12 @@ class VisualAgent:
         out_path = VISUALS_DIR / f"{post.group_id}_{date_str}.png"
         img.save(str(out_path), "PNG", optimize=True)
         print(f"  ✓ Visuel sauvegardé : {out_path.name}")
+
+        # Upload automatique vers Google Drive
+        drive_url = _try_upload(out_path)
+        if drive_url:
+            print(f"  ☁  Drive : {drive_url}")
+
         return out_path
 
     # ── Layout: question ─────────────────────────────────────────────────────
