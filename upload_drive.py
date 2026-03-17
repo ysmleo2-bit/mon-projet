@@ -39,7 +39,20 @@ def get_credentials() -> Credentials:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(CREDS_PATH, SCOPES)
-            creds = flow.run_local_server(port=0)
+            try:
+                creds = flow.run_local_server(port=0)
+            except Exception:
+                # Serveur sans navigateur : afficher l'URL manuellement
+                auth_url, _ = flow.authorization_url(prompt="consent")
+                print("\n" + "="*60)
+                print("AUTHENTIFICATION GOOGLE REQUISE")
+                print("="*60)
+                print("Ouvre cette URL dans ton navigateur :\n")
+                print(auth_url)
+                print("\n" + "="*60)
+                code = input("Colle le code d'autorisation ici : ").strip()
+                flow.fetch_token(code=code)
+                creds = flow.credentials
         with open(TOKEN_PATH, "w") as f:
             f.write(creds.to_json())
     return creds
