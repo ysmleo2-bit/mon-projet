@@ -1,0 +1,29 @@
+# Secrets — JAMAIS dans git
+.env
+.env.local
+.env.production
+credentials.json
+*.pem
+*.key
+service_account*.json
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Logs
+logs/
+*.log
+agent.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

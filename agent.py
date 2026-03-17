@@ -41,15 +41,15 @@ logger = logging.getLogger(__name__)
 
 
 def load_config() -> dict:
-    required = {
+    # Variables Telegram — obligatoires
+    required_telegram = {
         "TELEGRAM_BOT_TOKEN": "Token du bot Telegram (obtenu via @BotFather)",
-        "TELEGRAM_CHAT_ID": "Ton Chat ID Telegram",
-        "ICLOSED_API_KEY": "Clé API iClosed",
+        "TELEGRAM_CHAT_ID": "Ton Chat ID Telegram (envoie /start à @userinfobot)",
     }
     config = {}
     missing = []
 
-    for key, description in required.items():
+    for key, description in required_telegram.items():
         val = os.getenv(key)
         if not val:
             missing.append(f"  {key}  →  {description}")
@@ -62,7 +62,28 @@ def load_config() -> dict:
         logger.error("Copie .env.example vers .env et remplis les valeurs.")
         sys.exit(1)
 
+    # Source de données — au moins une doit être configurée
+    sheets_id = os.getenv("GOOGLE_SHEETS_ID", "")
+    creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
+    iclosed_key = os.getenv("ICLOSED_API_KEY", "")
+
+    has_sheets = bool(sheets_id and os.path.exists(creds_path))
+    has_api = bool(iclosed_key)
+
+    if not has_sheets and not has_api:
+        logger.warning(
+            "ATTENTION : Aucune source de données configurée !\n"
+            "  Option A (recommandée) : Configurer GOOGLE_SHEETS_ID + credentials.json\n"
+            "  Option B : Configurer ICLOSED_API_KEY\n"
+            "Le bot démarrera mais les récaps seront vides."
+        )
+    elif has_sheets:
+        logger.info(f"Source de données : Google Sheets (ID: {sheets_id[:8]}...)")
+    else:
+        logger.info("Source de données : API REST iClosed")
+
     config.update({
+        "ICLOSED_API_KEY": iclosed_key or None,
         "ICLOSED_BASE_URL": os.getenv("ICLOSED_BASE_URL", "https://api.iclosed.io/v1"),
         "RECAP_HOUR": int(os.getenv("RECAP_HOUR", "9")),
         "RECAP_MINUTE": int(os.getenv("RECAP_MINUTE", "0")),

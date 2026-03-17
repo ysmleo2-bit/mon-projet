@@ -1,8 +1,10 @@
 """
-Client pour l'API iClosed.
-Récupère les métriques de vente : prospects, calls bookés, shows, no-shows, disqualifiés.
+Client de données iClosed.
+Source primaire : Google Sheets (alimenté par Zapier depuis iClosed).
+Source secondaire (optionnelle) : API REST iClosed si ICLOSED_API_KEY est fourni.
 """
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 import requests
@@ -11,17 +13,40 @@ logger = logging.getLogger(__name__)
 
 
 class IClosedClient:
-    def __init__(self, api_key: str, base_url: str = "https://api.iclosed.io/v1"):
+    def __init__(self, api_key: str = None, base_url: str = "https://api.iclosed.io/v1"):
         self.api_key = api_key
-        self.base_url = base_url.rstrip("/")
-        self.session = requests.Session()
-        self.session.headers.update({
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        })
+        self.base_url = base_url.rstrip("/") if base_url else "https://api.iclosed.io/v1"
+        self._sheets_client = None
+
+        if api_key:
+            self.session = requests.Session()
+            self.session.headers.update({
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            })
+        else:
+            self.session = None
+
+        # Google Sheets est disponible si les variables sont configurées
+        sheets_id = os.getenv("GOOGLE_SHEETS_ID", "")
+        creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
+        if sheets_id and os.path.exists(creds_path):
+            try:
+                from sheets import SheetsClient
+                self._sheets_client = SheetsClient()
+                logger.info("Source de données : Google Sheets (Zapier)")
+            except ImportError:
+                logger.warning("gspread non disponible — pip install gspread")
+        elif not api_key:
+            logger.warning(
+                "Aucune source de données configurée. "
+                "Fournir GOOGLE_SHEETS_ID + credentials.json OU ICLOSED_API_KEY dans .env"
+            )
 
     def _get(self, endpoint: str, params: dict = None) -> dict:
+        if not self.session:
+            raise RuntimeError("API REST iClosed non configurée (ICLOSED_API_KEY manquant)")
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         try:
             resp = self.session.get(url, params=params, timeout=15)
@@ -47,16 +72,31 @@ class IClosedClient:
     def get_stats_for_date(self, date: str) -> dict:
         """
         Récupère toutes les métriques pour une date donnée (format YYYY-MM-DD).
-        Retourne un dict normalisé avec les métriques clés.
+        Priorité : Google Sheets → API REST iClosed
         """
-        try:
-            # Endpoint principal des statistiques
-            raw = self._get("stats", params={"date": date})
-            return self._normalize_stats(raw, date)
-        except Exception:
-            # Fallback : construction manuelle depuis les endpoints individuels
-            logger.warning("Fallback sur les endpoints individuels")
-            return self._build_stats_manually(date)
+        # Priorité 1 : Google Sheets (source Zapier)
+        if self._sheets_client:
+            try:
+                stats = self._sheets_client.get_stats_for_date(date)
+                logger.info(f"Stats récupérées depuis Google Sheets pour {date}")
+                return stats
+            except Exception as e:
+                logger.warning(f"Erreur Google Sheets, tentative API REST: {e}")
+
+        # Priorité 2 : API REST iClosed (si clé disponible)
+        if self.api_key:
+            try:
+                raw = self._get("stats", params={"date": date})
+                return self._normalize_stats(raw, date)
+            except Exception:
+                logger.warning("Fallback sur les endpoints individuels")
+                return self._build_stats_manually(date)
+
+        # Aucune source disponible
+        raise RuntimeError(
+            "Aucune source de données disponible. "
+            "Vérifier GOOGLE_SHEETS_ID + credentials.json dans .env"
+        )
 
     def _normalize_stats(self, raw: dict, date: str) -> dict:
         """Normalise la réponse de l'API en format standard."""
@@ -142,6 +182,17 @@ class IClosedClient:
         """Récupère les stats par membre de l'équipe (closers/setters)."""
         if date is None:
             date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+        # Si Google Sheets disponible, le breakdown est déjà dans get_stats_for_date
+        if self._sheets_client:
+            try:
+                stats = self._sheets_client.get_stats_for_date(date)
+                return stats.get("team", [])
+            except Exception as e:
+                logger.warning(f"Stats équipe Google Sheets indisponibles: {e}")
+                return []
+
+        # Fallback API REST
         try:
             data = self._get("team/stats", params={"date": date})
             return data.get("data", data.get("team", []))
