@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Reconversion Professionnelle France",
+    "id": "476524732394498",
+    "category": "reconversion",
+    "description": "Adultes en reconversion, 25-45 ans, cherchent nouvelle voie"
+  },
+  {
+    "name": "Emploi Job Paris",
+    "id": "1214796296071016",
+    "category": "emploi",
+    "description": "Chercheurs d'emploi actifs, toutes catégories, Île-de-France"
+  },
+  {
+    "name": "Entrepreneurs Freelances France",
+    "id": "entrepreneursfreelancesfr",
+    "category": "freelance",
+    "description": "Freelances, indépendants, micro-entrepreneurs"
+  },
+  {
+    "name": "Étudiants Job Étudiant",
+    "id": "etudiantsjobetudiant",
+    "category": "etudiant",
+    "description": "Étudiants cherchant petit boulot ou revenu complémentaire"
+  },
+  {
+    "name": "Trouver un Emploi - Offres & Conseils",
+    "id": "trouveremploi.france",
+    "category": "emploi",
+    "description": "Chercheurs d'emploi en CDI, CDD, intérim"
+  },
+  {
+    "name": "Chômage & Reconversion - Entraide",
+    "id": "chomagerecoversionentraide",
+    "category": "reconversion",
+    "description": "Personnes au chômage cherchant issue, soutien mutuel"
+  },
+  {
+    "name": "Revenus Complémentaires - Idées & Astuces",
+    "id": "revenuscomplementaires.france",
+    "category": "revenus",
+    "description": "Recherche de complément de revenu, side hustle"
+  },
+  {
+    "name": "Travailler de chez soi - Télétravailleurs",
+    "id": "travaillerdechez-soi",
+    "category": "teletravail",
+    "description": "Personnes voulant travailler depuis chez soi, remote"
+  },
+  {
+    "name": "Jobbing & Missions Freelance",
+    "id": "jobbingmissionsfreelance",
+    "category": "freelance",
+    "description": "Missions ponctuelles, microentrepreneurs, freelances débutants"
+  },
+  {
+    "name": "Mamans Entrepreneures",
+    "id": "mamansentrepreneursfr",
+    "category": "maman",
+    "description": "Mamans souhaitant créer revenus tout en s'occupant des enfants"
+  }
+]
