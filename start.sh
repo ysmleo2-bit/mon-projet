@@ -23,7 +23,8 @@ fi
 
 # Vérifie les dépendances Python
 echo -e "📦 Vérification des dépendances..."
-pip install -r requirements.txt -q
+PIP=$(command -v pip3 || command -v pip)
+$PIP install -r requirements.txt -q
 
 # Vérifie ngrok
 if ! command -v ngrok &> /dev/null; then
@@ -98,7 +99,8 @@ echo -e "🤖 Démarrage de l'agent..."
 echo ""
 
 # Démarre l'agent (prend le dessus sur le terminal)
-python agent.py
+PYTHON=$(command -v python3 || command -v python)
+$PYTHON agent.py
 
 # Nettoyage à l'arrêt
 kill $NGROK_PID 2>/dev/null
