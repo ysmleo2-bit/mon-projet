@@ -2,6 +2,7 @@
 Upload les 25 PNG depuis VISUELS_DIR vers le dossier Google Drive,
 puis met à jour l'onglet VISUELS du Sheet avec les URLs =IMAGE().
 """
+from __future__ import annotations
 
 import os
 import json
