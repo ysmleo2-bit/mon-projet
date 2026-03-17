@@ -1,0 +1,114 @@
+{
+  "market": "French B2C - Coaching & Formations en ligne",
+  "target_country": "FR",
+  "analysis_date": "2026-03-17",
+  "competitors": [
+    {
+      "name": "Théo Rossi",
+      "facebook_page": "theorossicoach",
+      "search_terms": ["Théo Rossi", "Theo Rossi coaching", "Theo Rossi formation"],
+      "niche": "Coaching Business / Mindset",
+      "tier": 1,
+      "estimated_monthly_spend": "50k-150k€",
+      "notes": "Référence principale - gros spender Meta Ads FR"
+    },
+    {
+      "name": "Antoine BM",
+      "facebook_page": "antoinebusinessmentor",
+      "search_terms": ["Antoine BM", "Antoine Business Mentor", "Antoine BM formation"],
+      "niche": "Coaching Entrepreneuriat / Business",
+      "tier": 1,
+      "estimated_monthly_spend": "50k-200k€",
+      "notes": "Un des plus gros spenders FR sur Meta - VSL + webinaire"
+    },
+    {
+      "name": "Yomi Denzel",
+      "facebook_page": "yomidenzel",
+      "search_terms": ["Yomi Denzel", "Yomi Denzel e-commerce", "Yomi Denzel formation"],
+      "niche": "E-commerce / Dropshipping / Liberté financière",
+      "tier": 1,
+      "estimated_monthly_spend": "30k-100k€",
+      "notes": "Fort sur vidéo, personal branding + formation"
+    },
+    {
+      "name": "Sébastien Night",
+      "facebook_page": "sebastiennight",
+      "search_terms": ["Sébastien Night", "Sebastien Night", "blog profit"],
+      "niche": "Blogging / Affiliation / Revenus passifs",
+      "tier": 1,
+      "estimated_monthly_spend": "20k-80k€",
+      "notes": "Pionnier du blogging FR, fort retargeting"
+    },
+    {
+      "name": "Maxence Rigottier",
+      "facebook_page": "maxencerigottier",
+      "search_terms": ["Maxence Rigottier", "maxence rigottier formation", "investissement bourse"],
+      "niche": "Bourse / Trading / Entrepreneuriat digital",
+      "tier": 1,
+      "estimated_monthly_spend": "20k-70k€",
+      "notes": "Multi-produits, fort sur la bourse et l'entrepreneuriat"
+    },
+    {
+      "name": "Kevin Anselme",
+      "facebook_page": "kevinanselme",
+      "search_terms": ["Kevin Anselme", "Kevin Anselme e-commerce", "formation dropshipping"],
+      "niche": "E-commerce / Dropshipping",
+      "tier": 1,
+      "estimated_monthly_spend": "20k-60k€",
+      "notes": "Spécialiste e-commerce FR, fort sur Meta"
+    },
+    {
+      "name": "Enzo Honoré",
+      "facebook_page": "enzohonore",
+      "search_terms": ["Enzo Honoré", "Enzo Honore", "copywriting formation", "enzo honore marketing"],
+      "niche": "Copywriting / Marketing Digital",
+      "tier": 2,
+      "estimated_monthly_spend": "10k-40k€",
+      "notes": "Leader copywriting FR, bonne pédagogie"
+    },
+    {
+      "name": "Franck Nicolas",
+      "facebook_page": "francknicolas",
+      "search_terms": ["Franck Nicolas", "Franck Nicolas coach", "développement personnel formation"],
+      "niche": "Développement personnel / Leadership",
+      "tier": 2,
+      "estimated_monthly_spend": "10k-40k€",
+      "notes": "Développement personnel, forte audience"
+    },
+    {
+      "name": "Jonathan Solaris",
+      "facebook_page": "jonathansolaris",
+      "search_terms": ["Jonathan Solaris", "Jonathan Solaris formation", "liberté financière"],
+      "niche": "Liberté financière / Business en ligne",
+      "tier": 2,
+      "estimated_monthly_spend": "10k-35k€",
+      "notes": "Lifestyle + business, fort engagement organique + paid"
+    },
+    {
+      "name": "Romuald Fons",
+      "facebook_page": "romualdfons",
+      "search_terms": ["Romuald Fons", "SEO formation", "Romuald Fons marketing"],
+      "niche": "SEO / Marketing Digital",
+      "tier": 2,
+      "estimated_monthly_spend": "5k-25k€",
+      "notes": "Expert SEO FR, bon rapport contenu/pubs"
+    }
+  ],
+  "funnel_stages": [
+    "Awareness (Notoriété)",
+    "Interest (Contenu Valeur / Lead Magnet)",
+    "Consideration (VSL / Webinaire / Challenge)",
+    "Intent (Page de vente / Appel stratégique)",
+    "Conversion (Achat / Upsell)"
+  ],
+  "ad_formats_to_track": [
+    "Video ads (VSL)",
+    "Carousel",
+    "Image statique",
+    "Témoignages",
+    "Avant/Après",
+    "Personal branding",
+    "Lead magnet",
+    "Webinaire / Challenge"
+  ]
+}

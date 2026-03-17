@@ -1,0 +1,350 @@
+{
+  "Théo Rossi": {
+    "competitor_name": "Théo Rossi",
+    "niche": "Coaching Business / Mindset / Liberté Financière",
+    "estimated_tier": "Gros spender (50k-150k€/mois)",
+    "funnel_structure": [
+      "1. Facebook/Instagram Ads — Vidéo courte 15-30s (hook fort sur la douleur/résultat)",
+      "2. Landing page VSL (vidéo 20-45min) — promesse de transformation radicale",
+      "3. Formulaire de candidature (filtre par engagement)",
+      "4. Appel stratégique 1-to-1 (closing téléphonique)",
+      "5. Programme haut de gamme 2000-10000€ (coaching individuel ou groupe mastermind)"
+    ],
+    "funnel_complexity": "sophistiqué",
+    "main_offer": "Programme coaching premium / mastermind — accès à une méthode de business scalable",
+    "price_point": "2000€+",
+    "offer_type": "coaching",
+    "dominant_angles": [
+      "La liberté vs l'esclavage salarial — 'Tu mérites mieux que ton job à 2000€/mois'",
+      "La preuve sociale par les résultats élèves — screenshots revenus, témoignages vidéo",
+      "L'identité — 'Les gens qui réussissent ne font pas X, ils font Y'"
+    ],
+    "copy_style": "direct response + storytelling personnel",
+    "emotional_triggers": [
+      "Peur de rater l'opportunité (FOMO)",
+      "Honte de ne pas encore avoir réussi",
+      "Désir de liberté géographique et financière",
+      "Appartenance à une élite / tribu de winners",
+      "Frustration vis-à-vis du système salarial"
+    ],
+    "dominant_formats": [
+      "Vidéo personnelle face caméra (talking head) — 80% du spend",
+      "Témoignages clients (écrans résultats, vidéos courtes)",
+      "Stories Instagram avec swipe-up vers VSL"
+    ],
+    "video_length_estimate": "court <30s pour awareness, long VSL 20-45min pour conversion",
+    "production_quality": "semi-pro (tournage soigné mais garde l'authenticité, pas de studio glacial)",
+    "ad_volume_estimate": "fort 50+ pubs actives (test A/B constant de hooks)",
+    "spend_estimate": "50 000 - 150 000€/mois estimé (Meta Ads FR)",
+    "frequency_hypothesis": "test A/B constant sur hooks + audiences, evergreen sur VSL centrale",
+    "strengths": [
+      "Personal branding fort — sa gueule = la marque",
+      "VSL très bien optimisée avec preuves sociales nombreuses",
+      "Funnel verticalement intégré (awareness → closing call en 3 jours max)",
+      "Ciblage audiences similaires très affiné",
+      "Réactivation base email/Messenger agressive"
+    ],
+    "weaknesses": [
+      "Dépendance totale à sa personne (non scalable sans lui)",
+      "Angles très saturés sur le marché FR (tout le monde fait 'liberté financière')",
+      "Peu de contenu organique — très paid-only",
+      "Audience vieillissante si pas de renouvellement"
+    ],
+    "opportunities_for_leo": [
+      "Différenciation par une niche plus spécifique (ex: reconversion pro, pas juste 'liberté')",
+      "Approche plus organique/communauté en complément des pubs",
+      "Prix point intermédiaire (500-2000€) pour tester avant d'aller en high ticket",
+      "Format challenge 5-7 jours comme étape intermédiaire funnel (moins cher que direct VSL)"
+    ],
+    "best_ads_summary": [
+      "Hook vidéo: 'Si tu gagnes moins de 5000€/mois, cette vidéo va changer ta vie' → cut to lifestyle + résultats élèves",
+      "Témoignage élève: 'En 3 mois j'ai quitté mon CDI et je gagne 8000€/mois' → appel à l'action vers formulaire",
+      "Pattern interrupt: 'Je suis désolé de te dire ça mais...' suivi de vérité inconfortable sur le travail salarié"
+    ]
+  },
+  "Antoine BM": {
+    "competitor_name": "Antoine BM",
+    "niche": "Coaching Entrepreneuriat / Business en ligne",
+    "estimated_tier": "Gros spender (50k-200k€/mois)",
+    "funnel_structure": [
+      "1. Ads vidéo face caméra — ton cash et direct, hook chiffre ou contre-pied",
+      "2. Page de vente directe OU webinaire automatisé (selon produit)",
+      "3. Formation mid-ticket (297-997€) OU programme high ticket via appel",
+      "4. Upsell mastermind / accompagnement premium",
+      "5. Backend email + communauté Discord/Telegram privée"
+    ],
+    "funnel_complexity": "sophistiqué",
+    "main_offer": "Formation business en ligne + accompagnement (plusieurs offres: formation seule, coaching groupe, mastermind)",
+    "price_point": "500-2000€ (formation) + 2000€+ (accompagnement)",
+    "offer_type": "formation + coaching",
+    "dominant_angles": [
+      "La vérité cash que personne ne te dit — 'Le dropshipping c'est mort, voilà ce qui marche vraiment'",
+      "Le chiffre d'affaires shocking comme preuve — screenshots CA mensuel",
+      "L'anti-gourou — 'Je suis pas un formateur, je suis entrepreneur qui partage'"
+    ],
+    "copy_style": "direct response agressif + autorité par les chiffres",
+    "emotional_triggers": [
+      "Méfiance envers les gourous (il joue dessus paradoxalement)",
+      "Désir de résultats concrets et rapides",
+      "Appartenance au groupe des 'vrais' entrepreneurs",
+      "Peur de perdre du temps avec de mauvaises formations"
+    ],
+    "dominant_formats": [
+      "Vidéo face caméra brute (iPhone ou semi-pro) — authenticité revendiquée",
+      "Carrousels de screenshots revenus/résultats",
+      "Reels courts avec texte accrocheur en overlay"
+    ],
+    "video_length_estimate": "court 15-60s pour awareness, webinaire 45-90min pour conversion",
+    "production_quality": "DIY/authentique (posture anti-prod pour contraster avec les 'faux gurus')",
+    "ad_volume_estimate": "fort 50+ pubs actives",
+    "spend_estimate": "50 000 - 200 000€/mois estimé",
+    "frequency_hypothesis": "test A/B constant, burst sur lancement de nouvelles offres",
+    "strengths": [
+      "Autorité par la preuve (chiffres réels publiés régulièrement)",
+      "Ton cash et authentique très différenciant",
+      "Multi-produits: capte tous les budgets",
+      "Fort organique + paid = coût acquisition réduit",
+      "Communauté engagée qui fait de la recommandation"
+    ],
+    "weaknesses": [
+      "Controverses régulières (image clivante)",
+      "Promesses parfois perçues comme excessives",
+      "Marché dropshipping en saturation — pivot nécessaire"
+    ],
+    "opportunities_for_leo": [
+      "Le positionnement 'anti-bullshit avec preuves' est réplicable sur d'autres niches",
+      "Multi-offres dès le départ pour capturer différents segments de budget",
+      "Construire une communauté (Discord/Telegram) pour réduire le coût d'acquisition long terme"
+    ],
+    "best_ads_summary": [
+      "Hook chiffre: 'J'ai fait 47 000€ en avril avec cette méthode' — direct sans fioritures, écran revenus visible",
+      "Contre-pied: 'Arrête de vendre des formations sur le dropshipping' — crédibilité par contre-intuition",
+      "Preuves sociales massives: carousel avec 10 témoignages clients chiffrés"
+    ]
+  },
+  "Yomi Denzel": {
+    "competitor_name": "Yomi Denzel",
+    "niche": "E-commerce / Investissement / Liberté Financière",
+    "estimated_tier": "Gros spender (30k-100k€/mois)",
+    "funnel_structure": [
+      "1. Ads vidéo lifestyle (voiture, voyages, résultats) — fort aspirationnel",
+      "2. Lead magnet gratuit (ebook, mini-formation) → email list",
+      "3. Séquence email nurturing 7-14 jours",
+      "4. Webinaire automatisé ou page de vente directe",
+      "5. Formation e-commerce (297-997€) + upsell coaching groupe"
+    ],
+    "funnel_complexity": "intermédiaire",
+    "main_offer": "Formation e-commerce / dropshipping + investissement",
+    "price_point": "100-500€ (formation) + 500-2000€ (coaching)",
+    "offer_type": "formation",
+    "dominant_angles": [
+      "Lifestyle aspirationnel — la vie de rêve accessible",
+      "Jeune âge + succès = preuve que c'est possible pour tous",
+      "Chiffres et résultats concrets comme argument central"
+    ],
+    "copy_style": "storytelling personnel + aspiration lifestyle",
+    "emotional_triggers": [
+      "Envie du lifestyle montré (voyages, voitures, liberté d'horaires)",
+      "Identification au personnage (jeune, normal au départ)",
+      "FOMO sur l'opportunité e-commerce",
+      "Désir d'indépendance financière"
+    ],
+    "dominant_formats": [
+      "Vidéo lifestyle (extérieur, voyages) — très aspirationnel",
+      "Témoignages étudiants (résultats chiffrés)",
+      "Reels courts sur Instagram + Facebook Ads"
+    ],
+    "video_length_estimate": "court <60s pour awareness, moyen 3-10min pour nurturing",
+    "production_quality": "semi-pro (bonne qualité mais accessible)",
+    "ad_volume_estimate": "moyen 20-50 pubs actives",
+    "spend_estimate": "30 000 - 100 000€/mois estimé",
+    "frequency_hypothesis": "evergreen stable avec burst sur les lancements",
+    "strengths": [
+      "Personal branding lifestyle très fort et cohérent",
+      "Audience jeune (18-30 ans) très réceptive",
+      "Lead magnet gratuit réduit le coût d'acquisition"
+    ],
+    "weaknesses": [
+      "Très dépendant du marché e-commerce qui évolue vite",
+      "Lifestyle aspirationnel de plus en plus banalisé",
+      "Prix point bas = volume nécessaire élevé"
+    ],
+    "opportunities_for_leo": [
+      "Le lead magnet gratuit pour construire une liste email avant de vendre est sous-utilisé",
+      "Le storytelling personnel (before/after) reste très efficace sur le marché FR"
+    ],
+    "best_ads_summary": [
+      "Vidéo vlog: 'Ma semaine à Dubaï pendant que mon shop tourne tout seul' — lifestyle + business automation",
+      "Témoignage: 'A 22 ans j'ai quitté mon BTS pour l'e-commerce, voilà mes résultats après 6 mois'",
+      "Pattern: chiffres shocking en texte overlay sur vidéo lifestyle ('+12 000€ ce mois-ci')"
+    ]
+  },
+  "Sébastien Night": {
+    "competitor_name": "Sébastien Night",
+    "niche": "Blogging / Affiliation / Revenus Passifs",
+    "estimated_tier": "Gros spender (20k-80k€/mois)",
+    "funnel_structure": [
+      "1. Contenu organique (blog, YouTube) + retargeting Ads sur visiteurs chauds",
+      "2. Lead magnet très spécifique (guide 'Comment gagner X€ avec un blog')",
+      "3. Séquence email longue (14-30 jours) — nurturing éducatif",
+      "4. Webinaire ou page de vente de formation",
+      "5. Formation blogging/affiliation (197-597€) + upsell coaching groupe annuel"
+    ],
+    "funnel_complexity": "sophistiqué",
+    "main_offer": "Formation blogging & affiliation — créer des revenus passifs avec un blog",
+    "price_point": "100-500€",
+    "offer_type": "formation",
+    "dominant_angles": [
+      "Revenus passifs pendant le sommeil — la promesse du blog qui tourne sans toi",
+      "Pionnier crédible — 'Je le fais depuis 2010, voilà ce qui marche vraiment'",
+      "Liberté de temps vs liberté d'argent — pas besoin de vendre son temps"
+    ],
+    "copy_style": "éducatif + autorité experte + preuve par la durée",
+    "emotional_triggers": [
+      "Désir de revenus passifs (ne plus vendre son temps)",
+      "Confiance dans l'expérience longue durée",
+      "Peur de créer quelque chose de voué à l'échec"
+    ],
+    "dominant_formats": [
+      "Vidéo éducative face caméra (qualité propre mais pas Hollywood)",
+      "Image statique avec chiffres revenus passifs",
+      "Retargeting sur audience vidéo chaude (YouTube viewers)"
+    ],
+    "video_length_estimate": "moyen 3-10min pour ads éducatives",
+    "production_quality": "semi-pro (bureau propre, qualité correcte)",
+    "ad_volume_estimate": "moyen 20-40 pubs actives",
+    "spend_estimate": "20 000 - 80 000€/mois estimé",
+    "frequency_hypothesis": "evergreen stable (business model mature)",
+    "strengths": [
+      "Autorité construite sur 15+ ans impossible à répliquer rapidement",
+      "Organique très fort (SEO) = coût acquisition paid réduit",
+      "Séquence email très mature et bien rodée"
+    ],
+    "weaknesses": [
+      "Marché blogging perçu comme en déclin par certains",
+      "Cible plutôt 30-50 ans — moins visible sur Meta jeune audience",
+      "Prix point bas impose un gros volume de ventes"
+    ],
+    "opportunities_for_leo": [
+      "Le retargeting sur audience chaude (video views) est une gold mine sous-exploitée",
+      "La séquence email longue de nurturing avant vente augmente fortement le taux de conversion"
+    ],
+    "best_ads_summary": [
+      "Vidéo éducative: 'Comment mon blog génère 8 000€/mois de revenus passifs sans que je travaille' — démonstration backstage Stripe",
+      "Lead magnet: 'Télécharge le guide gratuit : 7 étapes pour créer un blog qui rapporte'",
+      "Retargeting: 'Tu as regardé ma vidéo sur le blogging — voilà comment aller plus loin avec ma formation'"
+    ]
+  },
+  "Maxence Rigottier": {
+    "competitor_name": "Maxence Rigottier",
+    "niche": "Bourse / Trading / Entrepreneuriat Digital",
+    "estimated_tier": "Gros spender (20k-70k€/mois)",
+    "funnel_structure": [
+      "1. Ads vidéo éducative — 'Comment j'investis en bourse / comment créer mon business'",
+      "2. Lead magnet ou formation gratuite d'entrée",
+      "3. Email nurturing ou retargeting",
+      "4. Formation payante (97-497€) — plusieurs thématiques (bourse, business, mental)",
+      "5. Mastermind annuel high ticket"
+    ],
+    "funnel_complexity": "intermédiaire",
+    "main_offer": "Formation bourse/investissement + entrepreneuriat digital",
+    "price_point": "100-500€ (catalogue) + 2000€+ (mastermind)",
+    "offer_type": "formation",
+    "dominant_angles": [
+      "L'investissement accessible à tous — 'Tu n'as pas besoin d'être riche pour investir'",
+      "Indépendance totale — business + bourse = liberté maximale",
+      "Multi-revenus — diversifier ses sources de revenus"
+    ],
+    "copy_style": "éducatif + aspiration + preuve personnelle",
+    "emotional_triggers": [
+      "Peur de l'inflation et de perdre son argent",
+      "Désir d'indépendance financière",
+      "Sentiment que les autres savent des choses que tu ignores"
+    ],
+    "dominant_formats": [
+      "Vidéo face caméra éducative",
+      "Image avec chiffres et stats",
+      "Témoignages étudiants"
+    ],
+    "video_length_estimate": "moyen 2-8min",
+    "production_quality": "semi-pro",
+    "ad_volume_estimate": "moyen 20-40 pubs actives",
+    "spend_estimate": "20 000 - 70 000€/mois estimé",
+    "frequency_hypothesis": "evergreen stable avec pointe sur les périodes de marché volatil",
+    "strengths": [
+      "Deux marchés (bourse + business) = double audience potentielle",
+      "Crédibilité construite depuis 10+ ans",
+      "Catalogue de formations = revenu récurrent diversifié"
+    ],
+    "weaknesses": [
+      "Moins clivant que Antoine BM ou Yomi — manque de tranchant",
+      "Bourse = audience plus âgée, moins présente sur Meta",
+      "Identité de marque moins forte que les nouveaux entrants"
+    ],
+    "opportunities_for_leo": [
+      "Le multi-produits avec différents prix points permet de capter toute la pyramide d'acheteurs",
+      "Combiner business + investissement élargit l'audience"
+    ],
+    "best_ads_summary": [
+      "Vidéo éducative: 'Les 3 erreurs que font 90% des débutants en bourse (et comment les éviter)' → optin lead magnet",
+      "Aspiration: 'Comment je manage mes investissements en voyageant 6 mois par an'",
+      "Témoignages: compilation de résultats d'étudiants avec chiffres"
+    ]
+  },
+  "Kevin Anselme": {
+    "competitor_name": "Kevin Anselme",
+    "niche": "E-commerce / Dropshipping / Business en ligne",
+    "estimated_tier": "Gros spender (20k-60k€/mois)",
+    "funnel_structure": [
+      "1. Ads vidéo face caméra — résultats e-commerce chiffrés comme hook",
+      "2. Page de vente directe OU VSL courte (10-15min)",
+      "3. Formation e-commerce (297-797€)",
+      "4. Accompagnement coaching groupe mensuel (upsell)",
+      "5. Communauté privée Discord"
+    ],
+    "funnel_complexity": "intermédiaire",
+    "main_offer": "Formation e-commerce dropshipping + accompagnement",
+    "price_point": "100-500€",
+    "offer_type": "formation",
+    "dominant_angles": [
+      "Les résultats avant/après concrets (CA mensuel screenshots)",
+      "La méthode pas à pas — accessible même sans expérience",
+      "L'accompagnement communautaire — pas tout seul dans l'aventure"
+    ],
+    "copy_style": "direct response + preuve sociale chiffrée",
+    "emotional_triggers": [
+      "Désir de revenus complémentaires rapidement",
+      "Peur de se lancer seul sans méthode",
+      "Envie d'un business qui tourne sans bureau"
+    ],
+    "dominant_formats": [
+      "Vidéo face caméra avec écrans de résultats",
+      "Témoignages étudiants",
+      "Image statique avec chiffres impact"
+    ],
+    "video_length_estimate": "court 30s-2min pour awareness",
+    "production_quality": "DIY/authentique",
+    "ad_volume_estimate": "moyen 15-35 pubs actives",
+    "spend_estimate": "20 000 - 60 000€/mois estimé",
+    "frequency_hypothesis": "evergreen avec test A/B sur les hooks",
+    "strengths": [
+      "Clarté du message — une niche, une méthode",
+      "Communauté forte (réduction du churn)",
+      "Prix accessible = faible barrière à l'entrée"
+    ],
+    "weaknesses": [
+      "Marché dropshipping très saturé",
+      "Peu de différenciation vs concurrents directs nombreux",
+      "Prix bas = marges serrées sur le paid"
+    ],
+    "opportunities_for_leo": [
+      "La communauté privée comme différenciateur est sous-exploitée par beaucoup",
+      "Prix accessible + upsell coaching = bon modèle pour démarrer"
+    ],
+    "best_ads_summary": [
+      "Hook résultat: 'J'ai fait 23 000€ de CA en mars avec mon shop dropshipping — voilà exactement comment'",
+      "Témoignage: 'J'étais serveur, maintenant mon shop génère 5000€/mois de bénéfice net'",
+      "Méthode: 'Les 5 étapes pour lancer un shop dropshipping rentable en 30 jours'"
+    ]
+  }
+}
