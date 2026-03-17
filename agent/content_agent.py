@@ -175,7 +175,6 @@ Format qui fonctionne : {profile.best_post_format}
             for text in stream.text_stream:
                 full_response += text
                 print(text, end="", flush=True)
-            final_msg = stream.get_final_message()
 
         print()  # newline après le streaming
 

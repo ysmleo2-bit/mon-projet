@@ -34,6 +34,7 @@ load_dotenv()
 # ── Logging ───────────────────────────────────────────────────────────────────
 
 Path("data").mkdir(exist_ok=True)
+Path("data/weekly_reports").mkdir(exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",

@@ -31,7 +31,7 @@ def _try_upload(path: Path) -> str | None:
         from upload_drive import upload_single_file
         result = upload_single_file(str(path))
         return result.get("view_url") if result else None
-    except Exception as e:
+    except BaseException as e:
         print(f"  [Drive] Upload ignoré : {e}")
         return None
 
@@ -105,7 +105,7 @@ class VisualAgent:
         method = getattr(self, f"_layout_{layout}", self._layout_question)
         img    = method(post)
 
-        date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        date_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         out_path = VISUALS_DIR / f"{post.group_id}_{date_str}.png"
         img.save(str(out_path), "PNG", optimize=True)
         print(f"  ✓ Visuel sauvegardé : {out_path.name}")
