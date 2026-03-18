@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from datetime import datetime, date
 from pathlib import Path
 from pydantic import BaseModel
@@ -166,17 +167,36 @@ Format qui fonctionne : {profile.best_post_format}
 
         prompt = self._build_content_prompt(profile, dea, angle, day_offset)
 
-        # Streaming pour éviter les timeouts sur les réponses longues
+        # Streaming avec retry sur surcharge (529)
+        FALLBACK_MODEL = "claude-sonnet-4-6"
         full_response = ""
-        with self.client.messages.stream(
-            model=MODEL,
-            max_tokens=4000,
-            thinking={"type": "adaptive"},
-            messages=[{"role": "user", "content": prompt}],
-        ) as stream:
-            for text in stream.text_stream:
-                full_response += text
-                print(text, end="", flush=True)
+        last_err = None
+        for attempt, model_to_use in enumerate([MODEL, FALLBACK_MODEL, FALLBACK_MODEL]):
+            try:
+                if attempt > 0:
+                    wait = 5 * attempt
+                    print(f"\n  [Retry {attempt}] Attente {wait}s (modèle: {model_to_use})…")
+                    time.sleep(wait)
+                full_response = ""
+                with self.client.messages.stream(
+                    model=model_to_use,
+                    max_tokens=4000,
+                    thinking={"type": "adaptive"},
+                    messages=[{"role": "user", "content": prompt}],
+                ) as stream:
+                    for text in stream.text_stream:
+                        full_response += text
+                        print(text, end="", flush=True)
+                break  # succès
+            except anthropic.APIStatusError as e:
+                last_err = e
+                body = getattr(e, 'body', {}) or {}
+                err_type = body.get('error', {}).get('type', '') if isinstance(body, dict) else ''
+                if e.status_code == 529 or err_type == 'overloaded_error':
+                    continue
+                raise
+        else:
+            raise last_err
 
         print()  # newline après le streaming
 
@@ -196,11 +216,28 @@ Retourne UNIQUEMENT un JSON valide avec ces champs :
   "visual_brief": "description de l'image recommandée en 1 phrase"
 }}"""
 
-        struct_response = self.client.messages.create(
-            model=MODEL,
-            max_tokens=2000,
-            messages=[{"role": "user", "content": structure_prompt}],
-        )
+        struct_response = None
+        last_err = None
+        for attempt, model_to_use in enumerate([MODEL, FALLBACK_MODEL, FALLBACK_MODEL]):
+            try:
+                if attempt > 0:
+                    wait = 5 * attempt
+                    time.sleep(wait)
+                struct_response = self.client.messages.create(
+                    model=model_to_use,
+                    max_tokens=2000,
+                    messages=[{"role": "user", "content": structure_prompt}],
+                )
+                break
+            except anthropic.APIStatusError as e:
+                last_err = e
+                body = getattr(e, 'body', {}) or {}
+                err_type = body.get('error', {}).get('type', '') if isinstance(body, dict) else ''
+                if e.status_code == 529 or err_type == 'overloaded_error':
+                    continue
+                raise
+        if struct_response is None:
+            raise last_err
         struct_text = next(
             b.text for b in struct_response.content if b.type == "text"
         )

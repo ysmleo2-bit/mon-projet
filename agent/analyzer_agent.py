@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from pydantic import BaseModel
 from typing import List
@@ -121,14 +122,33 @@ Sois ultra-précis. Utilise des exemples tirés des posts. C'est une analyse des
 
         prompt = self._build_analysis_prompt(scraped_data, dea)
 
-        # Structured output avec adaptive thinking
-        response = self.client.messages.parse(
-            model=MODEL,
-            max_tokens=8000,
-            thinking={"type": "adaptive"},
-            output_format=GroupProfile,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        # Structured output avec adaptive thinking + retry sur surcharge
+        FALLBACK_MODEL = "claude-sonnet-4-6"
+        response = None
+        last_err = None
+        for attempt, model_to_use in enumerate([MODEL, FALLBACK_MODEL, FALLBACK_MODEL]):
+            try:
+                if attempt > 0:
+                    wait = 5 * attempt
+                    print(f"  [Retry {attempt}] Attente {wait}s (modèle: {model_to_use})…")
+                    time.sleep(wait)
+                response = self.client.messages.parse(
+                    model=model_to_use,
+                    max_tokens=8000,
+                    thinking={"type": "adaptive"},
+                    output_format=GroupProfile,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                break
+            except anthropic.APIStatusError as e:
+                last_err = e
+                body = getattr(e, 'body', {}) or {}
+                err_type = body.get('error', {}).get('type', '') if isinstance(body, dict) else ''
+                if e.status_code == 529 or err_type == 'overloaded_error':
+                    continue
+                raise
+        if response is None:
+            raise last_err
 
         profile: GroupProfile = response.parsed_output
         # S'assurer que les IDs sont corrects
