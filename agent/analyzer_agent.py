@@ -117,21 +117,64 @@ Sois ultra-précis. Utilise des exemples tirés des posts. C'est une analyse des
                 best_post_format="Texte court + question ouverte",
             )
 
-        prompt = self._build_analysis_prompt(scraped_data, dea)
+        prompt = self._build_analysis_prompt(scraped_data, dea) + """
 
-        # Structured output avec adaptive thinking
-        response = self.client.messages.parse(
+Retourne ton analyse UNIQUEMENT sous forme de JSON valide avec cette structure exacte :
+{
+  "summary": "résumé en 2-3 phrases",
+  "pain_points": [
+    {"label": "...", "frequency": "très fréquent|fréquent|occasionnel", "raw_quotes": ["extrait1"]}
+  ],
+  "engagement_patterns": [
+    {"pattern": "...", "why_it_works": "...", "example": "..."}
+  ],
+  "typical_vocabulary": ["mot1", "mot2"],
+  "typical_objections": ["objection1", "objection2"],
+  "maturity_level": "froid|tiède|chaud",
+  "hook_angles": ["angle1", "angle2"],
+  "tone_recommendation": "description du ton",
+  "best_post_format": "description du format"
+}"""
+
+        import re as _re
+
+        response = self.client.messages.create(
             model=MODEL,
             max_tokens=8000,
-            thinking={"type": "adaptive"},
-            output_format=GroupProfile,
+            thinking={"type": "enabled", "budget_tokens": 5000},
             messages=[{"role": "user", "content": prompt}],
         )
 
-        profile: GroupProfile = response.parsed_output
-        # S'assurer que les IDs sont corrects
-        profile.group_id   = group_id
-        profile.group_name = group_name
+        text  = next((b.text for b in response.content if b.type == "text"), "")
+        match = _re.search(r'\{[\s\S]+\}', text)
+        try:
+            data = json.loads(match.group()) if match else {}
+        except Exception:
+            data = {}
+
+        pain_points = [
+            PainPoint(**p) for p in data.get("pain_points", [])
+            if isinstance(p, dict) and "label" in p
+        ]
+        engagement_patterns = [
+            EngagementPattern(**e) for e in data.get("engagement_patterns", [])
+            if isinstance(e, dict) and "pattern" in e
+        ]
+
+        profile = GroupProfile(
+            group_id=group_id,
+            group_name=group_name,
+            category=scraped_data.get("category", ""),
+            summary=data.get("summary", ""),
+            pain_points=pain_points,
+            engagement_patterns=engagement_patterns,
+            typical_vocabulary=data.get("typical_vocabulary", []),
+            typical_objections=data.get("typical_objections", []),
+            maturity_level=data.get("maturity_level", "froid"),
+            hook_angles=data.get("hook_angles", []),
+            tone_recommendation=data.get("tone_recommendation", ""),
+            best_post_format=data.get("best_post_format", ""),
+        )
 
         # Sauvegarde
         out_path = GROUP_PROFILES_DIR / f"{group_id}.json"

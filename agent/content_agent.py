@@ -169,7 +169,7 @@ Format qui fonctionne : {profile.best_post_format}
         with self.client.messages.stream(
             model=MODEL,
             max_tokens=4000,
-            thinking={"type": "adaptive"},
+            thinking={"type": "enabled", "budget_tokens": 3000},
             messages=[{"role": "user", "content": prompt}],
         ) as stream:
             for text in stream.text_stream:
