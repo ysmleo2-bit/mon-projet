@@ -26,10 +26,9 @@ MODEL = "claude-opus-4-6"
 
 # Rotation des angles pour éviter la répétition
 DAILY_ANGLES = [
-    "storytelling_transformation",   # Avant/après, histoire personnelle
+    "storytelling_transformation",   # Avant/après, situation réelle
     "chiffres_concrets",              # Stats, revenus, délais précis
     "question_douleur",               # Question qui touche le point de douleur
-    "temoignage_fictif",              # Témoignage d'un profil similaire
     "mythe_vs_realite",               # Démontez une idée reçue
     "curiosite_metier",               # Révélez le métier mystère progressivement
     "urgence_marche",                 # Le marché explose maintenant
@@ -98,9 +97,6 @@ class ContentAgent:
             "question_douleur":
                 "Commence par UNE question qui touche exactement la douleur principale du groupe. "
                 "La question doit faire dire 'c'est moi ça !'. Puis amène la solution.",
-            "temoignage_fictif":
-                "Rédige un témoignage d'une personne EXACTEMENT dans la situation de ce groupe "
-                "(même âge approximatif, même problème). Synthèse credible, pas exagérée.",
             "mythe_vs_realite":
                 "Démontez une idée reçue que ce groupe a probablement sur l'argent / le travail / "
                 "les formations. 'Contrairement à ce qu'on croit…' ou 'Ce qu'on ne dit pas c'est que…'",

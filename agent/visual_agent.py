@@ -87,13 +87,12 @@ class VisualAgent:
 
     # Mapping angle → layout
     ANGLE_LAYOUTS = {
-        "storytelling_transformation": "split",          # Gauche/droite avant-après
-        "chiffres_concrets":           "numbers",        # Chiffres mis en avant
-        "question_douleur":            "question",       # Grande question centrale
-        "temoignage_fictif":           "quote",          # Citation stylée
-        "mythe_vs_realite":            "myth",           # Vrai/faux
-        "curiosite_metier":            "mystery",        # Mystère révélé
-        "urgence_marche":              "urgency",        # Urgence + chiffres
+        "storytelling_transformation": "split",    # Avant/après
+        "chiffres_concrets":           "numbers",  # Chiffres mis en avant
+        "question_douleur":            "question", # Grande question centrale
+        "mythe_vs_realite":            "myth",     # Vrai/faux
+        "curiosite_metier":            "mystery",  # Mystère révélé
+        "urgence_marche":              "urgency",  # Urgence + chiffres
     }
 
     def generate(self, post: GeneratedPost) -> Path:
@@ -159,11 +158,6 @@ class VisualAgent:
         w    = bbox[2] - bbox[0]
         draw.text(((1080 - w) // 2, 820), cta_text, font=font_cta, fill=C_BLACK)
 
-        # Branding
-        font_brand = _load_font("regular", 28)
-        draw.text((540, 950), "Léo Ollivier — Setting",
-                  font=font_brand, fill=C_GREEN_DIM, anchor="mm")
-
         # Bande verte en bas
         draw.rectangle([0, 1072, 1080, 1080], fill=C_GREEN)
         return img
@@ -212,10 +206,6 @@ class VisualAgent:
         draw.text(((1080 - (bbox[2]-bbox[0])) // 2, 820),
                   cta_text, font=font_cta, fill=C_BLACK)
 
-        # Branding
-        font_brand = _load_font("regular", 28)
-        draw.text((540, 950), "Léo Ollivier — Setting",
-                  font=font_brand, fill=C_GREEN_DIM, anchor="mm")
         draw.rectangle([0, 0, 1080, 8], fill=C_GREEN)
         draw.rectangle([0, 1072, 1080, 1080], fill=C_GREEN)
         return img
@@ -226,25 +216,31 @@ class VisualAgent:
         img  = Image.new("RGB", SIZE, C_DARK_CARD)
         draw = ImageDraw.Draw(img)
 
-        # Guillemets décoratifs
-        font_quote_mark = _load_font("bold", 200)
-        draw.text((60, 60), "❝", font=font_quote_mark, fill=(0, 255, 135, 30))
+        # Bande verte en haut
+        draw.rectangle([0, 0, 1080, 8], fill=C_GREEN)
 
-        # Corps de la citation
-        quote_lines = _wrap_text(post.body[:220], max_chars=30)
-        font_body   = _load_font("regular", 52)
+        # Hook (accroche principale, sans témoignage fictif)
+        hook_lines = _wrap_text(post.hook, max_chars=26)
+        font_hook  = _load_font("bold", 68)
         y = 280
-        for line in quote_lines[:4]:
+        for line in hook_lines[:3]:
+            bbox = font_hook.getbbox(line)
+            w    = bbox[2] - bbox[0]
+            draw.text(((1080 - w) // 2, y), line, font=font_hook, fill=C_WHITE)
+            y += 86
+
+        # Trait vert séparateur
+        draw.rectangle([200, y + 20, 880, y + 24], fill=C_GREEN)
+
+        # Brief visuel comme sous-titre
+        brief_lines = _wrap_text(post.visual_brief[:120], max_chars=38)
+        font_body   = _load_font("regular", 38)
+        y += 60
+        for line in brief_lines[:2]:
             bbox = font_body.getbbox(line)
             w    = bbox[2] - bbox[0]
-            draw.text(((1080 - w) // 2, y), line, font=font_body, fill=C_WHITE)
-            y += 68
-
-        # Attribution fictive
-        draw.rectangle([430, y + 30, 650, y + 34], fill=C_GREEN)
-        font_attr = _load_font("regular", 36)
-        draw.text((540, y + 60), "— Membre de la communauté",
-                  font=font_attr, fill=C_GREY, anchor="mm")
+            draw.text(((1080 - w) // 2, y), line, font=font_body, fill=C_GREY)
+            y += 50
 
         # CTA
         font_cta = _load_font("bold", 44)
@@ -254,11 +250,6 @@ class VisualAgent:
         draw.text(((1080 - (bbox[2]-bbox[0])) // 2, 840),
                   cta_text, font=font_cta, fill=C_BLACK)
 
-        # Branding
-        font_brand = _load_font("regular", 28)
-        draw.text((540, 960), "Léo Ollivier — Setting",
-                  font=font_brand, fill=C_GREEN_DIM, anchor="mm")
-        draw.rectangle([0, 0, 1080, 8], fill=C_GREEN)
         return img
 
     # ── Layout: mystery ──────────────────────────────────────────────────────
@@ -288,9 +279,6 @@ class VisualAgent:
         draw.text(((1080 - (bbox[2]-bbox[0])) // 2, 840),
                   cta_text, font=font_cta, fill=C_BLACK)
 
-        font_brand = _load_font("regular", 28)
-        draw.text((540, 960), "Léo Ollivier — Setting",
-                  font=font_brand, fill=C_GREEN_DIM, anchor="mm")
         draw.rectangle([0, 0, 1080, 8], fill=C_GREEN)
         draw.rectangle([0, 1072, 1080, 1080], fill=C_GREEN)
         return img
