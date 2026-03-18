@@ -99,15 +99,9 @@ class PublisherAgent:
         self.page: Page | None = None
 
     async def _connect(self):
+        from agent.facebook_auth import get_connected_context
         p = await async_playwright().start()
-        try:
-            browser   = await p.chromium.connect_over_cdp("http://localhost:9222")
-            context   = browser.contexts[0]
-            self.page = context.pages[0] if context.pages else await context.new_page()
-        except Exception:
-            browser   = await p.chromium.launch(headless=False, slow_mo=40)
-            context   = await browser.new_context()
-            self.page = await context.new_page()
+        _browser, _context, self.page = await get_connected_context(p)
 
     async def _post_to_group(
         self,

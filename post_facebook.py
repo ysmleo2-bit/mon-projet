@@ -255,16 +255,8 @@ async def run_posting_session(max_groups: int = None):
     print(f"\n=== Session de posting : {len(groups)} groupes / {len(manifest)} visuels ===\n")
 
     async with async_playwright() as p:
-        # Se connecter au Chrome existant (connecté à Facebook)
-        try:
-            browser = await p.chromium.connect_over_cdp("http://localhost:9222")
-            context = browser.contexts[0]
-            page    = context.pages[0] if context.pages else await context.new_page()
-        except Exception:
-            print("[WARN] Chrome CDP non disponible, lancement d'une nouvelle instance.")
-            browser = await p.chromium.launch(headless=False, slow_mo=50)
-            context = await browser.new_context()
-            page    = await context.new_page()
+        from agent.facebook_auth import get_connected_context
+        browser, context, page = await get_connected_context(p)
 
         post_index   = 0
         posts_this_hour = count_posts_last_hour(post_log)

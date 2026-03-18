@@ -53,18 +53,10 @@ class ScraperAgent:
     # ── Connexion au navigateur ───────────────────────────────────────────────
 
     async def connect(self):
-        """Se connecte au Chrome existant (déjà connecté à Facebook) via CDP."""
+        """Se connecte au Chrome existant via CDP, sinon utilise la session FB sauvegardée."""
+        from agent.facebook_auth import get_connected_context
         p = await async_playwright().start()
-        try:
-            browser = await p.chromium.connect_over_cdp("http://localhost:9222")
-            self.context = browser.contexts[0]
-            self.page    = self.context.pages[0] if self.context.pages else await self.context.new_page()
-            print("[Scraper] Connecté au Chrome existant.")
-        except Exception:
-            print("[Scraper] Chrome CDP indisponible — lancement d'un nouveau navigateur.")
-            browser      = await p.chromium.launch(headless=self.headless, slow_mo=30)
-            self.context = await browser.new_context()
-            self.page    = await self.context.new_page()
+        self._browser, self.context, self.page = await get_connected_context(p)
         return self
 
     # ── Navigation humaine ────────────────────────────────────────────────────
