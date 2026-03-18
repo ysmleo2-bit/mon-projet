@@ -123,7 +123,7 @@ Sois ultra-précis. Utilise des exemples tirés des posts. C'est une analyse des
         response = self.client.messages.parse(
             model=MODEL,
             max_tokens=8000,
-            thinking={"type": "adaptive"},
+            thinking={"type": "enabled", "budget_tokens": 5000},
             output_format=GroupProfile,
             messages=[{"role": "user", "content": prompt}],
         )
