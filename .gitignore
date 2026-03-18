@@ -7,3 +7,7 @@ post_log.json
 __pycache__/
 *.pyc
 .playwright/
+data/fb_session.json
+data/daemon.log
+data/leads.json
+data/publish_log.json
