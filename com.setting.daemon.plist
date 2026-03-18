@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Launchd plist macOS — démarre le daemon Setting au login et le relance si crash.
+
+  Installation (à faire UNE SEULE FOIS) :
+    bash install_autostart.sh
+
+  Commandes utiles ensuite :
+    launchctl list | grep setting         # vérifier le statut
+    launchctl stop  com.setting.daemon    # arrêter
+    launchctl start com.setting.daemon    # démarrer
+    tail -f ~/mon-projet-setting/data/daemon.log   # voir les logs
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.setting.daemon</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>PROJET_DIR/daemon.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>PROJET_DIR</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+
+    <!-- Démarrer automatiquement au login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Redémarrer automatiquement si crash -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Délai de 30s avant redémarrage après crash -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <!-- Logs -->
+    <key>StandardOutPath</key>
+    <string>PROJET_DIR/data/daemon.log</string>
+    <key>StandardErrorPath</key>
+    <string>PROJET_DIR/data/daemon.log</string>
+</dict>
+</plist>

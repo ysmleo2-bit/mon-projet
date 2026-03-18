@@ -213,6 +213,25 @@ async def task_publish(wave: str = "morning"):
     log.info(f"=== TÂCHE : Publication {wave.upper()} ===")
     _write_status(f"publish_{wave}", "running")
     try:
+        # Vérifier si Chrome CDP est disponible avant de lancer
+        import urllib.request
+        try:
+            urllib.request.urlopen("http://localhost:9222/json", timeout=3)
+            log.info("[Publisher] Chrome CDP détecté sur port 9222 ✓")
+        except Exception:
+            msg = (
+                "⚠️ <b>Chrome non détecté</b> — publication impossible\n\n"
+                "Pour activer la publication Facebook :\n"
+                "1. Lance Chrome avec :\n"
+                "<code>open -a 'Google Chrome' --args --remote-debugging-port=9222</code>\n"
+                "2. Connecte-toi à Facebook dans ce Chrome\n"
+                "3. La prochaine vague publiera automatiquement"
+            )
+            log.warning("[Publisher] Chrome CDP non disponible → publication annulée")
+            _tg().send(msg)
+            _write_status(f"publish_{wave}", "skipped", "Chrome CDP non disponible")
+            return
+
         from agent.publisher_agent import PublisherAgent
         publisher = PublisherAgent(
             api_key=os.environ.get("ANTHROPIC_API_KEY"),
@@ -303,6 +322,29 @@ def task_telegram_test():
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
+TASKS_TODAY_FILE = Path("data/tasks_today.json")
+
+
+def _load_tasks_today() -> dict:
+    today = datetime.now().strftime("%Y-%m-%d")
+    if TASKS_TODAY_FILE.exists():
+        data = json.loads(TASKS_TODAY_FILE.read_text(encoding="utf-8"))
+        if data.get("date") == today:
+            return data
+    return {"date": today, "done": []}
+
+
+def _mark_task_done_today(name: str):
+    data = _load_tasks_today()
+    if name not in data["done"]:
+        data["done"].append(name)
+    TASKS_TODAY_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _task_done_today(name: str) -> bool:
+    return name in _load_tasks_today()["done"]
+
+
 class TaskSchedule:
     def __init__(self, name: str, hour: int, minute: int, days: str = "daily"):
         self.name     = name
@@ -323,8 +365,19 @@ class TaskSchedule:
             return False
         return True
 
+    def was_missed_today(self, now: datetime) -> bool:
+        """Retourne True si la tâche aurait dû tourner aujourd'hui mais a été ratée."""
+        if self.days == "monday" and now.weekday() != 0:
+            return False
+        if self.days == "friday" and now.weekday() != 4:
+            return False
+        target = now.replace(hour=self.hour, minute=self.minute, second=0, microsecond=0)
+        # La tâche est dans le passé et n'a pas encore tourné aujourd'hui
+        return now > target and not _task_done_today(self.name)
+
     def mark_run(self, now: datetime):
         self.last_run = now
+        _mark_task_done_today(self.name)
 
 
 SCHEDULE = [
@@ -385,10 +438,11 @@ async def run_daemon():
     # Message de démarrage Telegram
     try:
         groups = _load_groups()
+        now_str = datetime.now().strftime('%d/%m/%Y %H:%M')
         _tg().send(
             f"🤖 <b>Daemon Setting démarré</b>\n"
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"⏰ {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
+            f"⏰ {now_str}\n"
             f"👥 {len(groups)} groupes actifs\n\n"
             f"Planning du jour :\n"
             f"  10h00 · Publication matin\n"
@@ -397,6 +451,24 @@ async def run_daemon():
         )
     except Exception:
         pass
+
+    # ── Rattrapage : exécuter les tâches manquées depuis minuit ──────────────
+    now = datetime.now()
+    missed = [s for s in SCHEDULE if s.was_missed_today(now)]
+    if missed:
+        log.info(f"⚡ Rattrapage de {len(missed)} tâche(s) manquée(s) :")
+        for sched in missed:
+            log.info(f"   → {sched.name} (prévu {sched.hour:02d}:{sched.minute:02d})")
+        try:
+            _tg().send(
+                f"⚡ <b>Rattrapage des tâches manquées</b>\n"
+                + "\n".join(f"  • {s.name} ({s.hour:02d}h{s.minute:02d})" for s in missed)
+            )
+        except Exception:
+            pass
+        for sched in missed:
+            sched.mark_run(now)
+            await _run_task(sched.name)
 
     while True:
         now = datetime.now()
