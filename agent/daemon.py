@@ -66,9 +66,8 @@ def _tg():
     """Retourne une instance TelegramReporter prête à l'emploi."""
     from agent.telegram_reporter import TelegramReporter
     return TelegramReporter(
-        token=os.environ.get("TELEGRAM_BOT_TOKEN",
-                             "8755703485:AAGNAU0FunCNgI5ECR2thta0qMZGJfOKf-I"),
-        chat_id=os.environ.get("TELEGRAM_CHAT_ID", "2108862908"),
+        token=os.environ.get("TELEGRAM_BOT_TOKEN"),
+        chat_id=os.environ.get("TELEGRAM_CHAT_ID"),
     )
 
 

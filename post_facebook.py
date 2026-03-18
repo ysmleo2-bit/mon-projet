@@ -25,7 +25,7 @@ from config import (
     SCROLL_BEFORE_POST_MIN, SCROLL_BEFORE_POST_MAX,
     TYPING_DELAY_MIN_MS, TYPING_DELAY_MAX_MS,
     CLICK_WAIT_MIN, CLICK_WAIT_MAX,
-    DESCRIPTIONS_DIR, SHEET_TAB_GROUPES, SPREADSHEET_ID,
+    DESCRIPTIONS_DIR,
 )
 
 MANIFEST_PATH  = "upload_manifest.json"
@@ -227,14 +227,14 @@ async def post_to_group(
 
 def load_groups_from_manifest_or_config() -> list[dict]:
     """
-    Tente de charger la liste complète depuis groups_manifest.json,
-    sinon utilise FB_GROUPS_PRIORITY depuis config.py.
+    Tente de charger la liste complète depuis groups_today.json (généré par pipeline_publish),
+    puis groups_manifest.json, sinon utilise FB_GROUPS_PRIORITY depuis config.py.
     """
-    groups_manifest = "groups_manifest.json"
-    if os.path.exists(groups_manifest):
-        with open(groups_manifest, encoding="utf-8") as f:
-            return json.load(f)
-    print("[WARN] groups_manifest.json absent, utilisation des groupes prioritaires de config.py")
+    for fname in ("groups_today.json", "groups_manifest.json"):
+        if os.path.exists(fname):
+            with open(fname, encoding="utf-8") as f:
+                return json.load(f)
+    print("[WARN] Aucun manifest de groupes trouvé, utilisation des groupes prioritaires de config.py")
     return FB_GROUPS_PRIORITY
 
 
