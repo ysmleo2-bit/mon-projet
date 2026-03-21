@@ -31,8 +31,8 @@ def _try_upload(path: Path) -> str | None:
         from upload_drive import upload_single_file
         result = upload_single_file(str(path))
         return result.get("view_url") if result else None
-    except Exception as e:
-        print(f"  [Drive] Upload ignoré : {e}")
+    except BaseException as e:
+        print(f"  [Drive] Upload ignoré : {type(e).__name__}")
         return None
 
 VISUALS_DIR = Path("data/generated_content/visuals")
