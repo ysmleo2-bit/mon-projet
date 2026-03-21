@@ -7,3 +7,12 @@ post_log.json
 __pycache__/
 *.pyc
 .playwright/
+data/generated_content/
+data/scraped_posts/
+data/group_profiles/
+data/leads.json
+data/publish_log.json
+data/discovery_log.json
+data/daemon.log
+data/daemon_status.json
+data/weekly_reports/
