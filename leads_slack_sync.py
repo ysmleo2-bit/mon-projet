@@ -15,16 +15,15 @@ Lancement :
   python leads_slack_sync.py --once       # Une seule passe
   python leads_slack_sync.py --interval 60  # Polling toutes les 60 secondes
 
-Prérequis :
-  - SLACK_WEBHOOK_URL dans .env
-  - token.json valide (généré par upload_drive.py ou run_agent.py)
+Prérequis (.env) — priorité au Bot Token :
+  SLACK_BOT_TOKEN=xoxb-...   + SLACK_CHANNEL=#leads   ← app Slack
+  ou SLACK_WEBHOOK_URL=https://hooks.slack.com/...     ← webhook (fallback)
+  token.json valide (généré par upload_drive.py ou run_agent.py)
 """
 
 import argparse
-import json
 import os
 import time
-import urllib.request
 from datetime import datetime
 from pathlib import Path
 
@@ -34,8 +33,9 @@ from googleapiclient.errors import HttpError
 
 load_dotenv()
 
-from config import SPREADSHEET_ID, SHEET_TAB_LEADS, SLACK_WEBHOOK_URL, SLACK_CHANNEL
+from config import SPREADSHEET_ID, SHEET_TAB_LEADS
 from upload_drive import get_credentials
+from agent.slack_notifier import SlackNotifier
 
 # ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -136,69 +136,15 @@ def _mark_notified(service, row_index: int) -> None:
 # ── Slack helper ──────────────────────────────────────────────────────────────
 
 def _send_slack(lead_row: list) -> bool:
-    """Envoie une carte Slack Block Kit pour un lead. Retourne True si succès."""
-    webhook = SLACK_WEBHOOK_URL
-    if not webhook:
-        _log("[Slack] SLACK_WEBHOOK_URL non configurée.")
-        return False
-
-    date     = lead_row[COL_DATE]    or datetime.now().strftime("%Y-%m-%d")
-    nom      = lead_row[COL_NOM]     or "Inconnu"
-    profil   = lead_row[COL_PROFIL]  or ""
-    groupe   = lead_row[COL_GROUPE]  or "—"
-    comment  = (lead_row[COL_COMMENT] or "")[:150]
-    statut   = lead_row[COL_STATUT]  or "nouveau"
-
-    profile_link = f"<{profil}|{nom}>" if profil else nom
-
-    payload = {
-        "text": f"🎯 Nouveau lead : {nom} ({groupe})",
-        "blocks": [
-            {
-                "type": "header",
-                "text": {"type": "plain_text", "text": "🎯 Nouveau lead qualifié !"},
-            },
-            {
-                "type": "section",
-                "fields": [
-                    {"type": "mrkdwn", "text": f"*Profil :*\n{profile_link}"},
-                    {"type": "mrkdwn", "text": f"*Groupe :*\n{groupe}"},
-                ],
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*Commentaire :*\n_{comment}_" if comment else "*Commentaire :*\n—",
-                },
-            },
-            {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "mrkdwn",
-                        "text": f"Détecté le {date} · Statut : {statut}",
-                    }
-                ],
-            },
-            {"type": "divider"},
-        ],
+    """Envoie une carte Slack Block Kit pour un lead via SlackNotifier."""
+    lead = {
+        "commenter_name": lead_row[COL_NOM]     or "Inconnu",
+        "commenter_url":  lead_row[COL_PROFIL]  or "",
+        "group_id":       lead_row[COL_GROUPE]  or "—",
+        "comment_text":   lead_row[COL_COMMENT] or "",
+        "detected_at":    lead_row[COL_DATE]    or datetime.now().strftime("%Y-%m-%d"),
     }
-
-    if SLACK_CHANNEL:
-        payload["channel"] = SLACK_CHANNEL
-
-    try:
-        data    = json.dumps(payload).encode("utf-8")
-        req     = urllib.request.Request(
-            webhook, data=data,
-            headers={"Content-Type": "application/json"},
-        )
-        urllib.request.urlopen(req, timeout=10)
-        return True
-    except Exception as e:
-        _log(f"[Slack] Erreur envoi : {e}")
-        return False
+    return SlackNotifier().nouveau_lead(lead)
 
 
 # ── Boucle principale ─────────────────────────────────────────────────────────

@@ -1,15 +1,19 @@
 """
 Agent Slack Notifier — envoie les alertes leads en temps réel sur Slack.
 
-Déclenché par le daemon à chaque nouveau lead détecté depuis Facebook.
-La fonction Google Apps Script `notifySlackOnNewLead` couvre l'autre sens :
-quand un lead est ajouté manuellement dans l'onglet LEADS du Sheet.
+Supporte deux modes (priorité au Bot Token) :
+  1. Bot Token  → SLACK_BOT_TOKEN=xoxb-...  + SLACK_CHANNEL=#leads
+                  Appelle chat.postMessage (méthode recommandée avec une app Slack)
+  2. Webhook    → SLACK_WEBHOOK_URL=https://hooks.slack.com/...
+                  Fallback si pas de token
 
-Variables d'environnement requises :
-  SLACK_WEBHOOK_URL  — Webhook entrant Slack (ex. https://hooks.slack.com/…)
-  SLACK_CHANNEL      — Canal cible, ex. #leads  (optionnel, défaut dans webhook)
+Variables d'environnement (.env) :
+  SLACK_BOT_TOKEN   — Token du bot Slack (xoxb-...)       ← prioritaire
+  SLACK_CHANNEL     — Canal cible, ex. #leads ou C0123ABC  ← requis avec le token
+  SLACK_WEBHOOK_URL — Webhook entrant (fallback)
 
-Utilise uniquement urllib (pas de dépendance externe).
+Permissions OAuth requises pour le Bot Token :
+  chat:write
 """
 
 import json
@@ -17,19 +21,50 @@ import os
 import urllib.request
 from datetime import datetime
 
+SLACK_API_POST = "https://slack.com/api/chat.postMessage"
+
 
 class SlackNotifier:
 
-    def __init__(self, webhook_url: str | None = None, channel: str | None = None):
+    def __init__(
+        self,
+        bot_token:   str | None = None,
+        webhook_url: str | None = None,
+        channel:     str | None = None,
+    ):
+        self.bot_token   = bot_token   or os.environ.get("SLACK_BOT_TOKEN",   "")
         self.webhook_url = webhook_url or os.environ.get("SLACK_WEBHOOK_URL", "")
-        self.channel     = channel     or os.environ.get("SLACK_CHANNEL", "")
+        self.channel     = channel     or os.environ.get("SLACK_CHANNEL",     "")
 
-    # ── Primitive ─────────────────────────────────────────────────────────────
+    # ── Primitives ────────────────────────────────────────────────────────────
 
-    def _post(self, payload: dict) -> bool:
-        if not self.webhook_url:
-            print("[Slack] SLACK_WEBHOOK_URL non configurée — notification ignorée.")
+    def _post_with_token(self, payload: dict) -> bool:
+        """Utilise l'API Slack officielle avec le Bot Token (chat.postMessage)."""
+        if not self.channel:
+            print("[Slack] SLACK_CHANNEL requis avec le Bot Token.")
             return False
+        payload["channel"] = self.channel
+        data = json.dumps(payload).encode("utf-8")
+        req  = urllib.request.Request(
+            SLACK_API_POST, data=data,
+            headers={
+                "Content-Type":  "application/json; charset=utf-8",
+                "Authorization": f"Bearer {self.bot_token}",
+            },
+        )
+        try:
+            res    = urllib.request.urlopen(req, timeout=10)
+            result = json.loads(res.read())
+            if not result.get("ok"):
+                print(f"[Slack] Erreur API : {result.get('error', '?')}")
+                return False
+            return True
+        except Exception as e:
+            print(f"[Slack] Erreur requête : {e}")
+            return False
+
+    def _post_with_webhook(self, payload: dict) -> bool:
+        """Fallback : Incoming Webhook."""
         data = json.dumps(payload).encode("utf-8")
         req  = urllib.request.Request(
             self.webhook_url, data=data,
@@ -39,16 +74,24 @@ class SlackNotifier:
             urllib.request.urlopen(req, timeout=10)
             return True
         except Exception as e:
-            print(f"[Slack] Erreur envoi : {e}")
+            print(f"[Slack] Erreur webhook : {e}")
             return False
 
     def send(self, text: str, blocks: list | None = None) -> bool:
+        """Envoie un message — préfère le Bot Token, sinon le Webhook."""
         payload: dict = {"text": text}
-        if self.channel:
-            payload["channel"] = self.channel
         if blocks:
             payload["blocks"] = blocks
-        return self._post(payload)
+
+        if self.bot_token:
+            return self._post_with_token(payload)
+        if self.webhook_url:
+            if self.channel:
+                payload["channel"] = self.channel
+            return self._post_with_webhook(payload)
+
+        print("[Slack] Aucune credential configurée (SLACK_BOT_TOKEN ou SLACK_WEBHOOK_URL).")
+        return False
 
     # ── Notifications leads ───────────────────────────────────────────────────
 
@@ -84,10 +127,7 @@ class SlackNotifier:
             },
             {"type": "divider"},
         ]
-        return self.send(
-            text=f"Nouveau lead : {name} ({group})",
-            blocks=blocks,
-        )
+        return self.send(text=f"Nouveau lead : {name} ({group})", blocks=blocks)
 
     def rapport_leads(self, new_count: int, weekly_count: int, weekly_goal: int) -> bool:
         """Résumé Slack après chaque scan leads (14h / 21h)."""
@@ -142,6 +182,7 @@ class SlackNotifier:
         )
 
     def test(self) -> bool:
+        mode = "Bot Token" if self.bot_token else "Webhook"
         ok = self.send(
             text="✅ Slack Notifier connecté — Setting Agent",
             blocks=[
@@ -150,7 +191,7 @@ class SlackNotifier:
                     "text": {
                         "type": "mrkdwn",
                         "text": (
-                            "*✅ Setting Agent — Slack connecté !*\n\n"
+                            f"*✅ Setting Agent — Slack connecté !* _({mode})_\n\n"
                             "Tu recevras ici :\n"
                             "• 🎯 Chaque nouveau lead (temps réel)\n"
                             "• 📊 Rapport après chaque scan (14h / 21h)\n"
@@ -161,5 +202,5 @@ class SlackNotifier:
             ],
         )
         if ok:
-            print("[Slack] ✓ Connexion OK")
+            print(f"[Slack] ✓ Connexion OK ({mode})")
         return ok

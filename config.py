@@ -28,8 +28,9 @@ FB_GROUPS_PRIORITY = [
 ]
 
 # ── Slack ─────────────────────────────────────────────────────────────────────
-SLACK_WEBHOOK_URL  = os.getenv("SLACK_WEBHOOK_URL", "")   # Incoming Webhook URL
-SLACK_CHANNEL      = os.getenv("SLACK_CHANNEL", "")       # ex. #leads (optionnel)
+SLACK_BOT_TOKEN    = os.getenv("SLACK_BOT_TOKEN",   "")   # xoxb-... (prioritaire)
+SLACK_CHANNEL      = os.getenv("SLACK_CHANNEL",     "")   # ex. #leads ou C0123ABC
+SLACK_WEBHOOK_URL  = os.getenv("SLACK_WEBHOOK_URL", "")   # Webhook (fallback)
 
 # ── Chemins locaux ────────────────────────────────────────────────────────────
 VISUELS_DIR      = "/mnt/user-data/outputs/VISUELS"
