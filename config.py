@@ -27,6 +27,10 @@ FB_GROUPS_PRIORITY = [
     {"name": "Entrepreneurs Freelances FR",    "id": "entrepreneursfreelancesfr"},
 ]
 
+# ── Slack ─────────────────────────────────────────────────────────────────────
+SLACK_WEBHOOK_URL  = os.getenv("SLACK_WEBHOOK_URL", "")   # Incoming Webhook URL
+SLACK_CHANNEL      = os.getenv("SLACK_CHANNEL", "")       # ex. #leads (optionnel)
+
 # ── Chemins locaux ────────────────────────────────────────────────────────────
 VISUELS_DIR      = "/mnt/user-data/outputs/VISUELS"
 DESCRIPTIONS_DIR = "/mnt/user-data/outputs/DESCRIPTIONS"

@@ -298,6 +298,12 @@ def task_telegram_test():
     _tg().test()
 
 
+def task_slack_test():
+    """Teste la connexion Slack et envoie un message de vérification."""
+    from agent.slack_notifier import SlackNotifier
+    SlackNotifier().test()
+
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 class TaskSchedule:
@@ -349,6 +355,7 @@ TASK_MAP = {
     "rapport_soir":    task_rapport_soir,
     "rapport_hebdo":   task_rapport_hebdo,
     "telegram_test":   task_telegram_test,
+    "slack_test":      task_slack_test,
 }
 
 

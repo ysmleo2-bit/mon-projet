@@ -249,6 +249,12 @@ class LeadTracker:
                 data["total"] = data.get("total", 0) + 1
                 new_count += 1
                 print(f"    ✓ Nouveau lead : {lead['commenter_name']} — '{lead['comment_text'][:50]}'")
+                # Notification Slack temps réel
+                try:
+                    from agent.slack_notifier import SlackNotifier
+                    SlackNotifier().nouveau_lead(lead)
+                except Exception as slack_err:
+                    print(f"    [Slack] Erreur notification : {slack_err}")
 
             await asyncio.sleep(random.uniform(10, 20))
 
@@ -257,10 +263,23 @@ class LeadTracker:
         print(f"\n[LeadTracker] +{new_count} nouveaux leads")
         print(progress_report())
 
+        # Rapport récap Slack après le scan
+        if new_count > 0:
+            try:
+                from agent.slack_notifier import SlackNotifier
+                SlackNotifier().rapport_leads(new_count, weekly_count(), WEEKLY_GOAL)
+            except Exception:
+                pass
+
         # Alerte si objectif atteint ou proche
         wc = weekly_count()
         if wc >= WEEKLY_GOAL:
             print(f"\n🎯 OBJECTIF ATTEINT ! {wc} leads cette semaine 🎉")
+            try:
+                from agent.slack_notifier import SlackNotifier
+                SlackNotifier().alerte_objectif_atteint(wc)
+            except Exception:
+                pass
         elif wc >= WEEKLY_GOAL * 0.7:
             remaining = WEEKLY_GOAL - wc
             print(f"\n⚡ Proche de l'objectif ! Plus que {remaining} leads à trouver.")
