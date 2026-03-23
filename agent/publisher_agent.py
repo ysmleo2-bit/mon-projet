@@ -104,10 +104,58 @@ class PublisherAgent:
             browser   = await p.chromium.connect_over_cdp("http://localhost:9222")
             context   = browser.contexts[0]
             self.page = context.pages[0] if context.pages else await context.new_page()
+            print("[Publisher] Connecté au Chrome existant.")
         except Exception:
-            browser   = await p.chromium.launch(headless=False, slow_mo=40)
-            context   = await browser.new_context()
+            browser   = await p.chromium.launch(headless=True, slow_mo=40)
+            cookies_path = "data/fb_cookies.json"
+            if os.path.exists(cookies_path):
+                import json as _json
+                context = await browser.new_context()
+                with open(cookies_path, encoding="utf-8") as f:
+                    cookies = _json.load(f)
+                await context.add_cookies(cookies)
+                print("[Publisher] Cookies Facebook chargés.")
+            else:
+                context = await browser.new_context()
+                print("[Publisher] Pas de cookies — tentative de connexion avec credentials…")
+                self.page = await context.new_page()
+                await self._fb_login(context)
+                return
             self.page = await context.new_page()
+
+    async def _fb_login(self, context):
+        """Se connecte à Facebook avec email/password et sauvegarde les cookies."""
+        from dotenv import load_dotenv
+        load_dotenv()
+        email    = os.environ.get("FB_EMAIL", "")
+        password = os.environ.get("FB_PASSWORD", "")
+        if not email or not password:
+            print("[Publisher] FB_EMAIL / FB_PASSWORD manquants dans .env")
+            return
+
+        page = await context.new_page()
+        await page.goto("https://www.facebook.com/login", wait_until="domcontentloaded", timeout=30_000)
+        await asyncio.sleep(2)
+
+        try:
+            await page.fill('#email', email)
+            await asyncio.sleep(1)
+            await page.fill('#pass', password)
+            await asyncio.sleep(1)
+            await page.click('[name="login"]')
+            await asyncio.sleep(5)
+
+            # Sauvegarder les cookies pour les prochaines fois
+            cookies = await context.cookies()
+            import json as _json
+            os.makedirs("data", exist_ok=True)
+            with open("data/fb_cookies.json", "w", encoding="utf-8") as f:
+                _json.dump(cookies, f)
+            print("[Publisher] Connecté à Facebook. Cookies sauvegardés.")
+        except Exception as e:
+            print(f"[Publisher] Erreur login Facebook : {e}")
+
+        self.page = page
 
     async def _post_to_group(
         self,

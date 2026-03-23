@@ -126,7 +126,7 @@ class DiscoveryAgent:
             context    = browser.contexts[0]
             self.page  = context.pages[0] if context.pages else await context.new_page()
         except Exception:
-            browser   = await p.chromium.launch(headless=False, slow_mo=30)
+            browser   = await p.chromium.launch(headless=True, slow_mo=30)
             context   = await browser.new_context()
             self.page = await context.new_page()
 
