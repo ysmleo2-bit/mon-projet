@@ -249,6 +249,15 @@ async def task_scan_leads():
         except Exception as sheet_err:
             log.warning(f"[Leads] Export Sheet échoué (non bloquant) : {sheet_err}")
 
+        # Notif Slack pour les nouveaux leads dans le Sheet
+        try:
+            from leads_slack_sync import run_once as slack_sync_once
+            notified = slack_sync_once()
+            if notified > 0:
+                log.info(f"[Slack] {notified} leads notifiés sur Slack.")
+        except Exception as slack_err:
+            log.warning(f"[Leads] Notif Slack échouée (non bloquant) : {slack_err}")
+
     except Exception as e:
         log.error(f"Erreur scan leads : {e}", exc_info=True)
         _write_status("leads", "error", str(e))
@@ -304,6 +313,13 @@ def task_slack_test():
     SlackNotifier().test()
 
 
+def task_leads_slack_sync():
+    """Scanne le Sheet LEADS et notifie Slack pour chaque nouveau lead non encore notifié."""
+    from leads_slack_sync import run_once
+    notified = run_once()
+    log.info(f"[Slack Sync] {notified} leads notifiés.")
+
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 class TaskSchedule:
@@ -338,8 +354,10 @@ SCHEDULE = [
     TaskSchedule("rapport_matin",    hour=10, minute=0,  days="daily"),
     TaskSchedule("publish_morning",  hour=10, minute=5,  days="daily"),
     TaskSchedule("leads_morning",    hour=14, minute=0,  days="daily"),
+    TaskSchedule("leads_slack_sync", hour=14, minute=10, days="daily"),
     TaskSchedule("publish_evening",  hour=19, minute=0,  days="daily"),
     TaskSchedule("rapport_soir",     hour=21, minute=0,  days="daily"),
+    TaskSchedule("leads_slack_sync", hour=21, minute=10, days="daily"),
     TaskSchedule("rapport_hebdo",    hour=21, minute=30, days="friday"),
 ]
 
@@ -354,8 +372,9 @@ TASK_MAP = {
     "rapport_matin":   task_rapport_matin,
     "rapport_soir":    task_rapport_soir,
     "rapport_hebdo":   task_rapport_hebdo,
-    "telegram_test":   task_telegram_test,
-    "slack_test":      task_slack_test,
+    "telegram_test":     task_telegram_test,
+    "slack_test":        task_slack_test,
+    "leads_slack_sync":  task_leads_slack_sync,
 }
 
 
