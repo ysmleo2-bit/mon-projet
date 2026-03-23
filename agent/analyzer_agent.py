@@ -141,7 +141,7 @@ Retourne ton analyse UNIQUEMENT sous forme de JSON valide avec cette structure e
         response = self.client.messages.create(
             model=MODEL,
             max_tokens=8000,
-            thinking={"type": "enabled", "budget_tokens": 5000},
+            thinking={"type": "adaptive"},
             messages=[{"role": "user", "content": prompt}],
         )
 
