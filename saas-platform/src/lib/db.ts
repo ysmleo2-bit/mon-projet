@@ -1,21 +1,31 @@
 import { PrismaClient } from '@/generated/prisma/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
+import { PrismaPg } from '@prisma/adapter-pg'
 import path from 'path'
 
-const dbPath = path.join(process.cwd(), 'prisma', 'dev.db')
-const dbUrl = `file://${dbPath}`
+let _prisma: PrismaClient | undefined
 
-function createPrismaClient() {
-  const adapter = new PrismaLibSql({ url: dbUrl })
-  return new PrismaClient({ adapter })
+export function getPrisma(): PrismaClient {
+  if (_prisma) return _prisma
+
+  const url = process.env.DATABASE_URL
+  if (!url) throw new Error('DATABASE_URL is not set')
+
+  if (url.startsWith('file:')) {
+    const dbPath = path.resolve(process.cwd(), 'prisma', 'dev.db')
+    const adapter = new PrismaLibSql({ url: `file://${dbPath}` })
+    _prisma = new PrismaClient({ adapter })
+  } else {
+    const adapter = new PrismaPg({ connectionString: url })
+    _prisma = new PrismaClient({ adapter })
+  }
+
+  return _prisma
 }
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
-
-export const prisma = globalForPrisma.prisma ?? createPrismaClient()
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+// Convenience export — same instance after first call
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    return (getPrisma() as unknown as Record<string | symbol, unknown>)[prop]
+  },
+})
