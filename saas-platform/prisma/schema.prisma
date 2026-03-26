@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      String   // "setter" | "entrepreneur"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile          Profile?
+  sentMessages     Message[]    @relation("SentMessages")
+  receivedMessages Message[]    @relation("ReceivedMessages")
+  connectionsFrom  Connection[] @relation("ConnectionFrom")
+  connectionsTo    Connection[] @relation("ConnectionTo")
+}
+
+model Profile {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  avatar     String?
+  title      String
+  bio        String
+  skills     String   // JSON array stored as string
+  hourlyRate Float?
+  location   String?
+  website    String?
+  available  Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Connection {
+  id        String   @id @default(cuid())
+  fromId    String
+  toId      String
+  status    String   @default("pending") // "pending" | "accepted" | "rejected"
+  createdAt DateTime @default(now())
+  from      User     @relation("ConnectionFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to        User     @relation("ConnectionTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  content    String
+  senderId   String
+  receiverId String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+}
