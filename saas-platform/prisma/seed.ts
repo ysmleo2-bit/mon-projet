@@ -1,22 +1,17 @@
 import 'dotenv/config'
 import { PrismaClient } from '../src/generated/prisma/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
-import { PrismaPg } from '@prisma/adapter-pg'
 import bcrypt from 'bcryptjs'
 import path from 'path'
 
-const defaultSqlite = `file:${path.resolve(process.cwd(), 'prisma', 'dev.db')}`
-const url = process.env.DATABASE_URL ?? defaultSqlite
+const absDbPath = path.resolve(process.cwd(), 'prisma', 'dev.db')
+const envUrl = process.env.DATABASE_URL
+const url = (!envUrl || envUrl.startsWith('file:'))
+  ? `file://${absDbPath}`
+  : envUrl
 
-let prisma: PrismaClient
-if (url.startsWith('file:')) {
-  const dbPath = path.resolve(process.cwd(), 'prisma', 'dev.db')
-  const adapter = new PrismaLibSql({ url: `file://${dbPath}` })
-  prisma = new PrismaClient({ adapter })
-} else {
-  const adapter = new PrismaPg({ connectionString: url })
-  prisma = new PrismaClient({ adapter })
-}
+const adapter = new PrismaLibSql({ url })
+const prisma = new PrismaClient({ adapter })
 
 const setters = [
   {
