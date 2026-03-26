@@ -8,8 +8,8 @@ let _prisma: PrismaClient | undefined
 export function getPrisma(): PrismaClient {
   if (_prisma) return _prisma
 
-  const url = process.env.DATABASE_URL
-  if (!url) throw new Error('DATABASE_URL is not set')
+  const defaultSqlite = `file:${path.resolve(process.cwd(), 'prisma', 'dev.db')}`
+  const url = process.env.DATABASE_URL ?? defaultSqlite
 
   if (url.startsWith('file:')) {
     const dbPath = path.resolve(process.cwd(), 'prisma', 'dev.db')

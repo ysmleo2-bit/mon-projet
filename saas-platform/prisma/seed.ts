@@ -5,8 +5,8 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import bcrypt from 'bcryptjs'
 import path from 'path'
 
-const url = process.env.DATABASE_URL
-if (!url) throw new Error('DATABASE_URL is not set')
+const defaultSqlite = `file:${path.resolve(process.cwd(), 'prisma', 'dev.db')}`
+const url = process.env.DATABASE_URL ?? defaultSqlite
 
 let prisma: PrismaClient
 if (url.startsWith('file:')) {

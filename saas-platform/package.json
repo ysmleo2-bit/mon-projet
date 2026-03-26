@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
+    "setup": "prisma migrate dev --name init && npm run seed",
     "postinstall": "prisma generate"
   },
   "dependencies": {

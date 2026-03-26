@@ -30,12 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
-.env
+# env files (only ignore production secrets)
 .env.local
 .env.production
-# keep .env.example tracked
-!.env.example
+# .env is safe to commit (only contains local SQLite path)
 
 # SQLite dev db
 prisma/dev.db
