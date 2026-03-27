@@ -3,8 +3,13 @@ import { PrismaClient } from '../src/generated/prisma/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
 import bcrypt from 'bcryptjs'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
-const absDbPath = path.resolve(process.cwd(), 'prisma', 'dev.db')
+// Use __filename so the path is relative to this file, not process.cwd()
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+// This file is at: <project>/prisma/seed.ts  → DB is at: <project>/prisma/dev.db
+const absDbPath = path.resolve(__dirname, 'dev.db')
 const envUrl = process.env.DATABASE_URL
 const url = (!envUrl || envUrl.startsWith('file:'))
   ? `file://${absDbPath}`
