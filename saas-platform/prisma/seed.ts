@@ -1,12 +1,19 @@
 import 'dotenv/config'
 import { PrismaClient } from '../src/generated/prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
-import pg from 'pg'
+import { PrismaLibSql } from '@prisma/adapter-libsql'
 import bcrypt from 'bcryptjs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-const url = process.env.DATABASE_URL!
-const pool = new pg.Pool({ connectionString: url })
-const adapter = new PrismaPg(pool)
+const envUrl = process.env.DATABASE_URL
+const authToken = process.env.TURSO_AUTH_TOKEN
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const absDbPath = path.resolve(__dirname, 'dev.db')
+const url = (!envUrl || envUrl.startsWith('file:'))
+  ? `file://${absDbPath}`
+  : envUrl.replace(/^libsql:\/\//, 'https://')
+const adapter = new PrismaLibSql({ url, authToken })
 const prisma = new PrismaClient({ adapter })
 
 const setters = [

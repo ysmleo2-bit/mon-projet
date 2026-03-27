@@ -1,17 +1,29 @@
 import { PrismaClient } from '@/generated/prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
-import pg from 'pg'
+import { PrismaLibSql } from '@prisma/adapter-libsql'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 let _prisma: PrismaClient | undefined
 
 export function getPrisma(): PrismaClient {
   if (_prisma) return _prisma
 
-  const url = process.env.DATABASE_URL
-  if (!url) throw new Error('DATABASE_URL environment variable is not set')
+  const envUrl = process.env.DATABASE_URL
+  const authToken = process.env.TURSO_AUTH_TOKEN
 
-  const pool = new pg.Pool({ connectionString: url })
-  const adapter = new PrismaPg(pool)
+  let url: string
+
+  if (!envUrl || envUrl.startsWith('file:')) {
+    // Local dev: resolve path relative to this file (immune to Turbopack cwd changes)
+    const thisDir = path.dirname(fileURLToPath(import.meta.url))
+    const absDbPath = path.resolve(thisDir, '..', '..', 'prisma', 'dev.db')
+    url = `file://${absDbPath}`
+  } else {
+    // Production Turso: force https:// so the HTTP client is used (not WebSockets)
+    url = envUrl.replace(/^libsql:\/\//, 'https://')
+  }
+
+  const adapter = new PrismaLibSql({ url, authToken })
   _prisma = new PrismaClient({ adapter })
   return _prisma
 }

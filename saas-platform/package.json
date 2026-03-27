@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "prisma migrate deploy && next dev",
     "build": "prisma generate && next build",
-    "deploy": "prisma db push && npm run seed",
+    "deploy": "npm run seed",
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
     "setup": "prisma migrate dev --name init && npm run seed",
-    "postinstall": "prisma generate"
+    "postinstall": "node scripts/patch-libsql.cjs && prisma generate"
   },
   "dependencies": {
     "@libsql/client": "^0.17.2",
