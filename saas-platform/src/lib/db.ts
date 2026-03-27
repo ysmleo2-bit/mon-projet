@@ -1,32 +1,17 @@
 import { PrismaClient } from '@/generated/prisma/client'
-import { PrismaLibSql } from '@prisma/adapter-libsql'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import { PrismaPg } from '@prisma/adapter-pg'
+import pg from 'pg'
 
 let _prisma: PrismaClient | undefined
 
 export function getPrisma(): PrismaClient {
   if (_prisma) return _prisma
 
-  const envUrl = process.env.DATABASE_URL
+  const url = process.env.DATABASE_URL
+  if (!url) throw new Error('DATABASE_URL environment variable is not set')
 
-  let url: string
-  let authToken: string | undefined
-
-  if (!envUrl || envUrl.startsWith('file:')) {
-    // Local dev: resolve path relative to this file (immune to Turbopack cwd changes)
-    // This file: <project>/src/lib/db.ts  →  DB: <project>/prisma/dev.db
-    const thisDir = path.dirname(fileURLToPath(import.meta.url))
-    const absDbPath = path.resolve(thisDir, '..', '..', 'prisma', 'dev.db')
-    url = `file://${absDbPath}`
-  } else {
-    // Production: Turso cloud — use https:// (not libsql://) so the HTTP
-    // client is used, which works in Vercel serverless (WebSockets don't).
-    url = envUrl.replace(/^libsql:\/\//, 'https://')
-    authToken = process.env.TURSO_AUTH_TOKEN
-  }
-
-  const adapter = new PrismaLibSql({ url, authToken })
+  const pool = new pg.Pool({ connectionString: url })
+  const adapter = new PrismaPg(pool)
   _prisma = new PrismaClient({ adapter })
   return _prisma
 }
