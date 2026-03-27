@@ -11,20 +11,21 @@ export function getPrisma(): PrismaClient {
   const envUrl = process.env.DATABASE_URL
 
   let url: string
+  let authToken: string | undefined
+
   if (!envUrl || envUrl.startsWith('file:')) {
-    // Use import.meta.url so the path is always relative to THIS file,
-    // not to process.cwd() (which Turbopack may change to the workspace root).
-    // This file is at: <project>/src/lib/db.ts
-    // DB is at:        <project>/prisma/dev.db
+    // Local dev: resolve path relative to this file (immune to Turbopack cwd changes)
+    // This file: <project>/src/lib/db.ts  →  DB: <project>/prisma/dev.db
     const thisDir = path.dirname(fileURLToPath(import.meta.url))
     const absDbPath = path.resolve(thisDir, '..', '..', 'prisma', 'dev.db')
     url = `file://${absDbPath}`
   } else {
-    // Turso/libsql cloud URL (libsql://...)
+    // Production: Turso cloud (libsql://...)
     url = envUrl
+    authToken = process.env.TURSO_AUTH_TOKEN
   }
 
-  const adapter = new PrismaLibSql({ url })
+  const adapter = new PrismaLibSql({ url, authToken })
   _prisma = new PrismaClient({ adapter })
   return _prisma
 }
