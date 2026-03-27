@@ -20,8 +20,9 @@ export function getPrisma(): PrismaClient {
     const absDbPath = path.resolve(thisDir, '..', '..', 'prisma', 'dev.db')
     url = `file://${absDbPath}`
   } else {
-    // Production: Turso cloud (libsql://...)
-    url = envUrl
+    // Production: Turso cloud — use https:// (not libsql://) so the HTTP
+    // client is used, which works in Vercel serverless (WebSockets don't).
+    url = envUrl.replace(/^libsql:\/\//, 'https://')
     authToken = process.env.TURSO_AUTH_TOKEN
   }
 
