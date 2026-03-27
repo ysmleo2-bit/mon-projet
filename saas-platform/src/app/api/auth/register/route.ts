@@ -57,7 +57,8 @@ export async function POST(request: NextRequest) {
     })
 
     return response
-  } catch {
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+  } catch (e) {
+    console.error('[register]', e)
+    return NextResponse.json({ error: 'Erreur serveur', detail: String(e) }, { status: 500 })
   }
 }
