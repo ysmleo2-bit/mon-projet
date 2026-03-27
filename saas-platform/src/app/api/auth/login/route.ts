@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { prisma } from '@/lib/db'
+import { query } from '@/lib/db'
 import { signToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
@@ -14,24 +14,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email et mot de passe requis' }, { status: 400 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: { profile: true },
-    })
+    const rows = await query(
+      `SELECT u.id, u.email, u.password, u.role,
+              p.id as profileId, p.name, p.avatar, p.title, p.bio,
+              p.skills, p.hourlyRate, p.location, p.website, p.available
+       FROM "User" u
+       LEFT JOIN "Profile" p ON p.userId = u.id
+       WHERE u.email = ?`,
+      [email]
+    )
 
-    if (!user) {
+    if (rows.length === 0) {
       return NextResponse.json({ error: 'Identifiants invalides' }, { status: 401 })
     }
 
-    const valid = await bcrypt.compare(password, user.password)
+    const row = rows[0]
+    const valid = await bcrypt.compare(password, row.password as string)
     if (!valid) {
       return NextResponse.json({ error: 'Identifiants invalides' }, { status: 401 })
     }
 
-    const token = signToken({ userId: user.id, email: user.email, role: user.role })
+    const userId = row.id as string
+    const role = row.role as string
+    const token = signToken({ userId, email: row.email as string, role })
+
+    const profile = row.profileId
+      ? {
+          id: row.profileId,
+          userId,
+          name: row.name,
+          avatar: row.avatar,
+          title: row.title,
+          bio: row.bio,
+          skills: safeJson(row.skills as string, []),
+          hourlyRate: row.hourlyRate,
+          location: row.location,
+          website: row.website,
+          available: row.available === 1 || row.available === true,
+        }
+      : null
 
     const response = NextResponse.json({
-      user: { id: user.id, email: user.email, role: user.role, profile: user.profile },
+      user: { id: userId, email: row.email, role, profile },
     })
 
     response.cookies.set('token', token, {
@@ -47,4 +71,8 @@ export async function POST(request: NextRequest) {
     console.error('[login]', e)
     return NextResponse.json({ error: 'Erreur serveur', detail: String(e) }, { status: 500 })
   }
+}
+
+function safeJson(s: string, fallback: unknown) {
+  try { return JSON.parse(s) } catch { return fallback }
 }

@@ -1,20 +1,87 @@
 import 'dotenv/config'
-import { PrismaClient } from '../src/generated/prisma/client'
-import { PrismaLibSql } from '@prisma/adapter-libsql'
 import bcrypt from 'bcryptjs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-const envUrl = process.env.DATABASE_URL
-const authToken = process.env.TURSO_AUTH_TOKEN
+// ─── Minimal DB client (mirrors src/lib/db.ts logic) ─────────────────────────
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const absDbPath = path.resolve(__dirname, 'dev.db')
-const url = (!envUrl || envUrl.startsWith('file:'))
-  ? `file://${absDbPath}`
-  : envUrl.replace(/^libsql:\/\//, 'https://')
-const adapter = new PrismaLibSql({ url, authToken })
-const prisma = new PrismaClient({ adapter })
+
+type Row = Record<string, unknown>
+
+function isLocalDb(): boolean {
+  const url = process.env.DATABASE_URL
+  return !url || url.startsWith('file:')
+}
+
+function encodeArg(v: unknown): Record<string, string> {
+  if (v === null || v === undefined) return { type: 'null' }
+  if (typeof v === 'boolean') return { type: 'integer', value: v ? '1' : '0' }
+  if (typeof v === 'number') {
+    if (Number.isInteger(v)) return { type: 'integer', value: String(v) }
+    return { type: 'float', value: String(v) }
+  }
+  return { type: 'text', value: String(v) }
+}
+
+async function tursoExec(sql: string, args: unknown[] = []): Promise<Row[]> {
+  const rawUrl = process.env.DATABASE_URL!
+  const url = rawUrl.replace(/^libsql:\/\//, 'https://')
+  const token = process.env.TURSO_AUTH_TOKEN ?? ''
+
+  const res = await fetch(`${url}/v2/pipeline`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requests: [
+        { type: 'execute', stmt: { sql, args: args.map(encodeArg) } },
+        { type: 'close' },
+      ],
+    }),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Turso HTTP ${res.status}: ${text}`)
+  }
+
+  const data = await res.json() as { results: Array<{ type: string; response?: { type: string; result?: { cols: { name: string }[]; rows: unknown[][] } }; error?: { message?: string } }> }
+
+  for (const r of data.results ?? []) {
+    if (r.type === 'error') throw new Error(`Turso error: ${r.error?.message ?? 'unknown'}`)
+  }
+
+  const execResult = data.results.find(r => r.type === 'ok' && r.response?.type === 'execute')
+  if (!execResult?.response?.result) return []
+
+  const { cols, rows } = execResult.response.result
+  return rows.map(row =>
+    Object.fromEntries(cols.map((col, i) => [col.name, row[i] ?? null]))
+  )
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _localClient: any
+
+async function localExec(sql: string, args: unknown[] = []): Promise<Row[]> {
+  if (!_localClient) {
+    const { createClient } = await import('@libsql/client')
+    const absDb = path.resolve(__dirname, 'dev.db')
+    _localClient = createClient({ url: `file://${absDb}` })
+  }
+  const result = await _localClient.execute({ sql, args })
+  return result.rows.map((row: unknown[]) =>
+    Object.fromEntries(result.columns.map((col: string, i: number) => [col, row[i] ?? null]))
+  )
+}
+
+async function exec(sql: string, args: unknown[] = []): Promise<Row[]> {
+  if (isLocalDb()) return localExec(sql, args)
+  return tursoExec(sql, args)
+}
+
+// ─── Seed data ────────────────────────────────────────────────────────────────
 
 const setters = [
   {
@@ -68,54 +135,47 @@ const entrepreneurs = [
 async function main() {
   console.log('Seeding database...')
   const password = await bcrypt.hash('password123', 10)
+  const now = new Date().toISOString()
 
   for (const s of setters) {
-    await prisma.user.upsert({
-      where: { email: s.email },
-      update: {},
-      create: {
-        email: s.email,
-        password,
-        role: 'setter',
-        profile: {
-          create: {
-            name: s.name,
-            title: s.title,
-            bio: s.bio,
-            skills: JSON.stringify(s.skills),
-            hourlyRate: s.hourlyRate,
-            location: s.location,
-            available: true,
-          },
-        },
-      },
-    })
+    const existing = await exec('SELECT id FROM "User" WHERE email = ?', [s.email])
+    if (existing.length > 0) {
+      console.log(`  skip ${s.email} (already exists)`)
+      continue
+    }
+    const userId = crypto.randomUUID()
+    const profileId = crypto.randomUUID()
+    await exec(
+      'INSERT INTO "User" (id, email, password, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+      [userId, s.email, password, 'setter', now, now]
+    )
+    await exec(
+      'INSERT INTO "Profile" (id, userId, name, title, bio, skills, hourlyRate, location, available, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)',
+      [profileId, userId, s.name, s.title, s.bio, JSON.stringify(s.skills), s.hourlyRate, s.location, now, now]
+    )
+    console.log(`  created setter: ${s.email}`)
   }
 
   for (const e of entrepreneurs) {
-    await prisma.user.upsert({
-      where: { email: e.email },
-      update: {},
-      create: {
-        email: e.email,
-        password,
-        role: 'entrepreneur',
-        profile: {
-          create: {
-            name: e.name,
-            title: e.title,
-            bio: e.bio,
-            skills: JSON.stringify(e.skills),
-            hourlyRate: null,
-            location: e.location,
-            available: true,
-          },
-        },
-      },
-    })
+    const existing = await exec('SELECT id FROM "User" WHERE email = ?', [e.email])
+    if (existing.length > 0) {
+      console.log(`  skip ${e.email} (already exists)`)
+      continue
+    }
+    const userId = crypto.randomUUID()
+    const profileId = crypto.randomUUID()
+    await exec(
+      'INSERT INTO "User" (id, email, password, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+      [userId, e.email, password, 'entrepreneur', now, now]
+    )
+    await exec(
+      'INSERT INTO "Profile" (id, userId, name, title, bio, skills, hourlyRate, location, available, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 1, ?, ?)',
+      [profileId, userId, e.name, e.title, e.bio, JSON.stringify(e.skills), e.location, now, now]
+    )
+    console.log(`  created entrepreneur: ${e.email}`)
   }
 
   console.log('Done! password: password123')
 }
 
-main().then(() => prisma.$disconnect()).catch(e => { console.error(e); prisma.$disconnect(); process.exit(1) })
+main().catch(e => { console.error(e); process.exit(1) })
