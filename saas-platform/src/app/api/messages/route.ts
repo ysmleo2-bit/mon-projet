@@ -1,112 +1,106 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { query, batch } from '@/lib/db'
 import { getAuthUser } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
-  const auth = await getAuthUser()
-  if (!auth) {
-    return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-  }
-
-  const { searchParams } = new URL(request.url)
-  const withUser = searchParams.get('with')
-
-  if (withUser) {
-    // Mark messages as read
-    await prisma.message.updateMany({
-      where: { senderId: withUser, receiverId: auth.userId, read: false },
-      data: { read: true },
-    })
-
-    const messages = await prisma.message.findMany({
-      where: {
-        OR: [
-          { senderId: auth.userId, receiverId: withUser },
-          { senderId: withUser, receiverId: auth.userId },
-        ],
-      },
-      orderBy: { createdAt: 'asc' },
-    })
-
-    return NextResponse.json({ messages })
-  }
-
-  // Return conversation list (latest message per user)
-  const sent = await prisma.message.findMany({
-    where: { senderId: auth.userId },
-    include: { receiver: { include: { profile: true } } },
-    orderBy: { createdAt: 'desc' },
-    distinct: ['receiverId'],
-  })
-
-  const received = await prisma.message.findMany({
-    where: { receiverId: auth.userId },
-    include: { sender: { include: { profile: true } } },
-    orderBy: { createdAt: 'desc' },
-    distinct: ['senderId'],
-  })
-
-  // Merge into unique conversations
-  const convMap = new Map<string, { userId: string; name: string; avatar: string | null; lastMessage: string; unread: number; updatedAt: Date }>()
-
-  for (const m of sent) {
-    const id = m.receiverId
-    if (!convMap.has(id)) {
-      convMap.set(id, {
-        userId: id,
-        name: m.receiver.profile?.name ?? m.receiver.email,
-        avatar: m.receiver.profile?.avatar ?? null,
-        lastMessage: m.content,
-        unread: 0,
-        updatedAt: m.createdAt,
-      })
+  try {
+    const auth = await getAuthUser()
+    if (!auth) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
-  }
 
-  for (const m of received) {
-    const id = m.senderId
-    if (!convMap.has(id)) {
-      const unread = await prisma.message.count({
-        where: { senderId: id, receiverId: auth.userId, read: false },
-      })
-      convMap.set(id, {
-        userId: id,
-        name: m.sender.profile?.name ?? m.sender.email,
-        avatar: m.sender.profile?.avatar ?? null,
-        lastMessage: m.content,
-        unread,
-        updatedAt: m.createdAt,
-      })
+    const { searchParams } = new URL(request.url)
+    const withUser = searchParams.get('with')
+
+    if (withUser) {
+      const [, msgRows] = await batch([
+        {
+          sql: 'UPDATE "Message" SET read=1 WHERE senderId=? AND receiverId=? AND read=0',
+          args: [withUser, auth.userId],
+        },
+        {
+          sql: `SELECT id, senderId, receiverId, content, read, createdAt
+                FROM "Message"
+                WHERE (senderId=? AND receiverId=?) OR (senderId=? AND receiverId=?)
+                ORDER BY createdAt ASC`,
+          args: [auth.userId, withUser, withUser, auth.userId],
+        },
+      ])
+
+      return NextResponse.json({ messages: msgRows })
     }
+
+    const allMsgs = await query(
+      `SELECT m.id, m.senderId, m.receiverId, m.content, m.read, m.createdAt,
+              sp.name as senderName, sp.avatar as senderAvatar,
+              rp.name as receiverName, rp.avatar as receiverAvatar
+       FROM "Message" m
+       LEFT JOIN "Profile" sp ON sp.userId = m.senderId
+       LEFT JOIN "Profile" rp ON rp.userId = m.receiverId
+       WHERE m.senderId = ? OR m.receiverId = ?
+       ORDER BY m.createdAt DESC`,
+      [auth.userId, auth.userId]
+    )
+
+    const convMap = new Map<
+      string,
+      { userId: string; name: string | null; avatar: string | null; lastMessage: string; unread: number; updatedAt: string }
+    >()
+
+    for (const m of allMsgs) {
+      const isSender = m.senderId === auth.userId
+      const peerId = (isSender ? m.receiverId : m.senderId) as string
+
+      if (!convMap.has(peerId)) {
+        convMap.set(peerId, {
+          userId: peerId,
+          name: (isSender ? m.receiverName : m.senderName) as string | null,
+          avatar: (isSender ? m.receiverAvatar : m.senderAvatar) as string | null,
+          lastMessage: m.content as string,
+          unread: 0,
+          updatedAt: m.createdAt as string,
+        })
+      }
+      if (!isSender && !m.read) {
+        convMap.get(peerId)!.unread += 1
+      }
+    }
+
+    return NextResponse.json({ conversations: Array.from(convMap.values()) })
+  } catch (e) {
+    console.error('[messages GET]', e)
+    return NextResponse.json({ error: 'Erreur serveur', detail: String(e) }, { status: 500 })
   }
-
-  const conversations = Array.from(convMap.values()).sort(
-    (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
-  )
-
-  return NextResponse.json({ conversations })
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await getAuthUser()
-  if (!auth) {
-    return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  try {
+    const auth = await getAuthUser()
+    if (!auth) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
+    const { receiverId, content } = await request.json()
+    if (!receiverId || !content?.trim()) {
+      return NextResponse.json({ error: 'Destinataire et contenu requis' }, { status: 400 })
+    }
+
+    const msgId = crypto.randomUUID()
+    const now = new Date().toISOString()
+
+    await query(
+      'INSERT INTO "Message" (id, content, senderId, receiverId, read, createdAt) VALUES (?, ?, ?, ?, 0, ?)',
+      [msgId, content.trim(), auth.userId, receiverId, now]
+    )
+
+    return NextResponse.json(
+      { message: { id: msgId, content: content.trim(), senderId: auth.userId, receiverId, read: false, createdAt: now } },
+      { status: 201 }
+    )
+  } catch (e) {
+    console.error('[messages POST]', e)
+    return NextResponse.json({ error: 'Erreur serveur', detail: String(e) }, { status: 500 })
   }
-
-  const { receiverId, content } = await request.json()
-  if (!receiverId || !content?.trim()) {
-    return NextResponse.json({ error: 'Destinataire et contenu requis' }, { status: 400 })
-  }
-
-  const message = await prisma.message.create({
-    data: {
-      content: content.trim(),
-      senderId: auth.userId,
-      receiverId,
-    },
-  })
-
-  return NextResponse.json({ message }, { status: 201 })
 }

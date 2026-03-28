@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { prisma } from '@/lib/db'
+import { query, batch } from '@/lib/db'
 import { signToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
@@ -18,35 +18,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Rôle invalide' }, { status: 400 })
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } })
-    if (existing) {
+    const existing = await query('SELECT id FROM "User" WHERE email = ?', [email])
+    if (existing.length > 0) {
       return NextResponse.json({ error: 'Email déjà utilisé' }, { status: 409 })
     }
 
     const hashed = await bcrypt.hash(password, 10)
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashed,
-        role,
-        profile: {
-          create: {
-            name,
-            title,
-            bio,
-            skills: JSON.stringify([]),
-            available: true,
-          },
+    const userId = crypto.randomUUID()
+    const profileId = crypto.randomUUID()
+    const now = new Date().toISOString()
+
+    await batch([
+      {
+        sql: 'INSERT INTO "User" (id, email, password, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+        args: [userId, email, hashed, role, now, now],
+      },
+      {
+        sql: 'INSERT INTO "Profile" (id, userId, name, title, bio, skills, available, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)',
+        args: [profileId, userId, name, title, bio, '[]', now, now],
+      },
+    ])
+
+    const token = signToken({ userId, email, role })
+
+    const response = NextResponse.json(
+      {
+        user: {
+          id: userId,
+          email,
+          role,
+          profile: { id: profileId, userId, name, title, bio, skills: [], available: true },
         },
       },
-      include: { profile: true },
-    })
-
-    const token = signToken({ userId: user.id, email: user.email, role: user.role })
-
-    const response = NextResponse.json({
-      user: { id: user.id, email: user.email, role: user.role, profile: user.profile },
-    }, { status: 201 })
+      { status: 201 }
+    )
 
     response.cookies.set('token', token, {
       httpOnly: true,
