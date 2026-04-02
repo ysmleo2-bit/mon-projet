@@ -32,7 +32,7 @@ function RegisterForm() {
 
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Erreur d\'inscription')
+        setError(data.detail ? `${data.error}: ${data.detail}` : (data.error ?? 'Erreur inconnue'))
         return
       }
 
