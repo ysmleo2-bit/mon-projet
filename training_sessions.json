@@ -1,0 +1,62 @@
+[
+  {
+    "eleve_id": "eleve_001",
+    "date": "2026-04-06",
+    "messages_envoyes": 22,
+    "reponses_obtenues": 8,
+    "rdv_poses": 2,
+    "rdv_honores": 1,
+    "niche": "reconversion",
+    "notes": "Bonne accroche, à travailler la relance"
+  },
+  {
+    "eleve_id": "eleve_001",
+    "date": "2026-04-07",
+    "messages_envoyes": 28,
+    "reponses_obtenues": 11,
+    "rdv_poses": 3,
+    "rdv_honores": 2,
+    "niche": "reconversion",
+    "notes": "Progression notable sur le taux de réponse"
+  },
+  {
+    "eleve_id": "eleve_002",
+    "date": "2026-04-06",
+    "messages_envoyes": 35,
+    "reponses_obtenues": 14,
+    "rdv_poses": 4,
+    "rdv_honores": 3,
+    "niche": "freelance",
+    "notes": "Excellente journée, objectif atteint"
+  },
+  {
+    "eleve_id": "eleve_002",
+    "date": "2026-04-07",
+    "messages_envoyes": 40,
+    "reponses_obtenues": 18,
+    "rdv_poses": 5,
+    "rdv_honores": 4,
+    "niche": "freelance",
+    "notes": "Top performance, à maintenir"
+  },
+  {
+    "eleve_id": "eleve_003",
+    "date": "2026-04-06",
+    "messages_envoyes": 48,
+    "reponses_obtenues": 21,
+    "rdv_poses": 7,
+    "rdv_honores": 6,
+    "niche": "emploi",
+    "notes": "Niveau expert, script parfaitement maîtrisé"
+  },
+  {
+    "eleve_id": "eleve_003",
+    "date": "2026-04-07",
+    "messages_envoyes": 52,
+    "reponses_obtenues": 24,
+    "rdv_poses": 8,
+    "rdv_honores": 7,
+    "niche": "emploi",
+    "notes": "Record personnel battu"
+  }
+]
