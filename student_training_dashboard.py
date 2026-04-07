@@ -16,6 +16,8 @@ import os
 from datetime import datetime, date, timedelta
 from typing import Optional
 
+from training_simulator import sim_stats_eleve, load_sim_sessions
+
 # ── Chemins des fichiers ─────────────────────────────────────────────────────
 BASE_DIR        = os.path.dirname(os.path.abspath(__file__))
 STUDENTS_FILE   = os.path.join(BASE_DIR, "students_config.json")
@@ -56,11 +58,6 @@ def save_students(students: list[dict]) -> None:
         json.dump(students, f, ensure_ascii=False, indent=2)
 
 
-def load_sim_sessions() -> list[dict]:
-    if not os.path.exists(SIM_FILE):
-        return []
-    with open(SIM_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
 
 
 def load_sessions() -> list[dict]:
@@ -119,24 +116,6 @@ def progression_niveau(eleve: dict, stats: dict) -> str:
     barre = "█" * blocs + "░" * (10 - blocs)
     return f"[{barre}] {pct}%"
 
-
-def sim_stats_eleve(sim_sessions: list[dict], eleve_id: str) -> dict:
-    ss = [s for s in sim_sessions if s["eleve_id"] == eleve_id]
-    if not ss:
-        return {"nb": 0, "score_moy": 0, "meilleur": 0, "progression": 0,
-                "rdv_pct": 0, "niv_moy": 0}
-    scores = [s["scores"]["global"] for s in ss]
-    rdv_ok = sum(1 for s in ss if s.get("rdv_pose"))
-    niveaux = [s.get("niveau_difficulte", 1) for s in ss]
-    prog    = scores[-1] - scores[0] if len(scores) > 1 else 0
-    return {
-        "nb":          len(ss),
-        "score_moy":   round(sum(scores) / len(scores)),
-        "meilleur":    max(scores),
-        "progression": prog,
-        "rdv_pct":     round(rdv_ok / len(ss) * 100),
-        "niv_moy":     round(sum(niveaux) / len(niveaux), 1),
-    }
 
 
 def badge_performance(taux_reponse: float) -> str:

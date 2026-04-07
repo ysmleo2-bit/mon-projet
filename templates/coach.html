@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Coach — Setting Training{% endblock %}
+
+{% block content %}
+<div class="coach-page">
+
+  <div class="coach-header">
+    <h1>🎯 Dashboard Coach</h1>
+    <div class="coach-totals">
+      <div class="total-chip">📊 {{ total_sessions }} simulations totales</div>
+      <div class="total-chip">✅ ~{{ total_rdv }} RDV posés</div>
+    </div>
+  </div>
+
+  <div class="students-grid">
+    {% for item in stats_list %}
+    {% set eleve = item.eleve %}
+    {% set stats = item.stats %}
+    <div class="student-dash-card">
+      <div class="student-dash-top">
+        <div>
+          <div class="student-dash-name">{{ eleve.nom }}</div>
+          <div class="student-dash-meta">{{ eleve.niveau }} · {{ eleve.niche }}</div>
+        </div>
+        {% if stats.nb > 0 %}
+        <div class="student-dash-score" style="color: {{ stats.score_moy | score_color }}">
+          {{ stats.score_moy }}<span>/100</span>
+        </div>
+        {% else %}
+        <div class="student-dash-score" style="color:#94a3b8">—</div>
+        {% endif %}
+      </div>
+
+      {% if stats.nb > 0 %}
+      <div class="student-dash-stats">
+        <div class="mini-stat">
+          <span class="mini-val">{{ stats.nb }}</span>
+          <span class="mini-key">sessions</span>
+        </div>
+        <div class="mini-stat">
+          <span class="mini-val">{{ stats.meilleur }}/100</span>
+          <span class="mini-key">meilleur</span>
+        </div>
+        <div class="mini-stat">
+          <span class="mini-val" style="color:{{ stats.progression | prog_color }}">
+            {% if stats.progression > 0 %}+{% endif %}{{ stats.progression }} pts
+          </span>
+          <span class="mini-key">progression</span>
+        </div>
+        <div class="mini-stat">
+          <span class="mini-val">{{ stats.rdv_pct }}%</span>
+          <span class="mini-key">taux RDV</span>
+        </div>
+      </div>
+
+      {% if item.recent %}
+      <div class="recent-sessions">
+        <div class="recent-title">Sessions récentes</div>
+        {% for s in item.recent %}
+        <a href="{{ url_for('coach_session', session_id=s.id) }}" class="recent-row">
+          <span class="recent-date">{{ s.date }}</span>
+          <span class="recent-niche">{{ s.niche }}</span>
+          <span class="recent-niv">{{ niveaux[s.niveau_difficulte].emoji }}</span>
+          <span class="recent-score" style="color:{{ s.scores.global | score_color }}">
+            {{ s.scores.global }}/100
+          </span>
+          <span class="recent-rdv">{% if s.rdv_pose %}✅{% else %}❌{% endif %}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% else %}
+      <div class="no-sim">Aucune simulation effectuée</div>
+      {% endif %}
+
+      <a href="{{ url_for('coach_eleve', eleve_id=eleve.id) }}" class="btn btn-ghost btn-sm btn-block">
+        Voir le détail →
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

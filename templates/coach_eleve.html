@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{{ eleve.nom }} — Dashboard Coach{% endblock %}
+
+{% block content %}
+<div class="coach-page">
+
+  <div class="coach-header">
+    <div>
+      <a href="{{ url_for('coach') }}" class="back-link">← Retour dashboard</a>
+      <h1>{{ eleve.nom }}</h1>
+      <div class="coach-totals">
+        <div class="total-chip">{{ eleve.niveau }} · {{ eleve.niche }}</div>
+        <div class="total-chip">Objectif : {{ eleve.objectif_rdv_jour }} RDV/j</div>
+      </div>
+    </div>
+    {% if stats.nb > 0 %}
+    <div class="eleve-score-big" style="color:{{ stats.score_moy | score_color }}">
+      {{ stats.score_moy }}<span class="score-max">/100</span>
+      <div class="score-label-sm">moy. sim.</div>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if stats.nb > 0 %}
+  <!-- Résumé stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-card-val">{{ stats.nb }}</div>
+      <div class="stat-card-key">Sessions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-val">{{ stats.score_moy }}/100</div>
+      <div class="stat-card-key">Score moyen</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-val">{{ stats.meilleur }}/100</div>
+      <div class="stat-card-key">Meilleur score</div>
+    </div>
+    <div class="stat-card" style="color:{{ stats.progression | prog_color }}">
+      <div class="stat-card-val">{% if stats.progression > 0 %}+{% endif %}{{ stats.progression }}</div>
+      <div class="stat-card-key">Progression (pts)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-val">{{ stats.rdv_pct }}%</div>
+      <div class="stat-card-key">Taux RDV posés</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-val">{{ stats.niv_moy }}/4</div>
+      <div class="stat-card-key">Niveau moyen</div>
+    </div>
+  </div>
+
+  <!-- Tableau de toutes les sessions -->
+  <div class="card">
+    <h2 class="section-title">Toutes les sessions</h2>
+    <table class="sessions-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Niche</th>
+          <th>Niv.</th>
+          <th>Score</th>
+          <th>Accroche</th>
+          <th>Objections</th>
+          <th>Qualification</th>
+          <th>RDV</th>
+          <th>Naturel</th>
+          <th>RDV posé</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sessions %}
+        <tr>
+          <td>{{ s.date }}</td>
+          <td>{{ s.niche }}</td>
+          <td>{{ niveaux[s.niveau_difficulte].emoji }} {{ s.niveau_label }}</td>
+          <td style="color:{{ s.scores.global | score_color }}; font-weight:700">{{ s.scores.global }}/100</td>
+          <td>{{ s.scores.accroche }}/10</td>
+          <td>{{ s.scores.gestion_objections }}/10</td>
+          <td>{{ s.scores.qualification }}/10</td>
+          <td>{{ s.scores.rdv }}/10</td>
+          <td>{{ s.scores.naturel }}/10</td>
+          <td>{% if s.rdv_pose %}✅{% else %}❌{% endif %}</td>
+          <td><a href="{{ url_for('coach_session', session_id=s.id) }}" class="link-detail">Détail →</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card">
+    <p style="text-align:center; color:#94a3b8; padding:2rem">
+      Aucune simulation effectuée pour le moment.
+    </p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

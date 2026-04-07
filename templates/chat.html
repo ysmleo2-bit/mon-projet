@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Session avec {{ persona.prenom }} — Setting Training{% endblock %}
+
+{% block content %}
+<div class="chat-layout">
+
+  <!-- Panneau latéral -->
+  <aside class="chat-sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Élève</div>
+      <div class="sidebar-value">{{ eleve.nom }}</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Prospect</div>
+      <div class="sidebar-value">{{ persona.prenom }}, {{ persona.age }} ans</div>
+      <div class="sidebar-sub">{{ persona.situation }}</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Niche</div>
+      <div class="sidebar-value">{{ niche|capitalize }}</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Difficulté</div>
+      <div class="sidebar-value">{{ niv_info.emoji }} {{ niv_info.label }}</div>
+    </div>
+
+    <div class="sidebar-tips">
+      <div class="tips-title">💡 Conseils rapides</div>
+      <ul class="tips-list">
+        <li>Accroche personnalisée, pas générique</li>
+        <li>Pose des questions sur SA situation</li>
+        <li>Écoute active : reformule ce qu'il/elle dit</li>
+        <li>Objections : empathie d'abord</li>
+        <li>Propose le RDV au bon moment</li>
+      </ul>
+    </div>
+
+    <form action="{{ url_for('end_session') }}" method="POST" class="end-form">
+      <button type="submit" class="btn btn-danger btn-block"
+        onclick="return confirm('Terminer la session et obtenir ton évaluation ?')">
+        Terminer &amp; évaluer
+      </button>
+    </form>
+  </aside>
+
+  <!-- Zone de chat -->
+  <div class="chat-main">
+    <div class="chat-header">
+      <div class="chat-prospect-avatar">{{ persona.prenom[0] }}</div>
+      <div class="chat-prospect-info">
+        <div class="chat-prospect-name">{{ persona.prenom }}</div>
+        <div class="chat-prospect-status">
+          <span class="status-dot"></span> En ligne
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-system-msg">
+        La simulation commence. Envoie ton premier message à {{ persona.prenom }}.
+      </div>
+      {% for msg in conversation %}
+        {% if msg.role == 'eleve' %}
+        <div class="msg msg-eleve">
+          <div class="msg-bubble">{{ msg.message }}</div>
+          <div class="msg-time">{{ msg.heure }}</div>
+        </div>
+        {% else %}
+        <div class="msg msg-prospect">
+          <div class="msg-avatar">{{ persona.prenom[0] }}</div>
+          <div>
+            <div class="msg-bubble">{{ msg.message }}</div>
+            <div class="msg-time">{{ persona.prenom }} · {{ msg.heure }}</div>
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <div class="chat-input-bar">
+      <textarea id="msgInput" class="chat-input" placeholder="Tape ton message..."
+        rows="1" autofocus></textarea>
+      <button id="sendBtn" class="btn btn-send" onclick="sendMessage()">
+        Envoyer ↵
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const PRENOM = {{ persona.prenom | tojson }};
+
+  function scrollBottom() {
+    const box = document.getElementById("chatMessages");
+    box.scrollTop = box.scrollHeight;
+  }
+  scrollBottom();
+
+  // Envoi avec Entrée (Shift+Entrée pour saut de ligne)
+  document.getElementById("msgInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  async function sendMessage() {
+    const input = document.getElementById("msgInput");
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    const sendBtn = document.getElementById("sendBtn");
+    input.value = "";
+    sendBtn.disabled = true;
+    sendBtn.textContent = "…";
+
+    // Afficher le message de l'élève immédiatement
+    appendMsg("eleve", msg);
+
+    // Indicateur de frappe du prospect
+    const typing = appendTyping();
+
+    try {
+      const res = await fetch("{{ url_for('send_message') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: msg }),
+      });
+      const data = await res.json();
+      typing.remove();
+
+      if (data.error) {
+        appendSystem("❌ " + data.error);
+      } else {
+        appendMsg("prospect", data.reply, data.prenom);
+      }
+    } catch (err) {
+      typing.remove();
+      appendSystem("❌ Erreur réseau. Réessaie.");
+    }
+
+    sendBtn.disabled = false;
+    sendBtn.textContent = "Envoyer ↵";
+    input.focus();
+  }
+
+  function appendMsg(role, text, prenom) {
+    const box = document.getElementById("chatMessages");
+    const now = new Date().toTimeString().slice(0, 8);
+    const div = document.createElement("div");
+    div.className = `msg msg-${role}`;
+
+    if (role === "eleve") {
+      div.innerHTML = `
+        <div class="msg-bubble">${escHtml(text)}</div>
+        <div class="msg-time">${now}</div>`;
+    } else {
+      div.innerHTML = `
+        <div class="msg-avatar">${escHtml(prenom[0])}</div>
+        <div>
+          <div class="msg-bubble">${escHtml(text)}</div>
+          <div class="msg-time">${escHtml(prenom)} · ${now}</div>
+        </div>`;
+    }
+    box.appendChild(div);
+    scrollBottom();
+    return div;
+  }
+
+  function appendTyping() {
+    const box = document.getElementById("chatMessages");
+    const div = document.createElement("div");
+    div.className = "msg msg-prospect msg-typing";
+    div.innerHTML = `
+      <div class="msg-avatar">${escHtml(PRENOM[0])}</div>
+      <div class="msg-bubble typing-dots"><span></span><span></span><span></span></div>`;
+    box.appendChild(div);
+    scrollBottom();
+    return div;
+  }
+
+  function appendSystem(text) {
+    const box = document.getElementById("chatMessages");
+    const div = document.createElement("div");
+    div.className = "chat-system-msg";
+    div.textContent = text;
+    box.appendChild(div);
+    scrollBottom();
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+              .replace(/"/g,"&quot;").replace(/\n/g,"<br>");
+  }
+</script>
+{% endblock %}

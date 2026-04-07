@@ -163,6 +163,25 @@ def save_sim_session(session: dict) -> None:
         json.dump(sessions, f, ensure_ascii=False, indent=2)
 
 
+def sim_stats_eleve(sim_sessions: list[dict], eleve_id: str) -> dict:
+    ss = [s for s in sim_sessions if s["eleve_id"] == eleve_id]
+    if not ss:
+        return {"nb": 0, "score_moy": 0, "meilleur": 0, "progression": 0,
+                "rdv_pct": 0, "niv_moy": 0}
+    scores = [s["scores"]["global"] for s in ss]
+    rdv_ok = sum(1 for s in ss if s.get("rdv_pose"))
+    niveaux = [s.get("niveau_difficulte", 1) for s in ss]
+    prog    = scores[-1] - scores[0] if len(scores) > 1 else 0
+    return {
+        "nb":          len(ss),
+        "score_moy":   round(sum(scores) / len(scores)),
+        "meilleur":    max(scores),
+        "progression": prog,
+        "rdv_pct":     round(rdv_ok / len(ss) * 100),
+        "niv_moy":     round(sum(niveaux) / len(niveaux), 1),
+    }
+
+
 # ── Helpers affichage ────────────────────────────────────────────────────────
 
 def header(titre: str) -> None:

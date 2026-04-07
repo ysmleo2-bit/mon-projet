@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Choisir ton entraînement — Setting Training{% endblock %}
+
+{% block content %}
+<div class="page-center">
+  <div class="card setup-card">
+    <div class="setup-header">
+      <h1>🎯 Simulateur Setting</h1>
+      <p>Entraîne-toi à prospecter un contact simulé par IA.<br>Reçois une évaluation détaillée à la fin.</p>
+    </div>
+
+    <form action="{{ url_for('start_session') }}" method="POST" class="setup-form">
+
+      <!-- Sélection élève -->
+      <div class="form-section">
+        <label class="form-label">👤 Qui es-tu ?</label>
+        <div class="student-grid">
+          {% for eleve in students %}
+          <label class="student-card">
+            <input type="radio" name="eleve_id" value="{{ eleve.id }}" required
+              {% if loop.first %}checked{% endif %}>
+            <div class="student-card-inner">
+              <span class="student-name">{{ eleve.nom }}</span>
+              <span class="student-meta">{{ eleve.niveau }} · {{ eleve.niche }}</span>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Sélection niche -->
+      <div class="form-section">
+        <label class="form-label">🎯 Quelle niche ?</label>
+        <div class="niche-grid">
+          {% set niche_icons = {
+            'reconversion': '🔄',
+            'emploi': '💼',
+            'freelance': '💻',
+            'etudiant': '🎓',
+            'revenus': '💰',
+            'teletravail': '🏠',
+            'maman': '👩‍👧'
+          } %}
+          {% for n in niches %}
+          <label class="niche-card">
+            <input type="radio" name="niche" value="{{ n }}" required
+              {% if loop.first %}checked{% endif %}>
+            <div class="niche-card-inner">
+              <span class="niche-icon">{{ niche_icons.get(n, '🎯') }}</span>
+              <span class="niche-name">{{ n|capitalize }}</span>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Sélection niveau -->
+      <div class="form-section">
+        <label class="form-label">⚡ Niveau de difficulté</label>
+        <div class="level-grid">
+          {% for num, info in niveaux.items() %}
+          <label class="level-card level-{{ num }}">
+            <input type="radio" name="niveau" value="{{ num }}"
+              {% if num == 1 %}checked{% endif %}>
+            <div class="level-card-inner">
+              <span class="level-emoji">{{ info.emoji }}</span>
+              <span class="level-name">{{ info.label }}</span>
+              <span class="level-desc">{{ info.desc }}</span>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg">
+        Commencer la simulation →
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

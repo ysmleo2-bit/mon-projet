@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Résultats — Setting Training{% endblock %}
+
+{% block content %}
+<div class="page-center">
+  <div class="card results-card">
+
+    <div class="results-header">
+      <div class="results-score-circle" style="--score-color: {{ result.scores.global | score_color }}">
+        <span class="score-number">{{ result.scores.global }}</span>
+        <span class="score-max">/100</span>
+      </div>
+      <div class="results-meta">
+        <h2>{{ result.scores.global | score_label }}</h2>
+        <p>{{ result.eleve_nom }} · {{ result.niche|capitalize }} · {{ niv_info.emoji }} {{ niv_info.label }}</p>
+        <p class="results-rdv {% if result.rdv_pose %}rdv-ok{% else %}rdv-ko{% endif %}">
+          {% if result.rdv_pose %}✅ RDV posé{% else %}❌ Pas de RDV posé{% endif %}
+        </p>
+      </div>
+    </div>
+
+    <!-- Barres de scores détaillés -->
+    <div class="scores-grid">
+      {% set criteres = [
+        ('accroche',           'Accroche',           '🎣'),
+        ('gestion_objections', 'Gestion objections', '🛡️'),
+        ('qualification',      'Qualification',      '🔍'),
+        ('rdv',                'Prise de RDV',       '📅'),
+        ('naturel',            'Naturel / Flow',     '💬'),
+      ] %}
+      {% for key, label, icon in criteres %}
+      {% set val = result.scores[key] %}
+      <div class="score-row">
+        <div class="score-row-label">{{ icon }} {{ label }}</div>
+        <div class="score-bar-wrap">
+          <div class="score-bar-fill" style="width:{{ val * 10 }}%; background:{{ val | score_color }}"></div>
+        </div>
+        <div class="score-row-val">{{ val }}/10</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Feedback -->
+    <div class="feedback-cols">
+      {% if result.points_forts %}
+      <div class="feedback-block feedback-good">
+        <div class="feedback-title">✅ Points forts</div>
+        <ul>
+          {% for p in result.points_forts %}
+          <li>{{ p }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if result.points_ameliorer %}
+      <div class="feedback-block feedback-improve">
+        <div class="feedback-title">📈 À améliorer</div>
+        <ul>
+          {% for p in result.points_ameliorer %}
+          <li>{{ p }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if result.conseil_principal %}
+    <div class="conseil-box">
+      <div class="conseil-title">💡 Conseil principal</div>
+      <p>{{ result.conseil_principal }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Statistiques de session -->
+    <div class="session-stats">
+      <div class="stat-item">
+        <div class="stat-val">{{ result.duree_minutes }} min</div>
+        <div class="stat-key">Durée</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val">{{ result.nb_messages_eleve }}</div>
+        <div class="stat-key">Tes messages</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val">{{ result.niveau_difficulte }}/4</div>
+        <div class="stat-key">Difficulté</div>
+      </div>
+    </div>
+
+    <div class="results-actions">
+      <a href="{{ url_for('index') }}" class="btn btn-primary">Nouvelle session →</a>
+      <a href="{{ url_for('coach') }}" class="btn btn-ghost">Tableau de bord coach</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
