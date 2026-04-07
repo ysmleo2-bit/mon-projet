@@ -20,6 +20,7 @@ from typing import Optional
 BASE_DIR        = os.path.dirname(os.path.abspath(__file__))
 STUDENTS_FILE   = os.path.join(BASE_DIR, "students_config.json")
 SESSIONS_FILE   = os.path.join(BASE_DIR, "training_sessions.json")
+SIM_FILE        = os.path.join(BASE_DIR, "sim_sessions.json")
 
 # ── Niveaux et seuils ────────────────────────────────────────────────────────
 NIVEAUX = {
@@ -53,6 +54,13 @@ def load_students() -> list[dict]:
 def save_students(students: list[dict]) -> None:
     with open(STUDENTS_FILE, "w", encoding="utf-8") as f:
         json.dump(students, f, ensure_ascii=False, indent=2)
+
+
+def load_sim_sessions() -> list[dict]:
+    if not os.path.exists(SIM_FILE):
+        return []
+    with open(SIM_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def load_sessions() -> list[dict]:
@@ -112,6 +120,25 @@ def progression_niveau(eleve: dict, stats: dict) -> str:
     return f"[{barre}] {pct}%"
 
 
+def sim_stats_eleve(sim_sessions: list[dict], eleve_id: str) -> dict:
+    ss = [s for s in sim_sessions if s["eleve_id"] == eleve_id]
+    if not ss:
+        return {"nb": 0, "score_moy": 0, "meilleur": 0, "progression": 0,
+                "rdv_pct": 0, "niv_moy": 0}
+    scores = [s["scores"]["global"] for s in ss]
+    rdv_ok = sum(1 for s in ss if s.get("rdv_pose"))
+    niveaux = [s.get("niveau_difficulte", 1) for s in ss]
+    prog    = scores[-1] - scores[0] if len(scores) > 1 else 0
+    return {
+        "nb":          len(ss),
+        "score_moy":   round(sum(scores) / len(scores)),
+        "meilleur":    max(scores),
+        "progression": prog,
+        "rdv_pct":     round(rdv_ok / len(ss) * 100),
+        "niv_moy":     round(sum(niveaux) / len(niveaux), 1),
+    }
+
+
 def badge_performance(taux_reponse: float) -> str:
     if taux_reponse >= 40:
         return "🏆 ELITE"
@@ -138,6 +165,7 @@ def header(titre: str) -> None:
 
 
 def vue_globale(students: list[dict], sessions: list[dict]) -> None:
+    sim_sessions = load_sim_sessions()
     header("TABLEAU DE BORD SETTING — VUE GLOBALE")
     print(f"  Date : {date.today().strftime('%d/%m/%Y')}  |  Élèves actifs : {len([e for e in students if e['statut']=='actif'])}")
     print(SEP2)
@@ -174,10 +202,36 @@ def vue_globale(students: list[dict], sessions: list[dict]) -> None:
     print(f"\n  TOTAUX 7 DERNIERS JOURS")
     print(f"  Messages envoyés  : {total_msg}")
     print(f"  RDV posés         : {total_rdv}")
+
+    # ── Simulations ───────────────────────────────────────────────────────────
+    total_sim = sum(
+        sim_stats_eleve(sim_sessions, e["id"])["nb"]
+        for e in students if e["statut"] == "actif"
+    )
+    if total_sim > 0:
+        print(f"\n  {SEP2}")
+        print("  SIMULATIONS D'ENTRAÎNEMENT")
+        print(f"  {SEP2}")
+        print(f"  {'ÉLÈVE':<22} {'SESSIONS':<10} {'SCORE MOY':<12} {'MEILLEUR':<10} {'PROG':<8} {'RDV%'}")
+        print(f"  {'-'*60}")
+        for eleve in students:
+            if eleve["statut"] != "actif":
+                continue
+            ss = sim_stats_eleve(sim_sessions, eleve["id"])
+            if ss["nb"] == 0:
+                print(f"  {eleve['nom']:<22} {'—':<10} {'—':<12} {'—':<10} {'—':<8} —")
+                continue
+            prog_s = f"+{ss['progression']}" if ss["progression"] > 0 else str(ss["progression"])
+            print(
+                f"  {eleve['nom']:<22} {ss['nb']:<10} "
+                f"{ss['score_moy']}/100{'':<5} {ss['meilleur']}/100{'':<3} "
+                f"{prog_s:>6}   {ss['rdv_pct']}%"
+            )
     print()
 
 
 def vue_eleve(eleve: dict, sessions: list[dict]) -> None:
+    sim_sessions = load_sim_sessions()
     niveau = NIVEAUX.get(eleve["niveau"], NIVEAUX["debutant"])
     header(f"FICHE ÉLÈVE — {eleve['nom'].upper()} {niveau['emoji']}")
 
@@ -228,6 +282,42 @@ def vue_eleve(eleve: dict, sessions: list[dict]) -> None:
                 f"{s['rdv_honores']:<6} "
                 f"{s.get('notes','')}"
             )
+
+    # ── Simulations ───────────────────────────────────────────────────────────
+    ss = sim_stats_eleve(sim_sessions, eleve["id"])
+    if ss["nb"] > 0:
+        prog_s = f"+{ss['progression']}" if ss["progression"] > 0 else str(ss["progression"])
+        print(f"\n  {SEP2[:66]}")
+        print("  SIMULATIONS D'ENTRAÎNEMENT IA")
+        print(f"  {SEP2[:66]}")
+        print(f"  Sessions effectuées   : {ss['nb']}")
+        print(f"  Score moyen           : {ss['score_moy']}/100")
+        print(f"  Meilleur score        : {ss['meilleur']}/100")
+        print(f"  Progression           : {prog_s} pts (1ère → dernière session)")
+        print(f"  Taux RDV posés        : {ss['rdv_pct']}%")
+        print(f"  Niveau moyen pratiqué : {ss['niv_moy']}/4")
+
+        # 3 dernières sessions sim
+        recent_sim = sorted(
+            [s for s in sim_sessions if s["eleve_id"] == eleve["id"]],
+            key=lambda x: (x["date"], x["heure"]),
+            reverse=True
+        )[:3]
+        if recent_sim:
+            print(f"\n  3 DERNIÈRES SIMULATIONS")
+            print(f"  {'DATE':<12} {'NICHE':<14} {'NIV':<5} {'SCORE':<8} {'RDV':<5} CONSEIL")
+            for s in recent_sim:
+                rdv_ic  = "✅" if s.get("rdv_pose") else "❌"
+                conseil = s.get("conseil_principal", "")[:35]
+                if len(s.get("conseil_principal", "")) > 35:
+                    conseil += "…"
+                print(
+                    f"  {s['date']:<12} {s['niche']:<14} "
+                    f"{s.get('niveau_difficulte',1)}/4  "
+                    f"{s['scores']['global']}/100  {rdv_ic}    {conseil}"
+                )
+    else:
+        print(f"\n  💡 Aucune simulation IA effectuée — lance : python training_simulator.py")
     print()
 
 
