@@ -19,7 +19,12 @@
         <a href="{{ url_for('login') }}">Connexion</a>
         <a href="{{ url_for('register') }}">Créer un compte</a>
       {% endif %}
-      <a href="{{ url_for('coach') }}" class="nav-coach">Coach</a>
+      {% if session.get('coach_logged_in') %}
+        <a href="{{ url_for('coach') }}" class="nav-coach">Dashboard Coach</a>
+        <a href="{{ url_for('coach_logout') }}" class="nav-logout">Déco Coach</a>
+      {% else %}
+        <a href="{{ url_for('coach_login') }}" class="nav-coach">Coach</a>
+      {% endif %}
     </div>
   </nav>
   <main>

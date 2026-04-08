@@ -31,6 +31,9 @@ STUDENTS_FILE = os.path.join(BASE_DIR, "students_config.json")
 SIM_FILE      = os.path.join(BASE_DIR, "sim_sessions.json")
 ACCOUNTS_FILE = os.path.join(BASE_DIR, "accounts.json")
 
+COACH_EMAIL    = os.environ.get("COACH_EMAIL", "leo")
+COACH_PASSWORD = os.environ.get("COACH_PASSWORD", "coach2026")
+
 # ── Import des données du simulateur ────────────────────────────────────────
 from training_simulator import (
     NIVEAUX, NICHES, PERSONAS,
@@ -83,6 +86,15 @@ def login_required(f):
     def decorated(*args, **kwargs):
         if "user_id" not in session:
             return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def coach_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("coach_logged_in"):
+            return redirect(url_for("coach_login"))
         return f(*args, **kwargs)
     return decorated
 
@@ -342,7 +354,34 @@ def results():
 
 # ── Routes coach ─────────────────────────────────────────────────────────────
 
+@app.route("/coach/login", methods=["GET", "POST"])
+def coach_login():
+    if session.get("coach_logged_in"):
+        return redirect(url_for("coach"))
+
+    error = None
+    if request.method == "POST":
+        email    = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+
+        if (email == COACH_EMAIL.lower() and
+                hash_password(password) == hash_password(COACH_PASSWORD)):
+            session["coach_logged_in"] = True
+            return redirect(url_for("coach"))
+        else:
+            error = "Identifiants incorrects."
+
+    return render_template("coach_login.html", error=error)
+
+
+@app.route("/coach/logout")
+def coach_logout():
+    session.pop("coach_logged_in", None)
+    return redirect(url_for("coach_login"))
+
+
 @app.route("/coach")
+@coach_required
 def coach():
     accounts     = load_accounts()
     sim_sessions = load_sim_sessions()
@@ -377,6 +416,7 @@ def coach():
 
 
 @app.route("/coach/eleve/<eleve_id>")
+@coach_required
 def coach_eleve(eleve_id):
     accounts     = load_accounts()
     sim_sessions = load_sim_sessions()
@@ -401,6 +441,7 @@ def coach_eleve(eleve_id):
 
 
 @app.route("/coach/session/<session_id>")
+@coach_required
 def coach_session(session_id):
     sim_sessions = load_sim_sessions()
     s = next((x for x in sim_sessions if x["id"] == session_id), None)
