@@ -534,7 +534,7 @@ def resume_coach(students: list[dict], sessions: list[dict], eleve_id: str = Non
 
 # ── Sélecteurs interactifs ────────────────────────────────────────────────────
 
-def choisir_eleve(students: list[dict]) -> dict | None:
+def choisir_eleve(students: list[dict]):  # -> dict | None
     actifs = [e for e in students if e.get("statut") == "actif"]
     if not actifs:
         print("  Aucun élève actif dans students_config.json")
