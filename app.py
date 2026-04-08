@@ -10,10 +10,12 @@ Usage :
 """
 
 import argparse
+import hashlib
 import json
 import os
 import uuid
 from datetime import date, datetime
+from functools import wraps
 
 from dotenv import load_dotenv
 from flask import (Flask, jsonify, redirect, render_template,
@@ -27,6 +29,7 @@ app.secret_key = os.environ.get("FLASK_SECRET", "setting-training-secret-2026")
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 STUDENTS_FILE = os.path.join(BASE_DIR, "students_config.json")
 SIM_FILE      = os.path.join(BASE_DIR, "sim_sessions.json")
+ACCOUNTS_FILE = os.path.join(BASE_DIR, "accounts.json")
 
 # ── Import des données du simulateur ────────────────────────────────────────
 from training_simulator import (
@@ -40,13 +43,25 @@ from training_simulator import (
 )
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# ── Helpers fichiers ─────────────────────────────────────────────────────────
 
-def load_students() -> list[dict]:
+def load_students():
     if not os.path.exists(STUDENTS_FILE):
         return []
     with open(STUDENTS_FILE, encoding="utf-8") as f:
         return json.load(f)
+
+
+def load_accounts():
+    if not os.path.exists(ACCOUNTS_FILE):
+        return []
+    with open(ACCOUNTS_FILE, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_accounts(accounts):
+    with open(ACCOUNTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(accounts, f, ensure_ascii=False, indent=2)
 
 
 def get_client():
@@ -57,50 +72,142 @@ def get_client():
     return anthropic.Anthropic(api_key=api_key)
 
 
+# ── Auth helpers ─────────────────────────────────────────────────────────────
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ── Routes auth ──────────────────────────────────────────────────────────────
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if "user_id" in session:
+        return redirect(url_for("index"))
+
+    error = None
+    if request.method == "POST":
+        nom      = request.form.get("nom", "").strip()
+        email    = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        confirm  = request.form.get("confirm", "")
+
+        if not nom or not email or not password:
+            error = "Tous les champs sont obligatoires."
+        elif password != confirm:
+            error = "Les mots de passe ne correspondent pas."
+        elif len(password) < 6:
+            error = "Le mot de passe doit faire au moins 6 caractères."
+        else:
+            accounts = load_accounts()
+            if any(a["email"] == email for a in accounts):
+                error = "Cet email est déjà utilisé."
+            else:
+                account = {
+                    "id":            str(uuid.uuid4())[:8],
+                    "nom":           nom,
+                    "email":         email,
+                    "password_hash": hash_password(password),
+                    "created_at":    datetime.now().isoformat(),
+                    "statut":        "actif",
+                }
+                accounts.append(account)
+                save_accounts(accounts)
+                session["user_id"]    = account["id"]
+                session["user_nom"]   = account["nom"]
+                session["user_email"] = account["email"]
+                return redirect(url_for("index"))
+
+    return render_template("register.html", error=error)
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if "user_id" in session:
+        return redirect(url_for("index"))
+
+    error = None
+    if request.method == "POST":
+        email    = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+
+        accounts = load_accounts()
+        account  = next((a for a in accounts if a["email"] == email), None)
+
+        if not account or account.get("password_hash") != hash_password(password):
+            error = "Email ou mot de passe incorrect."
+        else:
+            session["user_id"]    = account["id"]
+            session["user_nom"]   = account["nom"]
+            session["user_email"] = account["email"]
+            return redirect(url_for("index"))
+
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 # ── Routes publiques (élèves) ────────────────────────────────────────────────
 
 @app.route("/")
+@login_required
 def index():
-    students = load_students()
-    actifs = [e for e in students if e.get("statut") == "actif"]
-    return render_template("index.html", students=actifs, niveaux=NIVEAUX, niches=NICHES)
+    return render_template("index.html", niveaux=NIVEAUX, niches=NICHES)
 
 
 @app.route("/start", methods=["POST"])
+@login_required
 def start_session():
-    eleve_id = request.form.get("eleve_id")
-    niche    = request.form.get("niche")
-    niveau   = int(request.form.get("niveau", 1))
+    niche  = request.form.get("niche")
+    niveau = int(request.form.get("niveau", 1))
 
-    students = load_students()
-    eleve = next((e for e in students if e["id"] == eleve_id), None)
-    if not eleve:
-        return redirect(url_for("index"))
+    eleve = {
+        "id":    session["user_id"],
+        "nom":   session["user_nom"],
+        "email": session.get("user_email", ""),
+    }
 
-    persona = PERSONAS.get(niche, PERSONAS["reconversion"]).get(niveau, PERSONAS["reconversion"][1])
+    first_niche = NICHES[0] if NICHES else "trading"
+    persona = PERSONAS.get(niche, PERSONAS.get(first_niche, {})).get(
+        niveau, list(PERSONAS.get(first_niche, {}).values())[0] if PERSONAS.get(first_niche) else {}
+    )
 
-    session["eleve"]       = eleve
-    session["niche"]       = niche
-    session["niveau"]      = niveau
-    session["persona"]     = persona
+    session["eleve"]        = eleve
+    session["niche"]        = niche
+    session["niveau"]       = niveau
+    session["persona"]      = persona
     session["conversation"] = []
     session["api_messages"] = []
-    session["start_time"]  = datetime.now().isoformat()
-    session["session_id"]  = f"sim_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{eleve_id}"
+    session["start_time"]   = datetime.now().isoformat()
+    session["session_id"]   = f"sim_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{eleve['id']}"
 
     return redirect(url_for("chat"))
 
 
 @app.route("/chat")
+@login_required
 def chat():
     if "eleve" not in session:
         return redirect(url_for("index"))
-    eleve   = session["eleve"]
-    niche   = session["niche"]
-    niveau  = session["niveau"]
-    persona = session["persona"]
+    eleve    = session["eleve"]
+    niche    = session["niche"]
+    niveau   = session["niveau"]
+    persona  = session["persona"]
     niv_info = NIVEAUX[niveau]
-    conv    = session.get("conversation", [])
+    conv     = session.get("conversation", [])
     return render_template(
         "chat.html",
         eleve=eleve,
@@ -126,14 +233,13 @@ def send_message():
     if not client:
         return jsonify({"error": "ANTHROPIC_API_KEY manquante — contacte ton coach"}), 503
 
-    niche   = session["niche"]
-    niveau  = session["niveau"]
-    persona = session["persona"]
+    niche        = session["niche"]
+    niveau       = session["niveau"]
+    persona      = session["persona"]
     sys_prompt   = build_prospect_system_prompt(persona, niche, niveau)
     api_messages = session.get("api_messages", [])
     conversation = session.get("conversation", [])
 
-    # Ajouter le message élève
     api_messages.append({"role": "user", "content": message})
     conversation.append({
         "role":    "eleve",
@@ -161,6 +267,7 @@ def send_message():
 
 
 @app.route("/end", methods=["POST"])
+@login_required
 def end_session():
     if "eleve" not in session:
         return redirect(url_for("index"))
@@ -182,7 +289,6 @@ def end_session():
     nb_msgs    = sum(1 for m in conversation if m["role"] == "eleve")
     niv_info   = NIVEAUX[niveau]
 
-    # Évaluation
     if client:
         try:
             scores = evaluate_session(client, conversation, eleve["nom"], niche, niveau, persona)
@@ -191,17 +297,16 @@ def end_session():
     else:
         scores = _default_scores()
 
-    # Sauvegarder
     sim_session = {
-        "id":              session_id,
-        "eleve_id":        eleve["id"],
-        "eleve_nom":       eleve["nom"],
-        "date":            date.today().isoformat(),
-        "heure":           start_time.strftime("%H:%M"),
-        "niche":           niche,
+        "id":                session_id,
+        "eleve_id":          eleve["id"],
+        "eleve_nom":         eleve["nom"],
+        "date":              date.today().isoformat(),
+        "heure":             start_time.strftime("%H:%M"),
+        "niche":             niche,
         "niveau_difficulte": niveau,
-        "niveau_label":    niv_info["label"],
-        "duree_minutes":   duree,
+        "niveau_label":      niv_info["label"],
+        "duree_minutes":     duree,
         "nb_messages_eleve": nb_msgs,
         "scores": {
             "accroche":           scores.get("accroche", 5),
@@ -219,7 +324,6 @@ def end_session():
     }
     save_sim_session(sim_session)
 
-    # Stocker les résultats pour la page de résultats
     session["last_result"] = sim_session
     session.modified = True
 
@@ -227,6 +331,7 @@ def end_session():
 
 
 @app.route("/results")
+@login_required
 def results():
     if "last_result" not in session:
         return redirect(url_for("index"))
@@ -239,18 +344,16 @@ def results():
 
 @app.route("/coach")
 def coach():
-    students     = load_students()
+    accounts     = load_accounts()
     sim_sessions = load_sim_sessions()
-    actifs       = [e for e in students if e.get("statut") == "actif"]
 
     stats_list = []
-    for eleve in actifs:
+    for eleve in accounts:
         ss = sim_stats_eleve(sim_sessions, eleve["id"])
-        # Sessions récentes de cet élève
         recent = sorted(
             [s for s in sim_sessions if s["eleve_id"] == eleve["id"]],
             key=lambda x: (x["date"], x["heure"]),
-            reverse=True
+            reverse=True,
         )[:3]
         stats_list.append({
             "eleve":  eleve,
@@ -258,7 +361,6 @@ def coach():
             "recent": recent,
         })
 
-    # Totaux globaux
     total_sessions = sum(s["stats"]["nb"] for s in stats_list)
     total_rdv      = sum(
         s["stats"]["nb"] * s["stats"]["rdv_pct"] // 100
@@ -276,9 +378,10 @@ def coach():
 
 @app.route("/coach/eleve/<eleve_id>")
 def coach_eleve(eleve_id):
-    students     = load_students()
+    accounts     = load_accounts()
     sim_sessions = load_sim_sessions()
-    eleve = next((e for e in students if e["id"] == eleve_id), None)
+
+    eleve = next((a for a in accounts if a["id"] == eleve_id), None)
     if not eleve:
         return redirect(url_for("coach"))
 
@@ -309,7 +412,7 @@ def coach_session(session_id):
 
 # ── Utilitaires ───────────────────────────────────────────────────────────────
 
-def _default_scores() -> dict:
+def _default_scores():
     return {
         "accroche": 5, "gestion_objections": 5, "qualification": 5,
         "rdv": 5, "naturel": 5, "score_global": 50,
@@ -333,15 +436,15 @@ def score_color(score):
 @app.template_filter("score_label")
 def score_label(score):
     if score >= 85:
-        return "ELITE 🏆"
+        return "ELITE"
     elif score >= 70:
-        return "EXCELLENT ⭐"
+        return "EXCELLENT"
     elif score >= 55:
-        return "BON ✅"
+        return "BON"
     elif score >= 40:
-        return "EN PROGRESSION 📈"
+        return "EN PROGRESSION"
     else:
-        return "À TRAVAILLER 🔄"
+        return "A TRAVAILLER"
 
 
 @app.template_filter("prog_color")
@@ -361,7 +464,7 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=5000, help="Port (défaut: 5000)")
     parser.add_argument("--debug", action="store_true", help="Mode debug")
     args = parser.parse_args()
-    print(f"\n  🚀 Interface Setting Training démarrée")
-    print(f"  ➜  http://localhost:{args.port}")
-    print(f"  ➜  Coach : http://localhost:{args.port}/coach\n")
+    print(f"\n  Simulateur Setting Training")
+    print(f"  ->  http://localhost:{args.port}")
+    print(f"  ->  Coach : http://localhost:{args.port}/coach\n")
     app.run(host=args.host, port=args.port, debug=args.debug)

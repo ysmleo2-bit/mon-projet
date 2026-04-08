@@ -9,10 +9,17 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="{{ url_for('index') }}" class="nav-logo">⚡ Setting Training</a>
+    <a href="{{ url_for('index') }}" class="nav-logo">Setting Training</a>
     <div class="nav-links">
-      <a href="{{ url_for('index') }}">Entraînement</a>
-      <a href="{{ url_for('coach') }}" class="nav-coach">Coach 🎯</a>
+      {% if session.get('user_id') %}
+        <span class="nav-user">{{ session.get('user_nom') }}</span>
+        <a href="{{ url_for('index') }}">Entraînement</a>
+        <a href="{{ url_for('logout') }}" class="nav-logout">Déconnexion</a>
+      {% else %}
+        <a href="{{ url_for('login') }}">Connexion</a>
+        <a href="{{ url_for('register') }}">Créer un compte</a>
+      {% endif %}
+      <a href="{{ url_for('coach') }}" class="nav-coach">Coach</a>
     </div>
   </nav>
   <main>
