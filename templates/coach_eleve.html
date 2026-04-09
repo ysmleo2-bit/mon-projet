@@ -9,8 +9,8 @@
       <a href="{{ url_for('coach') }}" class="back-link">← Retour dashboard</a>
       <h1>{{ eleve.nom }}</h1>
       <div class="coach-totals">
-        <div class="total-chip">{{ eleve.niveau }} · {{ eleve.niche }}</div>
-        <div class="total-chip">Objectif : {{ eleve.objectif_rdv_jour }} RDV/j</div>
+        <div class="total-chip">{{ eleve.email }}</div>
+        <div class="total-chip">Inscrit le {{ eleve.created_at[:10] }}</div>
       </div>
     </div>
     {% if stats.nb > 0 %}

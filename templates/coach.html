@@ -20,7 +20,7 @@
       <div class="student-dash-top">
         <div>
           <div class="student-dash-name">{{ eleve.nom }}</div>
-          <div class="student-dash-meta">{{ eleve.niveau }} · {{ eleve.niche }}</div>
+          <div class="student-dash-meta">{{ eleve.email }}</div>
         </div>
         {% if stats.nb > 0 %}
         <div class="student-dash-score" style="color: {{ stats.score_moy | score_color }}">
