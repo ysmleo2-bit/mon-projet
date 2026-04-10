@@ -7,3 +7,5 @@ post_log.json
 __pycache__/
 *.pyc
 .playwright/
+app.pid
+monitor.log
