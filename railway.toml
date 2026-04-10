@@ -1,6 +1,2 @@
-[build]
-buildCommand = "pip install flask gunicorn python-dotenv anthropic"
-
 [deploy]
-startCommand = "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
 restartPolicyType = "on_failure"
