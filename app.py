@@ -14,7 +14,7 @@ import hashlib
 import json
 import os
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 
 from dotenv import load_dotenv
@@ -30,6 +30,8 @@ BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 STUDENTS_FILE = os.path.join(BASE_DIR, "students_config.json")
 SIM_FILE      = os.path.join(BASE_DIR, "sim_sessions.json")
 ACCOUNTS_FILE = os.path.join(BASE_DIR, "accounts.json")
+
+ACTIVE_FILE    = os.path.join(BASE_DIR, "active_sessions.json")
 
 COACH_EMAIL    = os.environ.get("COACH_EMAIL", "leo")
 COACH_PASSWORD = os.environ.get("COACH_PASSWORD", "coach2026")
@@ -65,6 +67,29 @@ def load_accounts():
 def save_accounts(accounts):
     with open(ACCOUNTS_FILE, "w", encoding="utf-8") as f:
         json.dump(accounts, f, ensure_ascii=False, indent=2)
+
+
+def load_active():
+    if not os.path.exists(ACTIVE_FILE):
+        return {}
+    try:
+        with open(ACTIVE_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_active(data):
+    try:
+        with open(ACTIVE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def clean_active(data):
+    cutoff = (datetime.now() - timedelta(minutes=5)).isoformat()
+    return {k: v for k, v in data.items() if v.get("last_ping", "") >= cutoff}
 
 
 def get_client():
@@ -206,6 +231,20 @@ def start_session():
     session["start_time"]   = datetime.now().isoformat()
     session["session_id"]   = f"sim_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{eleve['id']}"
 
+    # Enregistrement session active (live tracking)
+    active = clean_active(load_active())
+    active[session["session_id"]] = {
+        "eleve_nom":    eleve["nom"],
+        "eleve_id":     eleve["id"],
+        "niche":        niche,
+        "niveau":       niveau,
+        "niveau_label": NIVEAUX[niveau]["label"],
+        "nb_messages":  0,
+        "start_time":   session["start_time"],
+        "last_ping":    datetime.now().isoformat(),
+    }
+    save_active(active)
+
     return redirect(url_for("chat"))
 
 
@@ -275,6 +314,15 @@ def send_message():
     session["conversation"]  = conversation
     session.modified = True
 
+    # Ping session active
+    sid = session.get("session_id")
+    if sid:
+        active = load_active()
+        if sid in active:
+            active[sid]["nb_messages"] = sum(1 for m in conversation if m["role"] == "eleve")
+            active[sid]["last_ping"]   = datetime.now().isoformat()
+            save_active(active)
+
     return jsonify({"reply": reply, "prenom": persona["prenom"]})
 
 
@@ -334,6 +382,11 @@ def end_session():
         "conseil_principal": scores.get("conseil_principal", ""),
         "conversation":      conversation,
     }
+    # Retrait de la session active
+    active = load_active()
+    active.pop(session_id, None)
+    save_active(active)
+
     save_sim_session(sim_session)
 
     session["last_result"] = sim_session
@@ -449,6 +502,62 @@ def coach_session(session_id):
         return redirect(url_for("coach"))
     niv_info = NIVEAUX.get(s.get("niveau_difficulte", 1), NIVEAUX[1])
     return render_template("coach_session.html", s=s, niv_info=niv_info)
+
+
+@app.route("/api/dashboard")
+@coach_required
+def api_dashboard():
+    accounts     = load_accounts()
+    sim_sessions = load_sim_sessions()
+    active       = clean_active(load_active())
+
+    today       = date.today().isoformat()
+    sess_today  = [s for s in sim_sessions if s.get("date") == today]
+    rdv_today   = sum(1 for s in sess_today if s.get("rdv_pose"))
+    avg_today   = (
+        sum(s["scores"]["global"] for s in sess_today) // len(sess_today)
+        if sess_today else 0
+    )
+
+    sorted_recent = sorted(
+        sim_sessions,
+        key=lambda x: (x.get("date", ""), x.get("heure", "")),
+        reverse=True,
+    )[:25]
+    recent_light = [{
+        "id":                s["id"],
+        "eleve_id":          s.get("eleve_id", ""),
+        "eleve_nom":         s.get("eleve_nom", ""),
+        "date":              s.get("date", ""),
+        "heure":             s.get("heure", ""),
+        "niche":             s.get("niche", ""),
+        "niveau_difficulte": s.get("niveau_difficulte", 1),
+        "niveau_label":      s.get("niveau_label", ""),
+        "score":             s.get("scores", {}).get("global", 0),
+        "rdv_pose":          s.get("rdv_pose", False),
+    } for s in sorted_recent]
+
+    students       = []
+    total_sessions = 0
+    total_rdv      = 0
+    for e in accounts:
+        ss = sim_stats_eleve(sim_sessions, e["id"])
+        students.append({"id": e["id"], "nom": e["nom"], "email": e["email"], "stats": ss})
+        total_sessions += ss["nb"]
+        total_rdv      += round(ss["nb"] * ss["rdv_pct"] / 100)
+
+    return jsonify({
+        "ts":             datetime.now().isoformat(),
+        "active":         list(active.values()),
+        "active_count":   len(active),
+        "sessions_today": len(sess_today),
+        "rdv_today":      rdv_today,
+        "avg_today":      avg_today,
+        "total_sessions": total_sessions,
+        "total_rdv":      total_rdv,
+        "recent":         recent_light,
+        "students":       students,
+    })
 
 
 # ── Utilitaires ───────────────────────────────────────────────────────────────
