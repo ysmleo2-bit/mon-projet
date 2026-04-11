@@ -51,11 +51,11 @@ function setState(state: AppState): void {
   // Status label
   statusText.className = state !== "inactive" && state !== "idle" ? "active" : "";
   const labels: Record<AppState, string> = {
-    inactive: "Click to activate",
-    idle:     "Listening...",
-    listening:"Listening...",
-    thinking: "Thinking...",
-    speaking: "Speaking...",
+    inactive: "Cliquez pour activer",
+    idle:     "À l'écoute...",
+    listening:"À l'écoute...",
+    thinking: "Réflexion...",
+    speaking: "En train de parler...",
   };
   statusText.textContent = labels[state];
 
@@ -80,7 +80,7 @@ function connectWs(): void {
   });
 
   ws.on("disconnected", () => {
-    statusText.textContent = "Reconnecting...";
+    statusText.textContent = "Reconnexion...";
   });
 
   ws.on("status", (msg) => {
@@ -174,7 +174,7 @@ function init(): void {
 
   // Speech API warning
   if (!voice.hasSpeechSupport) {
-    statusText.textContent = "Use Chrome for voice support";
+    statusText.textContent = "Utilisez Chrome pour la reconnaissance vocale";
   }
 }
 

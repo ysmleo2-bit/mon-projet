@@ -37,7 +37,7 @@ export class VoiceManager {
     this.recognition = new SR();
     this.recognition.continuous = true;
     this.recognition.interimResults = false;
-    this.recognition.lang = "en-US";
+    this.recognition.lang = "fr-FR";
     this.recognition.maxAlternatives = 1;
 
     this.recognition.onresult = (ev) => {

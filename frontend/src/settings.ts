@@ -58,7 +58,7 @@ export function initSettingsPanel(
   });
 
   clearBtn.addEventListener("click", () => {
-    if (confirm("Clear all conversation history with JARVIS?")) {
+    if (confirm("Effacer tout l'historique de conversation avec JARVIS ?")) {
       onClearHistory();
     }
   });
