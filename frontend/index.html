@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="author" content="Taoufik — instagram.com/taoufik.ai">
+    <title>JARVIS</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="orb-canvas"></canvas>
+      <div id="status-ring"></div>
+      <div id="status-text">Click to activate</div>
+      <div id="transcript-box">
+        <div id="transcript-content"></div>
+      </div>
+      <button id="settings-btn" aria-label="Settings">&#9881;</button>
+    </div>
+
+    <div id="settings-panel" class="hidden">
+      <div class="settings-content">
+        <h2>JARVIS</h2>
+        <label>
+          Your name
+          <input type="text" id="setting-name" placeholder="Tony" autocomplete="off" />
+        </label>
+        <label>
+          Backend URL
+          <input type="text" id="setting-backend" placeholder="https://localhost:8340" autocomplete="off" />
+        </label>
+        <div class="settings-actions">
+          <button id="settings-save">Save</button>
+          <button id="settings-close">Close</button>
+          <button id="settings-clear-history">Clear History</button>
+        </div>
+        <p class="settings-hint">Make sure you're using Google Chrome for voice support.</p>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

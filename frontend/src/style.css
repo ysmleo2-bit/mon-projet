@@ -1,0 +1,290 @@
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #000;
+  --surface: #080808;
+  --border: #1c1c1c;
+  --text: #e2e2e2;
+  --text-muted: #555;
+  --accent: #4fc3f7;
+  --accent-dim: rgba(79, 195, 247, 0.15);
+  --danger: #ef5350;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* ─── Orb canvas ─────────────────────────────────────────────────────────── */
+
+#orb-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Status ring ────────────────────────────────────────────────────────── */
+
+#status-ring {
+  position: absolute;
+  width: 216px;
+  height: 216px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  pointer-events: none;
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+#status-ring.listening {
+  border-color: #00bcd4;
+  box-shadow: 0 0 24px #00bcd4, inset 0 0 24px rgba(0, 188, 212, 0.08);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+#status-ring.thinking {
+  border-color: #7c4dff;
+  box-shadow: 0 0 28px #7c4dff;
+  animation: spin 2s linear infinite;
+}
+
+#status-ring.speaking {
+  border-color: #00e5ff;
+  box-shadow: 0 0 36px #00e5ff;
+  animation: pulse 0.75s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Status label ───────────────────────────────────────────────────────── */
+
+#status-text {
+  position: absolute;
+  bottom: calc(50% - 148px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  pointer-events: none;
+  white-space: nowrap;
+  transition: color 0.3s;
+}
+
+#status-text.active {
+  color: var(--accent);
+}
+
+/* ─── Transcript ─────────────────────────────────────────────────────────── */
+
+#transcript-box {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(620px, 90vw);
+  max-height: 220px;
+  overflow-y: auto;
+  pointer-events: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+#transcript-box::-webkit-scrollbar { width: 3px; }
+#transcript-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+#transcript-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.transcript-line {
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  opacity: 0;
+  animation: fade-up 0.3s ease forwards;
+  max-width: 88%;
+}
+
+.transcript-line.user {
+  background: rgba(79, 195, 247, 0.08);
+  border: 1px solid rgba(79, 195, 247, 0.18);
+  align-self: flex-end;
+  color: #ddd;
+}
+
+.transcript-line.jarvis {
+  background: rgba(124, 77, 255, 0.08);
+  border: 1px solid rgba(124, 77, 255, 0.18);
+  align-self: flex-start;
+  color: #ccc;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Settings button ────────────────────────────────────────────────────── */
+
+#settings-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+  z-index: 100;
+}
+
+#settings-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text);
+}
+
+/* ─── Settings panel ─────────────────────────────────────────────────────── */
+
+#settings-panel {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+#settings-panel.hidden {
+  display: none;
+}
+
+.settings-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 36px 32px;
+  width: min(400px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.settings-content h2 {
+  font-size: 18px;
+  font-weight: 300;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.settings-content label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  color: var(--text-muted);
+}
+
+.settings-content input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 13px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.settings-content input:focus {
+  border-color: var(--accent);
+}
+
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-actions button {
+  flex: 1;
+  min-width: 80px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  letter-spacing: 0.5px;
+}
+
+.settings-actions button:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+#settings-save {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+#settings-clear-history {
+  border-color: var(--danger) !important;
+  color: var(--danger) !important;
+}
+
+.settings-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
