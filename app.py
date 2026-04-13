@@ -45,6 +45,7 @@ from training_simulator import (
     sim_stats_eleve,
     load_sim_sessions,
     save_sim_session,
+    pick_persona,
 )
 
 
@@ -217,10 +218,7 @@ def start_session():
         "email": session.get("user_email", ""),
     }
 
-    first_niche = NICHES[0] if NICHES else "trading"
-    persona = PERSONAS.get(niche, PERSONAS.get(first_niche, {})).get(
-        niveau, list(PERSONAS.get(first_niche, {}).values())[0] if PERSONAS.get(first_niche) else {}
-    )
+    persona = pick_persona(niche, niveau)
 
     session["eleve"]        = eleve
     session["niche"]        = niche

@@ -60,9 +60,20 @@ PERSONAS: dict[str, dict[int, dict]] = {
         2: {"prenom": "Antoine", "age": 32, "situation": "homme qui s'entraîne de façon irrégulière depuis 1 an",
             "contexte": "Il s'entraîne un peu mais sans régularité. Objectif : sécher un peu, reprendre du muscle, et vider la tête. Il sent qu'il progresse pas. Pas hostile, mais il va poser la question du prix assez tôt. Si le setter est naturel, il reste ouvert. Il peut hésiter sur le timing ('je sais pas si c'est le bon moment').",
             "objections": ["c'est combien ?", "j'sais pas si c'est le bon moment", "j'ai déjà essayé de me motiver seul", "t'as des résultats de gens comme moi ?"]},
-        3: {"prenom": "Sabine", "age": 45, "situation": "femme avec fibromyalgie qui a du mal à s'entraîner normalement",
-            "contexte": "Elle suit le coach depuis peu. Elle fait du yoga, tai chi, méditation mais ne peut pas faire du sport classique à cause de sa fibromyalgie. Elle a essayé plusieurs programmes sportifs qui n'ont pas tenu compte de sa condition. Méfiante, elle va poser des questions sur si le coach connaît vraiment sa pathologie. Elle n'est pas agressive mais elle teste la crédibilité.",
-            "objections": ["est-ce que tu connais vraiment la fibromyalgie ?", "j'ai essayé des programmes classiques et j'en pouvais plus", "c'est adapté à ma situation ?", "combien ça coûte ?", "j'ai peur de dépenser pour rien encore"]},
+        3: [
+            {"weight": 49, "prenom": "Romain", "age": 36,
+             "situation": "ex-sportif reconverti en sédentaire, a essayé la salle deux fois sans tenir",
+             "contexte": "Ancien foot en amateur, a pris 18 kg depuis l'arrêt. A payé deux abonnements salle qu'il n'a pas utilisés plus de 6 semaines. Il est méfiant des coachs Instagram qu'il associe au marketing vide. Il peut être sec au début mais si on creuse vraiment sa situation et qu'on ne sort pas de promesses floues, il s'ouvre. Il sort ses objections une par une.",
+             "objections": ["j'ai déjà pris deux abonnements salle et j'ai lâché les deux fois", "c'est quoi ta méthode concrètement ?", "tous les coachs disent la même chose sur Insta", "t'as des résultats réels sur des gens comme moi ?", "ça coûte combien ?"]},
+            {"weight": 49, "prenom": "Julie", "age": 33,
+             "situation": "a perdu 12 kg seule il y a deux ans et les a tous repris",
+             "contexte": "Elle sait ce qu'il faut faire en théorie — elle l'a prouvé. Mais elle a reperdu ses acquis et ça la ronge. Elle remet en question la valeur ajoutée d'un coach en ligne par rapport à ce qu'elle peut faire seule. Elle est frustrée, pas agressive. Elle s'engage si on lui montre très clairement ce que le coaching change par rapport à son approche solo.",
+             "objections": ["j'ai déjà réussi à perdre du poids seule donc je vois pas pourquoi payer quelqu'un", "le problème c'est pas de savoir quoi faire c'est de tenir", "en quoi tu vas faire différemment ?", "et si je craque encore dans 3 mois ?", "combien ça coûte ?"]},
+            {"weight": 2, "prenom": "Sabine", "age": 45,
+             "situation": "femme avec fibromyalgie qui a du mal à s'entraîner normalement",
+             "contexte": "Elle suit le coach depuis peu. Elle fait du yoga, tai chi, méditation mais ne peut pas faire du sport classique à cause de sa fibromyalgie. Elle a essayé plusieurs programmes sportifs qui n'ont pas tenu compte de sa condition. Méfiante, elle va poser des questions sur si le coach connaît vraiment sa pathologie. Elle n'est pas agressive mais elle teste la crédibilité.",
+             "objections": ["est-ce que tu connais vraiment la fibromyalgie ?", "j'ai essayé des programmes classiques et j'en pouvais plus", "c'est adapté à ma situation ?", "combien ça coûte ?", "j'ai peur de dépenser pour rien encore"]},
+        ],
         4: {"prenom": "Marc", "age": 50, "situation": "homme sceptique total du coaching sportif en ligne",
             "contexte": "Il a vu passer des dizaines de coachs sur Instagram. Il pense que c'est surtout du marketing et que les résultats ne durent pas. Il peut être sec dans ses réponses. Il va remettre en question la légitimité, demander des preuves de résultats réels, et se méfier de toute tentative de vente. Ne dit pas non immédiatement mais met la pression sur chaque réponse.",
             "objections": ["tout le monde se dit coach sur Insta", "t'as des preuves concrètes que ça marche ?", "j'ai déjà vu ça des dizaines de fois", "le vrai sport ça se fait en salle pas en ligne", "non merci j'ai pas besoin de ça"]},
@@ -138,6 +149,33 @@ PERSONAS: dict[str, dict[int, dict]] = {
             "objections": ["95% des SaaS échouent dans les 18 mois", "sans churn négatif ça sert à rien", "t'as investi combien et t'en es où ?", "non je passe"]},
     },
 }
+
+
+# ── Sélection de persona (avec tirage pondéré si liste) ─────────────────────
+
+def pick_persona(niche: str, niveau: int) -> dict:
+    """
+    Retourne un persona pour la niche et le niveau donnés.
+    Si la valeur est une liste de dicts avec un champ 'weight',
+    on fait un tirage pondéré. Sinon on retourne directement le dict.
+    """
+    import random
+    first_niche = NICHES[0] if NICHES else "trading"
+    entry = PERSONAS.get(niche, PERSONAS.get(first_niche, {})).get(
+        niveau,
+        list(PERSONAS.get(first_niche, {}).values())[0]
+        if PERSONAS.get(first_niche) else {}
+    )
+    if isinstance(entry, list):
+        total = sum(p.get("weight", 1) for p in entry)
+        r = random.uniform(0, total)
+        cumul = 0
+        for p in entry:
+            cumul += p.get("weight", 1)
+            if r <= cumul:
+                return {k: v for k, v in p.items() if k != "weight"}
+        return {k: v for k, v in entry[-1].items() if k != "weight"}
+    return entry
 
 
 # ── Chargement / Sauvegarde ──────────────────────────────────────────────────
