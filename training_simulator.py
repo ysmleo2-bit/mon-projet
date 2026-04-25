@@ -21,8 +21,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BASE_DIR       = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR       = "/data" if os.path.isdir("/data") else BASE_DIR
+
 STUDENTS_FILE  = os.path.join(BASE_DIR, "students_config.json")
-SIM_FILE       = os.path.join(BASE_DIR, "sim_sessions.json")
+SIM_FILE       = os.path.join(DATA_DIR, "sim_sessions.json")
 
 SEP  = "=" * 68
 SEP2 = "-" * 68

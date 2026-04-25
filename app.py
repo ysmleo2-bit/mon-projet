@@ -27,11 +27,12 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "setting-training-secret-2026")
 
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
-STUDENTS_FILE = os.path.join(BASE_DIR, "students_config.json")
-SIM_FILE      = os.path.join(BASE_DIR, "sim_sessions.json")
-ACCOUNTS_FILE = os.path.join(BASE_DIR, "accounts.json")
+DATA_DIR      = "/data" if os.path.isdir("/data") else BASE_DIR
 
-ACTIVE_FILE    = os.path.join(BASE_DIR, "active_sessions.json")
+STUDENTS_FILE = os.path.join(BASE_DIR, "students_config.json")
+SIM_FILE      = os.path.join(DATA_DIR, "sim_sessions.json")
+ACCOUNTS_FILE = os.path.join(DATA_DIR, "accounts.json")
+ACTIVE_FILE   = os.path.join(DATA_DIR, "active_sessions.json")
 
 COACH_EMAIL    = os.environ.get("COACH_EMAIL", "leo")
 COACH_PASSWORD = os.environ.get("COACH_PASSWORD", "coach2026")
