@@ -13,28 +13,22 @@
     <div class="nav-links">
 
       {% if session.get('coach_logged_in') %}
-        {# ── Coach connecté ── #}
         <span class="nav-user nav-coach-badge">Coach</span>
         <a href="{{ url_for('index') }}">Entraînement</a>
         <a href="{{ url_for('coach') }}" class="nav-coach">Dashboard</a>
-        <a href="{{ url_for('feedback') }}">Signaler</a>
+        <a href="#" class="nav-signaler" onclick="openFb();return false;">Signaler</a>
         <a href="{{ url_for('coach_feedbacks') }}" class="nav-coach nav-feedback-link">
-          Feedbacks
-          {% if feedback_new_count > 0 %}
-          <span class="nav-badge">{{ feedback_new_count }}</span>
-          {% endif %}
+          Feedbacks{% if feedback_new_count > 0 %}<span class="nav-badge">{{ feedback_new_count }}</span>{% endif %}
         </a>
         <a href="{{ url_for('coach_logout') }}" class="nav-logout">Déconnexion</a>
 
       {% elif session.get('user_id') %}
-        {# ── Élève connecté ── #}
         <span class="nav-user">{{ session.get('user_nom') }}</span>
         <a href="{{ url_for('index') }}">Entraînement</a>
-        <a href="{{ url_for('feedback') }}">Signaler</a>
+        <a href="#" class="nav-signaler" onclick="openFb();return false;">Signaler</a>
         <a href="{{ url_for('logout') }}" class="nav-logout">Déconnexion</a>
 
       {% else %}
-        {# ── Non connecté ── #}
         <a href="{{ url_for('login') }}">Connexion</a>
         <a href="{{ url_for('register') }}">Créer un compte</a>
         <a href="{{ url_for('coach_login') }}" class="nav-coach">Coach</a>
@@ -42,8 +36,109 @@
 
     </div>
   </nav>
+
   <main>
     {% block content %}{% endblock %}
   </main>
+
+  <!-- ── Modale feedback ──────────────────────────────────── -->
+  {% if session.get('user_id') or session.get('coach_logged_in') %}
+  <div class="fb-overlay" id="fbOverlay">
+    <div class="fb-modal" id="fbModal">
+
+      <div class="fb-modal-header">
+        <div class="fb-modal-title">Envoyer un feedback</div>
+        <div class="fb-modal-sub">Bug, suggestion, ou remarque : tout est utile !</div>
+      </div>
+
+      <div class="fb-type-row">
+        <button class="fb-type-btn active" data-type="bug"
+          onclick="selectFbType(this)">🐛 Bug</button>
+        <button class="fb-type-btn" data-type="amélioration"
+          onclick="selectFbType(this)">💡 Suggestion</button>
+        <button class="fb-type-btn" data-type="autre"
+          onclick="selectFbType(this)">💬 Autre</button>
+      </div>
+
+      <textarea class="fb-textarea" id="fbDesc" rows="5"
+        placeholder="Décris le bug : que s'est-il passé ?"></textarea>
+
+      <button class="fb-send-btn" id="fbSendBtn" onclick="submitFb()">
+        Envoyer
+      </button>
+
+      <div class="fb-success" id="fbSuccess">
+        ✅ Merci ! Le coach a bien été notifié.
+      </div>
+
+    </div>
+
+    <button class="fb-close-btn" onclick="closeFb()">✕</button>
+  </div>
+
+  <script>
+    const FB_PLACEHOLDERS = {
+      'bug':          "Décris le bug : que s'est-il passé ?",
+      'amélioration': "Quelle amélioration tu aimerais voir ?",
+      'autre':        "Ta question ou remarque…",
+    };
+    let fbType = 'bug';
+
+    function openFb() {
+      document.getElementById('fbOverlay').classList.add('active');
+      document.getElementById('fbDesc').focus();
+    }
+    function closeFb() {
+      document.getElementById('fbOverlay').classList.remove('active');
+      document.getElementById('fbDesc').value = '';
+      document.getElementById('fbSuccess').style.display = 'none';
+      const btn = document.getElementById('fbSendBtn');
+      btn.style.display = '';
+      btn.disabled = false;
+      btn.textContent = 'Envoyer';
+      // Reset type
+      document.querySelectorAll('.fb-type-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector('.fb-type-btn[data-type="bug"]').classList.add('active');
+      fbType = 'bug';
+      document.getElementById('fbDesc').placeholder = FB_PLACEHOLDERS['bug'];
+    }
+    function selectFbType(btn) {
+      document.querySelectorAll('.fb-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      fbType = btn.dataset.type;
+      document.getElementById('fbDesc').placeholder = FB_PLACEHOLDERS[fbType] || '';
+    }
+    async function submitFb() {
+      const desc = document.getElementById('fbDesc').value.trim();
+      if (!desc) { document.getElementById('fbDesc').focus(); return; }
+      const btn = document.getElementById('fbSendBtn');
+      btn.disabled = true;
+      btn.textContent = 'Envoi…';
+      try {
+        const res = await fetch('/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ type: fbType, description: desc }),
+        });
+        if (res.ok) {
+          btn.style.display = 'none';
+          document.getElementById('fbSuccess').style.display = '';
+          setTimeout(closeFb, 2200);
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Envoyer';
+        }
+      } catch(e) {
+        btn.disabled = false;
+        btn.textContent = 'Envoyer';
+      }
+    }
+    document.getElementById('fbOverlay').addEventListener('click', function(e) {
+      if (e.target === this) closeFb();
+    });
+  </script>
+  {% endif %}
+
 </body>
 </html>

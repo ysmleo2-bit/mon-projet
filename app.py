@@ -551,19 +551,25 @@ def coach_session(session_id):
 @app.route("/feedback", methods=["GET", "POST"])
 @login_required
 def feedback():
-    success = False
     if request.method == "POST":
-        fb_type = request.form.get("type", "autre")
-        titre   = request.form.get("titre", "").strip()
-        desc    = request.form.get("description", "").strip()
-        page    = request.form.get("page", "").strip()
-        if titre and desc:
-            item = {
+        if request.is_json:
+            data    = request.get_json()
+            fb_type = data.get("type", "autre")
+            desc    = data.get("description", "").strip()
+            page    = request.referrer or "non précisée"
+        else:
+            fb_type = request.form.get("type", "autre")
+            desc    = request.form.get("description", "").strip()
+            page    = request.form.get("page", "") or request.referrer or "non précisée"
+
+        if desc:
+            titre = (desc[:80] + "…") if len(desc) > 80 else desc
+            item  = {
                 "id":          f"fb_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}",
                 "type":        fb_type,
                 "titre":       titre,
                 "description": desc,
-                "page":        page or "non précisée",
+                "page":        page,
                 "user_id":     session.get("user_id", "?"),
                 "user_nom":    session.get("user_nom", "Inconnu"),
                 "date":        date.today().isoformat(),
@@ -572,8 +578,14 @@ def feedback():
                 "created_at":  datetime.now().isoformat(),
             }
             save_feedback_item(item)
-            success = True
-    return render_template("feedback.html", success=success)
+            if request.is_json:
+                return jsonify({"ok": True})
+            return render_template("feedback.html", success=True)
+
+        if request.is_json:
+            return jsonify({"ok": False}), 400
+
+    return render_template("feedback.html", success=False)
 
 
 @app.route("/coach/feedbacks")

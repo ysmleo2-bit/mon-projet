@@ -794,7 +794,125 @@ a:hover { text-decoration: underline; }
   font-size: .85rem;
 }
 
-/* ══ FEEDBACK ════════════════════════════════════════════════ */
+/* ══ MODALE FEEDBACK ═════════════════════════════════════════ */
+
+.fb-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 500;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(2px);
+}
+.fb-overlay.active { display: flex; }
+
+.fb-modal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 20px 20px 14px 14px;
+  padding: 1.75rem;
+  width: 100%;
+  max-width: 460px;
+  animation: slideUp .28s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(24px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.fb-modal-header   { margin-bottom: 1.3rem; }
+.fb-modal-title    { font-size: 1.1rem; font-weight: 700; }
+.fb-modal-sub      { font-size: .83rem; color: var(--text-muted); margin-top: .25rem; }
+
+.fb-type-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .45rem;
+  margin-bottom: 1rem;
+}
+.fb-type-btn {
+  padding: .65rem .4rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--bg3);
+  color: var(--text-muted);
+  font-size: .84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .18s, background .18s, color .18s;
+}
+.fb-type-btn.active {
+  border-color: var(--accent);
+  background: rgba(99,102,241,.12);
+  color: var(--accent);
+}
+.fb-type-btn:hover:not(.active) { border-color: var(--text-muted); }
+
+.fb-textarea {
+  width: 100%;
+  background: var(--bg3);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: .92rem;
+  font-family: inherit;
+  padding: .85rem 1rem;
+  resize: none;
+  line-height: 1.5;
+  min-height: 110px;
+  margin-bottom: 1rem;
+  transition: border-color .18s;
+}
+.fb-textarea:focus { outline: none; border-color: var(--accent); }
+.fb-textarea::placeholder { color: var(--text-muted); }
+
+.fb-send-btn {
+  width: 100%;
+  padding: .9rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s, opacity .18s;
+}
+.fb-send-btn:hover    { background: var(--accent-h); }
+.fb-send-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+.fb-success {
+  display: none;
+  text-align: center;
+  color: var(--green);
+  font-weight: 600;
+  font-size: .92rem;
+  padding: .5rem 0;
+}
+
+.fb-close-btn {
+  width: 50px; height: 50px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  font-size: 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: .85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  transition: background .18s, transform .18s;
+  flex-shrink: 0;
+}
+.fb-close-btn:hover { background: var(--accent-h); transform: scale(1.08); }
+
+/* ══ FEEDBACK PAGE & COACH LIST ══════════════════════════════ */
 
 .nav-coach-badge {
   background: rgba(99,102,241,.15);
