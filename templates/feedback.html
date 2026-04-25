@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Signaler un problème — Setting Training{% endblock %}
+
+{% block content %}
+<div class="page-center">
+  <div class="card feedback-card">
+
+    <div class="feedback-header">
+      <h2>Signaler un problème ou une idée</h2>
+      <p>Tout remonte directement au coach. Les bugs sont corrigés dès que possible.</p>
+    </div>
+
+    {% if success %}
+    <div class="feedback-success">
+      ✅ Merci ! Ton signalement a bien été envoyé au coach.
+      <br><a href="{{ url_for('index') }}">Retour à l'entraînement</a>
+    </div>
+    {% else %}
+
+    <form method="POST" class="feedback-form">
+
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <div class="type-grid">
+          <label class="type-card">
+            <input type="radio" name="type" value="bug" checked>
+            <div class="type-card-inner">
+              <span class="type-icon">🐛</span>
+              <span class="type-name">Bug</span>
+              <span class="type-desc">Quelque chose ne fonctionne pas</span>
+            </div>
+          </label>
+          <label class="type-card">
+            <input type="radio" name="type" value="amélioration">
+            <div class="type-card-inner">
+              <span class="type-icon">💡</span>
+              <span class="type-name">Amélioration</span>
+              <span class="type-desc">Une idée pour améliorer l'app</span>
+            </div>
+          </label>
+          <label class="type-card">
+            <input type="radio" name="type" value="autre">
+            <div class="type-card-inner">
+              <span class="type-icon">💬</span>
+              <span class="type-name">Autre</span>
+              <span class="type-desc">Question ou commentaire</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="titre">Titre court</label>
+        <input type="text" id="titre" name="titre" class="form-input"
+          placeholder="Ex : Le chat plante quand j'envoie un long message" required maxlength="120">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="description">Description</label>
+        <textarea id="description" name="description" class="form-input feedback-textarea"
+          placeholder="Décris en détail : ce que tu faisais, ce qui s'est passé, ce que tu attendais…" required rows="5"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="page">Page concernée <span style="color:var(--text-muted);font-weight:400">(optionnel)</span></label>
+        <input type="text" id="page" name="page" class="form-input"
+          placeholder="Ex : /chat, /register, /results…">
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full" style="margin-top:1rem">
+        Envoyer le signalement →
+      </button>
+    </form>
+
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

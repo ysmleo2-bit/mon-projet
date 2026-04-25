@@ -794,6 +794,125 @@ a:hover { text-decoration: underline; }
   font-size: .85rem;
 }
 
+/* ══ FEEDBACK ════════════════════════════════════════════════ */
+
+.nav-coach-badge {
+  background: rgba(99,102,241,.15);
+  color: var(--accent);
+  border: 1px solid rgba(99,102,241,.3);
+  border-radius: 20px;
+  padding: .15rem .6rem;
+  font-size: .78rem;
+  font-weight: 700;
+}
+.nav-feedback-link { position: relative; }
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--red);
+  color: #fff;
+  border-radius: 50%;
+  font-size: .65rem;
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  margin-left: .25rem;
+  vertical-align: middle;
+}
+
+/* Feedback form */
+.feedback-card { max-width: 620px; width: 100%; }
+.feedback-header { margin-bottom: 1.5rem; }
+.feedback-header h2 { font-size: 1.3rem; margin-bottom: .35rem; }
+.feedback-header p  { color: var(--text-muted); font-size: .88rem; }
+
+.feedback-success {
+  background: rgba(34,197,94,.1);
+  border: 1px solid rgba(34,197,94,.3);
+  border-radius: 8px;
+  padding: 1.25rem;
+  color: var(--green);
+  font-size: .9rem;
+  line-height: 2;
+}
+
+.feedback-form { display: flex; flex-direction: column; gap: 1.1rem; }
+.feedback-textarea { min-height: 110px; resize: vertical; }
+
+.type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .5rem;
+}
+.type-card input { display: none; }
+.type-card-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .25rem;
+  padding: .8rem .5rem;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  text-align: center;
+}
+.type-card input:checked + .type-card-inner {
+  border-color: var(--accent);
+  background: rgba(99,102,241,.1);
+}
+.type-icon { font-size: 1.4rem; }
+.type-name { font-weight: 700; font-size: .85rem; }
+.type-desc { font-size: .72rem; color: var(--text-muted); }
+
+/* Coach feedbacks list */
+.feedbacks-list { display: flex; flex-direction: column; gap: .85rem; }
+
+.fb-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+.fb-nouveau  { border-left: 3px solid var(--red); }
+.fb-en_cours { border-left: 3px solid var(--yellow); }
+.fb-résolu   { border-left: 3px solid var(--green); opacity: .7; }
+
+.fb-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.fb-left  { display: flex; align-items: center; gap: .6rem; }
+.fb-right { display: flex; gap: .75rem; flex-shrink: 0; }
+
+.fb-type-badge {
+  font-size: .75rem;
+  font-weight: 700;
+  padding: .15rem .5rem;
+  border-radius: 20px;
+  background: var(--bg3);
+}
+.fb-statut {
+  font-size: .75rem;
+  font-weight: 700;
+}
+.fb-statut-nouveau  { color: var(--red); }
+.fb-statut-en_cours { color: var(--yellow); }
+.fb-statut-résolu   { color: var(--green); }
+
+.fb-meta { font-size: .75rem; color: var(--text-muted); }
+
+.fb-titre { font-weight: 700; font-size: .95rem; }
+.fb-desc  { font-size: .85rem; color: var(--text-muted); white-space: pre-wrap; line-height: 1.6; }
+
+.fb-actions { display: flex; gap: .6rem; margin-top: .25rem; }
+
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 768px) {
   .chat-layout { grid-template-columns: 1fr; }

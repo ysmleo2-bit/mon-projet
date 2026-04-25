@@ -32,7 +32,8 @@ DATA_DIR      = "/data" if os.path.isdir("/data") else BASE_DIR
 STUDENTS_FILE = os.path.join(BASE_DIR, "students_config.json")
 SIM_FILE      = os.path.join(DATA_DIR, "sim_sessions.json")
 ACCOUNTS_FILE = os.path.join(DATA_DIR, "accounts.json")
-ACTIVE_FILE   = os.path.join(DATA_DIR, "active_sessions.json")
+ACTIVE_FILE    = os.path.join(DATA_DIR, "active_sessions.json")
+FEEDBACK_FILE  = os.path.join(DATA_DIR, "feedback.json")
 
 COACH_EMAIL    = os.environ.get("COACH_EMAIL", "leo")
 COACH_PASSWORD = os.environ.get("COACH_PASSWORD", "coach2026")
@@ -94,6 +95,33 @@ def clean_active(data):
     return {k: v for k, v in data.items() if v.get("last_ping", "") >= cutoff}
 
 
+def load_feedback():
+    if not os.path.exists(FEEDBACK_FILE):
+        return []
+    try:
+        with open(FEEDBACK_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def save_feedback_item(item):
+    items = load_feedback()
+    items.append(item)
+    with open(FEEDBACK_FILE, "w", encoding="utf-8") as f:
+        json.dump(items, f, ensure_ascii=False, indent=2)
+
+
+def update_feedback_status(fb_id, statut):
+    items = load_feedback()
+    for item in items:
+        if item["id"] == fb_id:
+            item["statut"] = statut
+            break
+    with open(FEEDBACK_FILE, "w", encoding="utf-8") as f:
+        json.dump(items, f, ensure_ascii=False, indent=2)
+
+
 def get_client():
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -112,7 +140,12 @@ def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if "user_id" not in session:
-            return redirect(url_for("login"))
+            if session.get("coach_logged_in"):
+                session["user_id"]    = "coach"
+                session["user_nom"]   = "Coach"
+                session["user_email"] = COACH_EMAIL
+            else:
+                return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated
 
@@ -419,6 +452,9 @@ def coach_login():
         if (email == COACH_EMAIL.lower() and
                 hash_password(password) == hash_password(COACH_PASSWORD)):
             session["coach_logged_in"] = True
+            session["user_id"]         = "coach"
+            session["user_nom"]        = "Coach"
+            session["user_email"]      = COACH_EMAIL
             return redirect(url_for("coach"))
         else:
             error = "Identifiants incorrects."
@@ -428,8 +464,17 @@ def coach_login():
 
 @app.route("/coach/logout")
 def coach_logout():
-    session.pop("coach_logged_in", None)
+    for key in ("coach_logged_in", "user_id", "user_nom", "user_email"):
+        session.pop(key, None)
     return redirect(url_for("coach_login"))
+
+
+@app.context_processor
+def inject_feedback_count():
+    count = 0
+    if session.get("coach_logged_in"):
+        count = sum(1 for f in load_feedback() if f.get("statut") == "nouveau")
+    return {"feedback_new_count": count}
 
 
 @app.route("/coach")
@@ -501,6 +546,55 @@ def coach_session(session_id):
         return redirect(url_for("coach"))
     niv_info = NIVEAUX.get(s.get("niveau_difficulte", 1), NIVEAUX[1])
     return render_template("coach_session.html", s=s, niv_info=niv_info)
+
+
+@app.route("/feedback", methods=["GET", "POST"])
+@login_required
+def feedback():
+    success = False
+    if request.method == "POST":
+        fb_type = request.form.get("type", "autre")
+        titre   = request.form.get("titre", "").strip()
+        desc    = request.form.get("description", "").strip()
+        page    = request.form.get("page", "").strip()
+        if titre and desc:
+            item = {
+                "id":          f"fb_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}",
+                "type":        fb_type,
+                "titre":       titre,
+                "description": desc,
+                "page":        page or "non précisée",
+                "user_id":     session.get("user_id", "?"),
+                "user_nom":    session.get("user_nom", "Inconnu"),
+                "date":        date.today().isoformat(),
+                "heure":       datetime.now().strftime("%H:%M"),
+                "statut":      "nouveau",
+                "created_at":  datetime.now().isoformat(),
+            }
+            save_feedback_item(item)
+            success = True
+    return render_template("feedback.html", success=success)
+
+
+@app.route("/coach/feedbacks")
+@coach_required
+def coach_feedbacks():
+    items = sorted(load_feedback(), key=lambda x: x.get("created_at", ""), reverse=True)
+    return render_template("coach_feedbacks.html", items=items)
+
+
+@app.route("/coach/feedback/<fb_id>/resolve", methods=["POST"])
+@coach_required
+def coach_feedback_resolve(fb_id):
+    update_feedback_status(fb_id, "résolu")
+    return redirect(url_for("coach_feedbacks"))
+
+
+@app.route("/coach/feedback/<fb_id>/en-cours", methods=["POST"])
+@coach_required
+def coach_feedback_en_cours(fb_id):
+    update_feedback_status(fb_id, "en_cours")
+    return redirect(url_for("coach_feedbacks"))
 
 
 @app.route("/api/dashboard")

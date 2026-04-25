@@ -11,20 +11,35 @@
   <nav class="navbar">
     <a href="{{ url_for('index') }}" class="nav-logo">Setting Training</a>
     <div class="nav-links">
-      {% if session.get('user_id') %}
+
+      {% if session.get('coach_logged_in') %}
+        {# ── Coach connecté ── #}
+        <span class="nav-user nav-coach-badge">Coach</span>
+        <a href="{{ url_for('index') }}">Entraînement</a>
+        <a href="{{ url_for('coach') }}" class="nav-coach">Dashboard</a>
+        <a href="{{ url_for('feedback') }}">Signaler</a>
+        <a href="{{ url_for('coach_feedbacks') }}" class="nav-coach nav-feedback-link">
+          Feedbacks
+          {% if feedback_new_count > 0 %}
+          <span class="nav-badge">{{ feedback_new_count }}</span>
+          {% endif %}
+        </a>
+        <a href="{{ url_for('coach_logout') }}" class="nav-logout">Déconnexion</a>
+
+      {% elif session.get('user_id') %}
+        {# ── Élève connecté ── #}
         <span class="nav-user">{{ session.get('user_nom') }}</span>
         <a href="{{ url_for('index') }}">Entraînement</a>
+        <a href="{{ url_for('feedback') }}">Signaler</a>
         <a href="{{ url_for('logout') }}" class="nav-logout">Déconnexion</a>
+
       {% else %}
+        {# ── Non connecté ── #}
         <a href="{{ url_for('login') }}">Connexion</a>
         <a href="{{ url_for('register') }}">Créer un compte</a>
-      {% endif %}
-      {% if session.get('coach_logged_in') %}
-        <a href="{{ url_for('coach') }}" class="nav-coach">Dashboard Coach</a>
-        <a href="{{ url_for('coach_logout') }}" class="nav-logout">Déco Coach</a>
-      {% else %}
         <a href="{{ url_for('coach_login') }}" class="nav-coach">Coach</a>
       {% endif %}
+
     </div>
   </nav>
   <main>

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Feedbacks — Setting Training{% endblock %}
+
+{% block content %}
+<div class="coach-page">
+
+  <div class="coach-header">
+    <div>
+      <h1>Feedbacks &amp; Bugs</h1>
+      <p style="color:var(--text-muted);font-size:.9rem;margin-top:.3rem">
+        Tous les signalements de tes élèves — bugs, idées, remarques.
+      </p>
+    </div>
+    <div class="coach-totals">
+      {% set nouveaux = items | selectattr('statut','equalto','nouveau') | list %}
+      {% set en_cours = items | selectattr('statut','equalto','en_cours') | list %}
+      {% set resolus  = items | selectattr('statut','equalto','résolu')  | list %}
+      <div class="total-chip" style="color:#ef4444;border-color:rgba(239,68,68,.3)">
+        🔴 {{ nouveaux|length }} nouveaux
+      </div>
+      <div class="total-chip" style="color:#f59e0b;border-color:rgba(245,158,11,.3)">
+        🟡 {{ en_cours|length }} en cours
+      </div>
+      <div class="total-chip" style="color:#22c55e;border-color:rgba(34,197,94,.3)">
+        ✅ {{ resolus|length }} résolus
+      </div>
+    </div>
+  </div>
+
+  {% if not items %}
+  <div class="no-sim" style="padding:3rem;text-align:center">
+    Aucun feedback pour l'instant. Les signalements de tes élèves apparaîtront ici.
+  </div>
+  {% else %}
+
+  <div class="feedbacks-list">
+    {% for fb in items %}
+    <div class="fb-card fb-{{ fb.statut | replace(' ','_') }}">
+      <div class="fb-card-top">
+        <div class="fb-left">
+          <span class="fb-type-badge fb-type-{{ fb.type }}">
+            {% if fb.type == 'bug' %}🐛 Bug
+            {% elif fb.type == 'amélioration' %}💡 Amélioration
+            {% else %}💬 Autre{% endif %}
+          </span>
+          <span class="fb-statut fb-statut-{{ fb.statut }}">
+            {% if fb.statut == 'nouveau' %}● Nouveau
+            {% elif fb.statut == 'en_cours' %}◐ En cours
+            {% else %}✓ Résolu{% endif %}
+          </span>
+        </div>
+        <div class="fb-right">
+          <span class="fb-meta">{{ fb.user_nom }}</span>
+          <span class="fb-meta">{{ fb.date }} {{ fb.heure }}</span>
+          <span class="fb-meta">{{ fb.page }}</span>
+        </div>
+      </div>
+
+      <div class="fb-titre">{{ fb.titre }}</div>
+      <div class="fb-desc">{{ fb.description }}</div>
+
+      {% if fb.statut != 'résolu' %}
+      <div class="fb-actions">
+        {% if fb.statut == 'nouveau' %}
+        <form method="POST" action="{{ url_for('coach_feedback_en_cours', fb_id=fb.id) }}" style="display:inline">
+          <button class="btn btn-ghost btn-sm">Marquer en cours</button>
+        </form>
+        {% endif %}
+        <form method="POST" action="{{ url_for('coach_feedback_resolve', fb_id=fb.id) }}" style="display:inline">
+          <button class="btn btn-primary btn-sm">Marquer résolu ✓</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% endif %}
+</div>
+{% endblock %}
