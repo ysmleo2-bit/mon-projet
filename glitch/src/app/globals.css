@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: #04060d;
+  color: #e2e8f0;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #080c1a; }
+::-webkit-scrollbar-thumb { background: #1a2340; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #00e676; }
+
+::selection { background: rgba(0, 230, 118, 0.25); color: white; }
+
+/* Glass panel */
+.glass {
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+/* Mono font utility */
+.mono { font-family: var(--font-mono); }
+
+/* Gradient text */
+.text-glitch-gradient {
+  background: linear-gradient(135deg, #00e676 0%, #00b0ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Category pill base */
+.pill {
+  @apply inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border uppercase tracking-wider;
+}
+.pill-glitch  { @apply bg-purple-500/15 border-purple-500/40 text-purple-300; }
+.pill-flash   { @apply bg-orange-500/15 border-orange-500/40 text-orange-300; }
+.pill-deal    { @apply bg-emerald-500/15 border-emerald-500/40 text-emerald-300; }
+.pill-watch   { @apply bg-sky-500/15 border-sky-500/40 text-sky-300; }
+
+/* Confidence bar */
+.conf-bar {
+  height: 3px;
+  border-radius: 2px;
+  transition: width 1s ease;
+}
+
+/* Scan line animation for hero */
+@keyframes scanline {
+  0%   { top: -10%; }
+  100% { top: 110%; }
+}
+.scanline {
+  position: absolute;
+  left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,230,118,0.4), transparent);
+  animation: scanline 4s linear infinite;
+  pointer-events: none;
+}
+
+/* Blinking cursor */
+@keyframes blink { 0%,100% { opacity:1 } 50% { opacity:0 } }
+.cursor { animation: blink 1s step-end infinite; }
+
+/* Urgent pulse ring */
+@keyframes urgentRing {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 23, 68, 0.5); }
+  70%  { box-shadow: 0 0 0 8px rgba(255, 23, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 23, 68, 0); }
+}
+.urgent-ring { animation: urgentRing 1.5s ease-out infinite; }
+
+/* Live dot */
+@keyframes liveDot {
+  0%,100% { opacity:1; transform: scale(1); }
+  50%     { opacity:0.4; transform: scale(0.6); }
+}
+.live-dot { animation: liveDot 1.2s ease-in-out infinite; }
+
+/* Input */
+.g-input {
+  @apply w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-white
+    placeholder-white/25 focus:outline-none focus:border-glitch-green/50 focus:bg-white/[0.06]
+    transition-all text-sm mono;
+}
+
+/* Buttons */
+.btn-green {
+  @apply bg-glitch-green text-black font-bold px-6 py-3 rounded-xl
+    hover:bg-emerald-400 transition-all active:scale-95 focus:outline-none;
+}
+.btn-outline {
+  @apply border border-white/15 text-white/70 hover:text-white hover:border-white/30
+    px-4 py-2.5 rounded-xl transition-all text-sm font-medium;
+}
