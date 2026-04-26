@@ -1,6 +1,3 @@
-"use client";
-
-import { use } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, ExternalLink, ThumbsUp, ThumbsDown,
@@ -9,24 +6,28 @@ import {
 import Navbar from "@/components/Navbar";
 import ConfidenceMeter from "@/components/ConfidenceMeter";
 import BookingSteps from "@/components/BookingSteps";
-import { getDeal } from "@/lib/mock-deals";
+import PriceChart from "@/components/PriceChart";
 import { categoryMeta, urgencyMeta, formatWindow } from "@/lib/detector";
 import { cn, timeAgo, timeLeft, isExpired, formatDate } from "@/lib/utils";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import { kayakLink, skyscannerLink } from "@/lib/booking-links";
+import type { GlitchDeal } from "@/lib/types";
 
-function PriceTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="glass rounded-lg px-2 py-1.5 text-xs mono">
-      <div className="text-white/40">{label}</div>
-      <div className="text-glitch-green font-bold">{payload[0].value}€</div>
-    </div>
-  );
+async function getDealById(id: string): Promise<GlitchDeal | null> {
+  try {
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const res  = await fetch(`${base}/api/deals`, { next: { revalidate: 900 } });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const deals: GlitchDeal[] = json.deals ?? [];
+    return deals.find(d => d.id === id) ?? null;
+  } catch {
+    return null;
+  }
 }
 
-export default function DealPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const deal = getDeal(id);
+export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const deal    = await getDealById(id);
 
   if (!deal) {
     return (
@@ -46,27 +47,41 @@ export default function DealPage({ params }: { params: Promise<{ id: string }> }
   const expired = isExpired(deal.expiresEstimate) || deal.status === "expired";
   const saving  = deal.normalPrice - deal.currentPrice;
 
-  const chartData = deal.priceHistory.map(p => ({
-    date: new Date(p.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }),
-    price: p.price,
-  }));
+  // Lien Kayak direct (résultats filtrés pour cette route + date)
+  const kayak = kayakLink({
+    from:       deal.fromCode,
+    to:         deal.toCode,
+    departDate: deal.departDate,
+    returnDate: deal.returnDate,
+    cabin:      deal.cabin as any,
+  });
+  // Lien Skyscanner alternatif
+  const skyscanner = skyscannerLink({
+    from:       deal.fromCode,
+    to:         deal.toCode,
+    departDate: deal.departDate,
+    returnDate: deal.returnDate,
+    cabin:      deal.cabin as any,
+  });
+
+  // URL de réservation principale (Kiwi deep_link si disponible, sinon Kayak)
+  const primaryBookingUrl = deal.bookingUrl?.startsWith("http") ? deal.bookingUrl : kayak;
 
   return (
     <div className="min-h-screen bg-ink-950">
       <Navbar />
 
       <div className="max-w-4xl mx-auto px-4 pt-20 pb-20">
-        {/* Breadcrumb */}
         <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-white/30 hover:text-white mono mb-6 transition-colors">
           <ArrowLeft className="w-3.5 h-3.5" /> Retour au feed
         </Link>
 
-        {/* Alert banner for critical */}
+        {/* Bannière critique */}
         {analysis.urgency === "critical" && !expired && (
           <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-6 urgent-ring">
             <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
             <div className="text-sm text-red-300 font-medium">
-              Erreur tarifaire critique — Agissez dans les prochaines heures avant qu'elle disparaisse.
+              Erreur tarifaire critique — Agissez dans les prochaines heures avant qu&apos;elle disparaisse.
             </div>
             <div className="ml-auto text-sm font-black text-red-400 mono shrink-0">
               {timeLeft(deal.expiresEstimate)}
@@ -82,9 +97,9 @@ export default function DealPage({ params }: { params: Promise<{ id: string }> }
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main column */}
+          {/* Colonne principale */}
           <div className="lg:col-span-2 space-y-5">
-            {/* Deal header */}
+            {/* Header du deal */}
             <div className="glass rounded-2xl p-6">
               <div className="flex items-start justify-between gap-4 mb-5">
                 <div>
@@ -104,7 +119,7 @@ export default function DealPage({ params }: { params: Promise<{ id: string }> }
                     {deal.from} ({deal.fromCode}) → {deal.to} ({deal.toCode}) {deal.flag}
                   </h1>
                   <div className="text-sm text-white/40 mt-1">
-                    {deal.airline} · {deal.stops === 0 ? "Direct" : `${deal.stops} escale${deal.stops>1?"s":""}`} · {deal.cabin}
+                    {deal.airline} · {deal.stops === 0 ? "Direct" : `${deal.stops} escale${deal.stops > 1 ? "s" : ""}`} · {deal.cabin}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
@@ -124,7 +139,7 @@ export default function DealPage({ params }: { params: Promise<{ id: string }> }
                 <span>🔍 Détecté {timeAgo(deal.detectedAt)}</span>
               </div>
 
-              {/* Confidence */}
+              {/* Confiance */}
               <div className="mb-5">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Score de confiance GLITCH</span>
@@ -133,8 +148,8 @@ export default function DealPage({ params }: { params: Promise<{ id: string }> }
                 <ConfidenceMeter score={analysis.confidence} size="lg" />
               </div>
 
-              {/* Signals */}
-              <div>
+              {/* Signaux */}
+              <div className="mb-6">
                 <div className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">Signaux détectés</div>
                 <div className="space-y-1.5">
                   {analysis.signals.filter(s => s.triggered).map(s => (
@@ -153,50 +168,52 @@ export default function DealPage({ params }: { params: Promise<{ id: string }> }
                 </div>
               </div>
 
-              {/* CTA */}
+              {/* CTA principal */}
               {!expired && (
-                <a href={deal.bookingUrl} target="_blank" rel="noopener noreferrer"
-                  className="mt-5 w-full btn-green flex items-center justify-center gap-2 text-base">
-                  Réserver maintenant sur {deal.airline}
-                  <ExternalLink className="w-4 h-4" />
-                </a>
+                <div className="space-y-3">
+                  {/* Bouton principal */}
+                  <a href={primaryBookingUrl} target="_blank" rel="noopener noreferrer"
+                    className="w-full btn-green flex items-center justify-center gap-2 text-base py-4">
+                    Réserver maintenant — {deal.currentPrice}€
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+
+                  {/* Liens alternatifs */}
+                  <div className="flex gap-2">
+                    <a href={kayak} target="_blank" rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs py-2.5 rounded-xl border border-white/[0.08] text-white/50 hover:text-white hover:border-white/20 transition-all">
+                      <ExternalLink className="w-3 h-3" />
+                      Voir sur Kayak
+                    </a>
+                    <a href={skyscanner} target="_blank" rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs py-2.5 rounded-xl border border-white/[0.08] text-white/50 hover:text-white hover:border-white/20 transition-all">
+                      <ExternalLink className="w-3 h-3" />
+                      Voir sur Skyscanner
+                    </a>
+                  </div>
+
+                  <p className="text-[10px] text-white/25 text-center">
+                    Les liens ouvrent directement les résultats pour cette route et cette date.
+                    {deal.source === "Kiwi.com" && " Le prix affiché est verrouillé via Kiwi.com."}
+                  </p>
+                </div>
               )}
             </div>
 
-            {/* Price history chart */}
+            {/* Graphique historique */}
             <div className="glass rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-4">
                 <BarChart3 className="w-4 h-4 text-white/40" />
                 <h3 className="text-sm font-semibold text-white">Historique des prix — 30 derniers jours</h3>
               </div>
-              <ResponsiveContainer width="100%" height={140}>
-                <AreaChart data={chartData} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                  <defs>
-                    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#00e676" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#00e676" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 9 }}
-                    axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                  <YAxis hide domain={["auto", "auto"]} />
-                  <Tooltip content={<PriceTooltip />} />
-                  <ReferenceLine
-                    y={deal.currentPrice}
-                    stroke="#00e676" strokeDasharray="4 4" strokeWidth={1.5}
-                    label={{ value: `${deal.currentPrice}€`, position: "right", fill: "#00e676", fontSize: 10 }}
-                  />
-                  <Area type="monotone" dataKey="price" stroke="rgba(255,255,255,0.2)" strokeWidth={1.5}
-                    fill="url(#g)" dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <PriceChart history={deal.priceHistory} currentPrice={deal.currentPrice} />
               <div className="flex items-center justify-between mt-2 text-[10px] mono text-white/30">
                 <span>Moy. 30j : {deal.normalPrice}€</span>
                 <span className="text-glitch-green">Actuel : {deal.currentPrice}€ (-{analysis.savingPct}%)</span>
               </div>
             </div>
 
-            {/* Community */}
+            {/* Communauté */}
             <div className="glass rounded-2xl p-5">
               <h3 className="text-sm font-semibold text-white mb-4">Communauté</h3>
               <div className="flex items-center gap-4 mb-4">
@@ -212,23 +229,21 @@ export default function DealPage({ params }: { params: Promise<{ id: string }> }
               </div>
               <p className="text-xs text-white/30">
                 {deal.confirmations} membres ont confirmé avoir réussi à réserver à ce prix.
-                {deal.reports > 0 && ` ${deal.reports} signalement${deal.reports>1?"s":""} reçu${deal.reports>1?"s":""}.`}
+                {deal.reports > 0 && ` ${deal.reports} signalement${deal.reports > 1 ? "s" : ""} reçu${deal.reports > 1 ? "s" : ""}.`}
               </p>
             </div>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-4">
-            {/* Booking window */}
+            {/* Fenêtre de réservation */}
             {!expired && (
               <div className={cn(
                 "glass rounded-2xl p-4 border",
                 analysis.urgency === "critical" ? "border-red-500/25" : "border-white/[0.06]"
               )}>
                 <div className="flex items-center gap-2 mb-2">
-                  <Clock className={cn("w-4 h-4",
-                    analysis.urgency === "critical" ? "text-red-400" : "text-white/40"
-                  )} />
+                  <Clock className={cn("w-4 h-4", analysis.urgency === "critical" ? "text-red-400" : "text-white/40")} />
                   <span className="text-xs font-semibold text-white">Fenêtre de réservation</span>
                 </div>
                 <div className={cn("text-2xl font-black mono mb-1",
@@ -237,19 +252,25 @@ export default function DealPage({ params }: { params: Promise<{ id: string }> }
                   {timeLeft(deal.expiresEstimate)}
                 </div>
                 <div className="text-xs text-white/40">
-                  {formatWindow(analysis.bookingWindowHours)} estimé pour ce type d'erreur
+                  {formatWindow(analysis.bookingWindowHours)} estimé pour ce type d&apos;erreur
                 </div>
+
+                {/* CTA sidebar répété */}
+                <a href={primaryBookingUrl} target="_blank" rel="noopener noreferrer"
+                  className="mt-3 w-full btn-green flex items-center justify-center gap-1.5 text-sm py-2.5">
+                  Réserver {deal.currentPrice}€ <ExternalLink className="w-3.5 h-3.5" />
+                </a>
               </div>
             )}
 
-            {/* Quick stats */}
+            {/* Stats rapides */}
             <div className="glass rounded-2xl p-4 border border-white/[0.06] space-y-3">
               {[
-                { l: "Prix normal", v: `${deal.normalPrice}€`, c: "text-white/50" },
-                { l: "Prix actuel", v: `${deal.currentPrice}€`, c: cat.text },
-                { l: "Économie", v: `${saving}€ (-${analysis.savingPct}%)`, c: "text-emerald-400" },
-                { l: "Plus bas historique", v: `${deal.lowestEver}€`, c: "text-white/50" },
-                { l: "Confiance GLITCH", v: `${analysis.confidence}%`, c: cat.text },
+                { l: "Prix normal",          v: `${deal.normalPrice}€`,                    c: "text-white/50" },
+                { l: "Prix actuel",          v: `${deal.currentPrice}€`,                   c: cat.text },
+                { l: "Économie",             v: `${saving}€ (-${analysis.savingPct}%)`,    c: "text-emerald-400" },
+                { l: "Plus bas historique",  v: `${deal.lowestEver}€`,                     c: "text-white/50" },
+                { l: "Confiance GLITCH",     v: `${analysis.confidence}%`,                 c: cat.text },
               ].map(({ l, v, c }) => (
                 <div key={l} className="flex items-center justify-between">
                   <span className="text-xs text-white/40">{l}</span>
@@ -258,7 +279,7 @@ export default function DealPage({ params }: { params: Promise<{ id: string }> }
               ))}
             </div>
 
-            {/* How to book */}
+            {/* Guide de réservation */}
             <div className="glass rounded-2xl p-4 border border-white/[0.06]">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider mono mb-3">
                 Guide de réservation
@@ -266,11 +287,11 @@ export default function DealPage({ params }: { params: Promise<{ id: string }> }
               <BookingSteps />
             </div>
 
-            {/* Legal note */}
+            {/* Note légale */}
             <div className="text-[10px] text-white/25 leading-relaxed px-1">
               Les erreurs tarifaires sont légalement contraignantes dans la plupart des pays si
               la compagnie a émis une confirmation de réservation. GLITCH ne garantit pas que le vol
-              sera honoré, mais la majorité des grandes compagnies l'honorent pour éviter les controverses.
+              sera honoré, mais la majorité des grandes compagnies l&apos;honorent pour éviter les controverses.
             </div>
           </div>
         </div>
