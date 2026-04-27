@@ -1,3 +1,5 @@
+export const revalidate = 900; // ISR : régénère toutes les 15 min
+
 import Navbar from "@/components/Navbar";
 import LiveTicker from "@/components/LiveTicker";
 import FeedClient from "@/components/FeedClient";

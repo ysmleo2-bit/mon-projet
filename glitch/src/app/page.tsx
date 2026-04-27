@@ -1,3 +1,5 @@
+export const revalidate = 900; // ISR : régénère toutes les 15 min
+
 import Link from "next/link";
 import {
   Zap, Bell, ArrowRight, ShieldCheck, Radio, BarChart3,

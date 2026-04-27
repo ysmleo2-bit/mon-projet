@@ -15,10 +15,7 @@ const DEFAULT_AIRPORT = "BVA";
 export default function FeedClient({ initialDeals }: { initialDeals: GlitchDeal[] }) {
   const [deals,        setDeals]        = useState<GlitchDeal[]>(initialDeals);
   const [loading,      setLoading]      = useState(false);
-  const [airport,      setAirport]      = useState<string>(() => {
-    if (typeof window !== "undefined") return localStorage.getItem(STORAGE_KEY) ?? DEFAULT_AIRPORT;
-    return DEFAULT_AIRPORT;
-  });
+  const [airport,      setAirport]      = useState<string>(DEFAULT_AIRPORT);
 
   const [search,       setSearch]       = useState("");
   const [catFilter,    setCatFilter]    = useState<GlitchCategory | "ALL">("ALL");
