@@ -9,14 +9,13 @@ import LiveTicker from "@/components/LiveTicker";
 import DealCard from "@/components/DealCard";
 import DealFeedSection from "@/components/DealFeedSection";
 import { categoryMeta } from "@/lib/detector";
-import { cn, timeAgo } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { fetchDeals } from "@/lib/fetch-deals";
 
 export default async function HomePage() {
   const deals     = await fetchDeals();
   const liveDeals = deals.filter(d => d.status === "live");
   const topDeal   = liveDeals[0];
-  const lastScanAt = new Date().toISOString();
 
   const stats = {
     liveNow:         liveDeals.length,
@@ -44,7 +43,7 @@ export default async function HomePage() {
         <div className="relative max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-ink-800 border border-glitch-green/25 rounded-full px-4 py-1.5 mb-8 mono text-xs text-glitch-green">
             <span className="w-1.5 h-1.5 rounded-full bg-glitch-green live-dot" />
-            {stats.liveNow} erreurs tarifaires actives · dernier scan {timeAgo(lastScanAt)}
+            {stats.liveNow} erreurs tarifaires actives · mis à jour toutes les 15 min
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white leading-[1.02] mb-6 mono">
