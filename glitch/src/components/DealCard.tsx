@@ -4,8 +4,9 @@ import Link from "next/link";
 import { ThumbsUp, AlertTriangle, ExternalLink, Clock, Users, Zap } from "lucide-react";
 import type { GlitchDeal } from "@/lib/types";
 import { categoryMeta, urgencyMeta, formatWindow } from "@/lib/detector";
-import { cn, timeAgo, timeLeft, isExpired, formatPrice, formatDate } from "@/lib/utils";
+import { cn, isExpired, formatPrice, formatDate } from "@/lib/utils";
 import ConfidenceMeter from "./ConfidenceMeter";
+import { DetectedAt, TimeLeft } from "./ClientTime";
 
 interface Props {
   deal: GlitchDeal;
@@ -103,7 +104,7 @@ export default function DealCard({ deal, featured = false }: Props) {
               <Users className="w-3 h-3" />{deal.comments} commentaires
             </span>
             <span className="text-white/20">·</span>
-            <span suppressHydrationWarning>Détecté {timeAgo(deal.detectedAt)}</span>
+            <DetectedAt date={deal.detectedAt} />
           </div>
 
           <div className="flex items-center gap-2">
@@ -116,7 +117,7 @@ export default function DealCard({ deal, featured = false }: Props) {
                                                    "text-white/40 bg-white/[0.04] border-white/[0.08]"
               )}>
                 <Clock className="w-2.5 h-2.5" />
-                <span suppressHydrationWarning>{timeLeft(deal.expiresEstimate)}</span>
+                <TimeLeft date={deal.expiresEstimate} />
               </span>
             )}
 

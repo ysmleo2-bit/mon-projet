@@ -8,7 +8,8 @@ import ConfidenceMeter from "@/components/ConfidenceMeter";
 import BookingSteps from "@/components/BookingSteps";
 import PriceChart from "@/components/PriceChart";
 import { categoryMeta, urgencyMeta, formatWindow } from "@/lib/detector";
-import { cn, timeAgo, timeLeft, isExpired, formatDate } from "@/lib/utils";
+import { cn, isExpired, formatDate } from "@/lib/utils";
+import { DetectedAt, TimeLeft } from "@/components/ClientTime";
 import { kayakLink, skyscannerLink } from "@/lib/booking-links";
 import type { GlitchDeal } from "@/lib/types";
 
@@ -84,7 +85,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
               Erreur tarifaire critique — Agissez dans les prochaines heures avant qu&apos;elle disparaisse.
             </div>
             <div className="ml-auto text-sm font-black text-red-400 mono shrink-0">
-              {timeLeft(deal.expiresEstimate)}
+              <TimeLeft date={deal.expiresEstimate} />
             </div>
           </div>
         )}
@@ -136,7 +137,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                 <span>✈ Départ : <strong className="text-white">{formatDate(deal.departDate)}</strong></span>
                 {deal.returnDate && <span>🔄 Retour : <strong className="text-white">{formatDate(deal.returnDate)}</strong></span>}
                 <span>📌 Source : <strong className="text-white">{deal.source}</strong></span>
-                <span suppressHydrationWarning>🔍 Détecté {timeAgo(deal.detectedAt)}</span>
+                <DetectedAt date={deal.detectedAt} />
               </div>
 
               {/* Confiance */}
@@ -249,7 +250,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                 <div className={cn("text-2xl font-black mono mb-1",
                   analysis.urgency === "critical" ? "text-red-400" : "text-orange-400"
                 )}>
-                  {timeLeft(deal.expiresEstimate)}
+                  <TimeLeft date={deal.expiresEstimate} />
                 </div>
                 <div className="text-xs text-white/40">
                   {formatWindow(analysis.bookingWindowHours)} estimé pour ce type d&apos;erreur
