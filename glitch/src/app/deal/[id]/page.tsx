@@ -136,7 +136,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                 <span>✈ Départ : <strong className="text-white">{formatDate(deal.departDate)}</strong></span>
                 {deal.returnDate && <span>🔄 Retour : <strong className="text-white">{formatDate(deal.returnDate)}</strong></span>}
                 <span>📌 Source : <strong className="text-white">{deal.source}</strong></span>
-                <span>🔍 Détecté {timeAgo(deal.detectedAt)}</span>
+                <span suppressHydrationWarning>🔍 Détecté {timeAgo(deal.detectedAt)}</span>
               </div>
 
               {/* Confiance */}

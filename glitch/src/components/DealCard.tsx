@@ -103,7 +103,7 @@ export default function DealCard({ deal, featured = false }: Props) {
               <Users className="w-3 h-3" />{deal.comments} commentaires
             </span>
             <span className="text-white/20">·</span>
-            <span>Détecté {timeAgo(deal.detectedAt)}</span>
+            <span suppressHydrationWarning>Détecté {timeAgo(deal.detectedAt)}</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -116,7 +116,7 @@ export default function DealCard({ deal, featured = false }: Props) {
                                                    "text-white/40 bg-white/[0.04] border-white/[0.08]"
               )}>
                 <Clock className="w-2.5 h-2.5" />
-                {timeLeft(deal.expiresEstimate)}
+                <span suppressHydrationWarning>{timeLeft(deal.expiresEstimate)}</span>
               </span>
             )}
 
