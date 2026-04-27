@@ -1,22 +1,10 @@
 import Navbar from "@/components/Navbar";
 import LiveTicker from "@/components/LiveTicker";
 import FeedClient from "@/components/FeedClient";
-import type { GlitchDeal } from "@/lib/types";
-
-async function getDeals(): Promise<GlitchDeal[]> {
-  try {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    const res  = await fetch(`${base}/api/deals`, { next: { revalidate: 900 } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    return json.deals ?? [];
-  } catch {
-    return [];
-  }
-}
+import { fetchDeals } from "@/lib/fetch-deals";
 
 export default async function FeedPage() {
-  const deals = await getDeals();
+  const deals = await fetchDeals();
 
   return (
     <div className="min-h-screen bg-ink-950">
@@ -35,7 +23,7 @@ export default async function FeedPage() {
           </p>
         </div>
 
-        <FeedClient deals={deals} />
+        <FeedClient initialDeals={deals} />
       </div>
     </div>
   );

@@ -8,24 +8,12 @@ import DealCard from "@/components/DealCard";
 import DealFeedSection from "@/components/DealFeedSection";
 import { categoryMeta } from "@/lib/detector";
 import { cn, timeAgo } from "@/lib/utils";
-import type { GlitchDeal } from "@/lib/types";
-
-async function getDeals(): Promise<GlitchDeal[]> {
-  try {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    const res  = await fetch(`${base}/api/deals`, { next: { revalidate: 900 } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    return json.deals ?? [];
-  } catch {
-    return [];
-  }
-}
+import { fetchDeals } from "@/lib/fetch-deals";
 
 export default async function HomePage() {
-  const deals     = await getDeals();
+  const deals     = await fetchDeals();
   const liveDeals = deals.filter(d => d.status === "live");
-  const topDeal   = liveDeals[0]; // trié par confiance desc côté API
+  const topDeal   = liveDeals[0];
   const lastScanAt = new Date().toISOString();
 
   const stats = {
@@ -107,8 +95,8 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Feed filtrable (composant client) */}
-      <DealFeedSection deals={liveDeals} />
+      {/* Feed filtrable avec sélecteur d'aéroport */}
+      <DealFeedSection initialDeals={liveDeals} />
 
       {/* How it works */}
       <section className="border-t border-white/[0.05] px-4 py-16 bg-ink-900/40">
