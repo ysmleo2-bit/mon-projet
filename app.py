@@ -27,9 +27,13 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "setting-training-secret-2026")
 
 # Démarrage de l'agent GDoc en background (une seule fois, pas avec le reloader Flask)
-import gdoc_agent
-if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-    gdoc_agent.start()
+try:
+    import gdoc_agent
+    if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        gdoc_agent.start()
+except Exception as _e:
+    import logging
+    logging.getLogger("app").warning(f"Agent GDoc non démarré : {_e}")
 
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR      = "/data" if os.path.isdir("/data") else BASE_DIR
