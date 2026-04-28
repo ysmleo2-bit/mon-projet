@@ -56,9 +56,16 @@ PERSONAS: dict[str, dict[int, dict]] = {
             "objections": ["le trading c'est pour les professionnels pas pour monsieur tout le monde", "vous vivez de vos formations pas de vos trades", "les marchés sont pas battables sur le long terme", "non merci"]},
     },
     "coaching_sportif": {
-        1: {"prenom": "Ari", "age": 28, "situation": "femme qui stagne dans sa perte de poids depuis 8 mois",
-            "contexte": "Elle a déjà perdu 30 kg par elle-même mais stagne depuis 8 mois. Veut perdre encore 10-15 kg et se muscler pour éviter que la peau ne relâche. Elle est au chômage en ce moment donc le budget est une vraie contrainte — elle le mentionne si on parle RDV ou argent. Mais elle est ouverte, répond franchement quand on lui pose des questions sur sa situation. Elle donne ses infos progressivement, pas tout d'un coup.",
-            "objections": ["je suis au chômage en ce moment c'est compliqué niveau budget", "c'est combien ?", "j'ai peur de pas pouvoir me le payer"]},
+        1: [
+            {"weight": 50, "prenom": "Ari", "age": 28,
+             "situation": "femme qui stagne dans sa perte de poids depuis 8 mois",
+             "contexte": "Elle a déjà perdu 30 kg par elle-même mais stagne depuis 8 mois. Veut perdre encore 10-15 kg et se muscler pour éviter que la peau ne relâche. Elle est au chômage en ce moment donc le budget est une vraie contrainte — elle le mentionne si on parle RDV ou argent. Mais elle est ouverte, répond franchement quand on lui pose des questions sur sa situation. Elle donne ses infos progressivement, pas tout d'un coup.",
+             "objections": ["je suis au chômage en ce moment c'est compliqué niveau budget", "c'est combien ?", "j'ai peur de pas pouvoir me le payer"]},
+            {"weight": 50, "prenom": "Sarah", "age": 34,
+             "situation": "maman solo avec un fils de 10 ans, veut affiner sa taille et muscler son dos, totalement débutante en salle",
+             "contexte": "Elle veut se transformer : affiner sa taille, muscler son dos, entretenir le reste. Elle est maxi débutante — les machines l'intimident, elle ne sait pas comment les utiliser. Elle peut aller en salle seulement 2 fois par semaine à cause de son fils. Elle a un dérèglement hormonal qui lui fait stocker le sucre, ce qui rend la perte de poids plus difficile malgré une alimentation déjà saine. Elle est positive et ouverte. Elle répond facilement. Elle peut donner son numéro de téléphone et son email si on les lui demande APRÈS avoir accepté le RDV.",
+             "objections": ["je suis vraiment débutante les machines m'impressionnent un peu", "j'ai un dérèglement hormonal ça complique un peu les choses", "je peux y aller que deux fois par semaine avec mon fils"]},
+        ],
         2: {"prenom": "Antoine", "age": 32, "situation": "homme qui s'entraîne de façon irrégulière depuis 1 an",
             "contexte": "Il s'entraîne un peu mais sans régularité. Objectif : sécher un peu, reprendre du muscle, et vider la tête. Il sent qu'il progresse pas. Pas hostile, mais il va poser la question du prix assez tôt. Si le setter est naturel, il reste ouvert. Il peut hésiter sur le timing ('je sais pas si c'est le bon moment').",
             "objections": ["c'est combien ?", "j'sais pas si c'est le bon moment", "j'ai déjà essayé de me motiver seul", "t'as des résultats de gens comme moi ?"]},
@@ -296,6 +303,11 @@ TON RAPPORT AU RDV ({niv['label']}) :
 {rdv_rules[niveau]}
 
 IMPORTANT : Si quelqu'un te propose un "appel de 45 minutes" ou un "diagnostic offert", c'est là que tu peux demander les dispos, le prix, ou exprimer tes hésitations selon ton niveau. Ne dis jamais oui trop vite — même au niveau 1, tu demandes au moins les dispos et si c'est payant.
+
+APRÈS LE RDV ACCEPTÉ :
+- Si on te propose deux créneaux précis (ex : "Samedi 18h ou 18h30 ?") → tu choisis le premier qui te convient, en un mot ("18h parfait" / "Samedi ça marche").
+- Si on te demande ton numéro de téléphone ou ton email pour confirmer → tu les donnes naturellement. Invente un numéro (06XXXXXXXX) et un email (prénom.nom@gmail.com).
+- C'est la conclusion normale d'une vraie prise de RDV. Réponds naturellement, comme dans un vrai DM.
 """
 
 
@@ -334,6 +346,7 @@ Retourne UNIQUEMENT un JSON valide (sans markdown, sans commentaires) :
   "naturel": <1-10>,
   "score_global": <0-100 (moyenne pondérée : accroche×15% + objections×25% + qualification×25% + rdv×20% + naturel×15%)>,
   "rdv_pose": <true|false>,
+  "coordonnees_demandees": <true si le setter a demandé le téléphone ou l'email après le RDV, sinon false>,
   "points_forts": ["...", "..."],
   "points_ameliorer": ["...", "..."],
   "conseil_principal": "..."
@@ -374,7 +387,7 @@ def evaluate_session(client, conversation: list[dict], eleve_nom: str,
 # ── Session de chat interactive ──────────────────────────────────────────────
 
 def run_chat_session(client, eleve: dict, niche: str, niveau: int) -> None:
-    persona   = PERSONAS.get(niche, PERSONAS["reconversion"]).get(niveau, PERSONAS["reconversion"][1])
+    persona   = pick_persona(niche, niveau)
     niv_info  = NIVEAUX[niveau]
     sys_prompt = build_prospect_system_prompt(persona, niche, niveau)
 
