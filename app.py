@@ -252,8 +252,13 @@ def index():
 @app.route("/start", methods=["POST"])
 @login_required
 def start_session():
-    niche  = request.form.get("niche")
-    niveau = int(request.form.get("niveau", 1))
+    niche  = request.form.get("niche") or NICHES[0]
+    try:
+        niveau = int(request.form.get("niveau", 1))
+        if niveau not in NIVEAUX:
+            niveau = 1
+    except (ValueError, TypeError):
+        niveau = 1
 
     eleve = {
         "id":    session["user_id"],
@@ -316,7 +321,9 @@ def send_message():
     if "eleve" not in session:
         return jsonify({"error": "Session expirée"}), 401
 
-    data    = request.get_json()
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Requête invalide"}), 400
     message = data.get("message", "").strip()
     if not message:
         return jsonify({"error": "Message vide"}), 400
@@ -325,9 +332,9 @@ def send_message():
     if not client:
         return jsonify({"error": "ANTHROPIC_API_KEY manquante — contacte ton coach"}), 503
 
-    niche        = session["niche"]
-    niveau       = session["niveau"]
-    persona      = session["persona"]
+    niche        = session.get("niche", NICHES[0])
+    niveau       = session.get("niveau", 1)
+    persona      = session.get("persona", {})
     sys_prompt   = build_prospect_system_prompt(persona, niche, niveau)
     api_messages = session.get("api_messages", [])
     conversation = session.get("conversation", [])
@@ -374,10 +381,10 @@ def end_session():
         return redirect(url_for("index"))
 
     client       = get_client()
-    eleve        = session["eleve"]
-    niche        = session["niche"]
-    niveau       = session["niveau"]
-    persona      = session["persona"]
+    eleve        = session.get("eleve", {})
+    niche        = session.get("niche", NICHES[0])
+    niveau       = session.get("niveau", 1)
+    persona      = session.get("persona", {})
     conversation = session.get("conversation", [])
     start_iso    = session.get("start_time", datetime.now().isoformat())
     session_id   = session.get("session_id", f"sim_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{eleve['id']}")
@@ -562,7 +569,7 @@ def coach_session(session_id):
 def feedback():
     if request.method == "POST":
         if request.is_json:
-            data    = request.get_json()
+            data    = request.get_json(silent=True) or {}
             fb_type = data.get("type", "autre")
             desc    = data.get("description", "").strip()
             page    = request.referrer or "non précisée"

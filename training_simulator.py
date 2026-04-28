@@ -391,6 +391,8 @@ def get_prospect_reply(client, messages: list[dict], system_prompt: str) -> str:
         system=system_prompt,
         messages=messages,
     )
+    if not response.content:
+        return "…"
     return response.content[0].text.strip()
 
 

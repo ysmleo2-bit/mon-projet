@@ -96,6 +96,8 @@ def extract_conversation(client, image_bytes: bytes) -> str | None:
                 ]
             }]
         )
+        if not resp.content:
+            return None
         result = resp.content[0].text.strip()
         return None if result == "NON_PERTINENT" else result
     except Exception as e:
@@ -124,6 +126,8 @@ def analyze_conversation(client, conv_text: str) -> dict:
                 )
             }]
         )
+        if not resp.content:
+            return {}
         raw = resp.content[0].text.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
