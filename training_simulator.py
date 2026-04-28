@@ -257,6 +257,32 @@ def badge_score(global_score: int) -> str:
 
 # ── Prompt système pour le prospect (Claude) ─────────────────────────────────
 
+def load_real_examples(niche: str) -> str:
+    """Charge les exemples de vraies conversations pour la niche donnée."""
+    conv_file = os.path.join(DATA_DIR, "conversations_reelles.json")
+    if not os.path.exists(conv_file):
+        return ""
+    try:
+        with open(conv_file, encoding="utf-8") as f:
+            convs = json.load(f)
+    except Exception:
+        return ""
+    matching = [c for c in convs if c.get("analyse", {}).get("niche") == niche]
+    if not matching:
+        matching = convs
+    examples = matching[:2]
+    if not examples:
+        return ""
+    lines = ["\nEXEMPLES DE VRAIES CONVERSATIONS RÉUSSIES (inspire-toi de ce style) :"]
+    for ex in examples:
+        analyse = ex.get("analyse", {})
+        lecon   = analyse.get("lecon_principale", "")
+        lines.append(f"\n---\n{ex['texte'][:800]}")
+        if lecon:
+            lines.append(f"[Leçon : {lecon}]")
+    return "\n".join(lines)
+
+
 def build_prospect_system_prompt(persona: dict, niche: str, niveau: int) -> str:
     niv = NIVEAUX[niveau]
     objections_txt = ""
@@ -303,6 +329,8 @@ TON RAPPORT AU RDV ({niv['label']}) :
 {rdv_rules[niveau]}
 
 IMPORTANT : Si quelqu'un te propose un "appel de 45 minutes" ou un "diagnostic offert", c'est là que tu peux demander les dispos, le prix, ou exprimer tes hésitations selon ton niveau. Ne dis jamais oui trop vite — même au niveau 1, tu demandes au moins les dispos et si c'est payant.
+
+{load_real_examples(niche)}
 
 APRÈS LE RDV ACCEPTÉ :
 - Si on te propose deux créneaux précis (ex : "Samedi 18h ou 18h30 ?") → tu choisis le premier qui te convient, en un mot ("18h parfait" / "Samedi ça marche").
