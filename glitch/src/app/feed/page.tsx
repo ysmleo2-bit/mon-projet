@@ -1,4 +1,4 @@
-export const revalidate = 900; // ISR : régénère toutes les 15 min
+export const dynamic = "force-dynamic";
 
 import Navbar from "@/components/Navbar";
 import LiveTicker from "@/components/LiveTicker";
