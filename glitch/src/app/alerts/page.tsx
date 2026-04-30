@@ -10,51 +10,57 @@ import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 import type { GlitchCategory, AlertPreference } from "@/lib/types";
 
-const MOCK_ALERTS: AlertPreference[] = [
-  {
-    id: "a1",
-    routes: ["CDG-JFK", "CDG-NYC"],
-    categories: ["GLITCH", "FLASH"],
-    minSaving: 200,
-    minConfidence: 70,
-    channel: "telegram",
-    telegramChatId: "123456789",
-    active: true,
-    createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
-    triggeredCount: 4,
-  },
-  {
-    id: "a2",
-    routes: ["*-BKK", "*-TYO", "*-NRT"],
-    categories: ["GLITCH", "FLASH", "DEAL"],
-    minSaving: 150,
-    minConfidence: 60,
-    channel: "both",
-    telegramChatId: "123456789",
-    email: "user@example.com",
-    active: true,
-    createdAt: new Date(Date.now() - 86400000 * 14).toISOString(),
-    triggeredCount: 9,
-  },
-  {
-    id: "a3",
-    routes: ["CDG-*"],
-    categories: ["GLITCH"],
-    minSaving: 300,
-    minConfidence: 80,
-    channel: "telegram",
-    telegramChatId: "123456789",
-    active: false,
-    createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
-    triggeredCount: 2,
-  },
-];
+function buildMockAlerts(): AlertPreference[] {
+  const now = Date.now();
+  return [
+    {
+      id: "a1",
+      routes: ["CDG-JFK", "CDG-NYC"],
+      categories: ["GLITCH", "FLASH"],
+      minSaving: 200,
+      minConfidence: 70,
+      channel: "telegram",
+      telegramChatId: "123456789",
+      active: true,
+      createdAt: new Date(now - 86400000 * 7).toISOString(),
+      triggeredCount: 4,
+    },
+    {
+      id: "a2",
+      routes: ["*-BKK", "*-TYO", "*-NRT"],
+      categories: ["GLITCH", "FLASH", "DEAL"],
+      minSaving: 150,
+      minConfidence: 60,
+      channel: "both",
+      telegramChatId: "123456789",
+      email: "user@example.com",
+      active: true,
+      createdAt: new Date(now - 86400000 * 14).toISOString(),
+      triggeredCount: 9,
+    },
+    {
+      id: "a3",
+      routes: ["CDG-*"],
+      categories: ["GLITCH"],
+      minSaving: 300,
+      minConfidence: 80,
+      channel: "telegram",
+      telegramChatId: "123456789",
+      active: false,
+      createdAt: new Date(now - 86400000 * 30).toISOString(),
+      triggeredCount: 2,
+    },
+  ];
+}
 
-const RECENT_TRIGGERS = [
-  { route: "CDG → JFK", price: "89€", saving: "83%", cat: "GLITCH" as GlitchCategory, at: new Date(Date.now() - 3600000 * 2).toISOString() },
-  { route: "CDG → TYO", price: "340€", saving: "88%", cat: "GLITCH" as GlitchCategory, at: new Date(Date.now() - 3600000 * 18).toISOString() },
-  { route: "CDG → BKK", price: "390€", saving: "51%", cat: "FLASH" as GlitchCategory, at: new Date(Date.now() - 86400000 * 2).toISOString() },
-];
+function buildRecentTriggers() {
+  const now = Date.now();
+  return [
+    { route: "CDG → JFK", price: "89€", saving: "83%", cat: "GLITCH" as GlitchCategory, at: new Date(now - 3600000 * 2).toISOString() },
+    { route: "CDG → TYO", price: "340€", saving: "88%", cat: "GLITCH" as GlitchCategory, at: new Date(now - 3600000 * 18).toISOString() },
+    { route: "CDG → BKK", price: "390€", saving: "51%", cat: "FLASH" as GlitchCategory, at: new Date(now - 86400000 * 2).toISOString() },
+  ];
+}
 
 const CATEGORY_COLORS: Record<GlitchCategory, string> = {
   GLITCH: "text-purple-300 bg-purple-500/15 border-purple-500/30",
@@ -83,7 +89,8 @@ interface NewAlertForm {
 }
 
 export default function AlertsPage() {
-  const [alerts, setAlerts]           = useState<AlertPreference[]>(MOCK_ALERTS);
+  const [alerts, setAlerts]           = useState<AlertPreference[]>(() => buildMockAlerts());
+  const recentTriggers = buildRecentTriggers();
   const [showNew, setShowNew]         = useState(false);
   const [expandedId, setExpandedId]   = useState<string | null>(null);
   const [telegramStep, setTelegramStep] = useState<1 | 2 | 3>(1);
@@ -382,11 +389,11 @@ export default function AlertsPage() {
             </div>
 
             {/* Recent triggers */}
-            {RECENT_TRIGGERS.length > 0 && (
+            {recentTriggers.length > 0 && (
               <div className="glass rounded-2xl p-5 border border-white/[0.06]">
                 <h3 className="text-sm font-semibold text-white mb-4">Dernières alertes déclenchées</h3>
                 <div className="space-y-3">
-                  {RECENT_TRIGGERS.map((t, i) => (
+                  {recentTriggers.map((t, i) => (
                     <div key={i} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <span className={cn("text-[10px] font-bold mono px-2 py-0.5 rounded-full border", CATEGORY_COLORS[t.cat])}>
