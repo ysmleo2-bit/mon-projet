@@ -10,3 +10,4 @@ __pycache__/
 app.pid
 monitor.log
 active_sessions.json
+.prod_config.json

@@ -46,6 +46,7 @@ FEEDBACK_FILE  = os.path.join(DATA_DIR, "feedback.json")
 
 COACH_EMAIL    = os.environ.get("COACH_EMAIL", "leo")
 COACH_PASSWORD = os.environ.get("COACH_PASSWORD", "coach2026")
+INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "rivia-internal-2026")
 
 # ── Import des données du simulateur ────────────────────────────────────────
 from training_simulator import (
@@ -679,6 +680,31 @@ def api_dashboard():
         "recent":         recent_light,
         "students":       students,
     })
+
+
+# ── API interne (accès autonome agent) ───────────────────────────────────────
+
+@app.route("/api/internal/feedbacks")
+def api_internal_feedbacks():
+    key = request.args.get("key") or request.headers.get("X-Internal-Key")
+    if key != INTERNAL_API_KEY:
+        return jsonify({"error": "Unauthorized"}), 401
+    items = sorted(load_feedback(), key=lambda x: x.get("created_at", ""), reverse=True)
+    nouveaux = [f for f in items if f.get("statut") == "nouveau"]
+    return jsonify({
+        "total":    len(items),
+        "nouveaux": len(nouveaux),
+        "items":    items,
+    })
+
+
+@app.route("/api/internal/feedback/<fb_id>/resolve", methods=["POST"])
+def api_internal_feedback_resolve(fb_id):
+    key = request.args.get("key") or request.headers.get("X-Internal-Key")
+    if key != INTERNAL_API_KEY:
+        return jsonify({"error": "Unauthorized"}), 401
+    update_feedback_status(fb_id, "résolu")
+    return jsonify({"ok": True})
 
 
 # ── Utilitaires ───────────────────────────────────────────────────────────────
