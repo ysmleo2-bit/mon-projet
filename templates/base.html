@@ -30,6 +30,7 @@
       {% elif session.get('user_id') %}
         <span class="nav-user">{{ session.get('user_nom') }}</span>
         <a href="{{ url_for('index') }}">Entraînement</a>
+        <a href="{{ url_for('student_dashboard') }}" class="nav-coach">Mon tableau de bord</a>
         <a href="#" class="nav-signaler" onclick="openFb();return false;">Signaler</a>
         <a href="{{ url_for('logout') }}" class="nav-logout">Déconnexion</a>
 
