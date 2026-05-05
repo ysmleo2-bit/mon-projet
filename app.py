@@ -565,6 +565,37 @@ def coach_session(session_id):
     return render_template("coach_session.html", s=s, niv_info=niv_info)
 
 
+@app.route("/dashboard")
+@login_required
+def student_dashboard():
+    user_id      = session.get("user_id")
+    sim_sessions = load_sim_sessions()
+    user_sessions = sorted(
+        [s for s in sim_sessions if s.get("eleve_id") == user_id],
+        key=lambda x: (x.get("date", ""), x.get("heure", "")),
+        reverse=True,
+    )
+    stats = sim_stats_eleve(sim_sessions, user_id)
+
+    criteres = ["accroche", "gestion_objections", "qualification", "rdv", "naturel"]
+    scores_moy = {}
+    if user_sessions:
+        for c in criteres:
+            vals = [s["scores"].get(c, 0) for s in user_sessions if "scores" in s]
+            scores_moy[c] = round(sum(vals) / len(vals), 1) if vals else 0
+    else:
+        scores_moy = {c: 0 for c in criteres}
+
+    return render_template(
+        "dashboard.html",
+        stats=stats,
+        sessions=user_sessions[:10],
+        scores_moy=scores_moy,
+        niveaux=NIVEAUX,
+        user_nom=session.get("user_nom", ""),
+    )
+
+
 @app.route("/feedback", methods=["GET", "POST"])
 @login_required
 def feedback():
