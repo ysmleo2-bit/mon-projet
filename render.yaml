@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: rivia-setting
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 2
+    plan: free
+    envVars:
+      - key: FLASK_SECRET
+        generateValue: true
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: COACH_EMAIL
+        sync: false
+      - key: COACH_PASSWORD
+        sync: false
+      - key: INTERNAL_API_KEY
+        sync: false
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
