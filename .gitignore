@@ -7,3 +7,7 @@ post_log.json
 __pycache__/
 *.pyc
 .playwright/
+app.pid
+monitor.log
+active_sessions.json
+.prod_config.json
