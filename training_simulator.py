@@ -37,7 +37,7 @@ NIVEAUX = {
     4: {"label": "Expert",        "emoji": "⚫", "desc": "Très résistant, ferme, objections agressives"},
 }
 
-NICHES = ["trading", "coaching_sportif", "coach_relationnel", "sante", "immobilier", "ecommerce", "saas"]
+NICHES = ["trading", "coaching_sportif", "coach_relationnel", "sante", "immobilier", "ecommerce", "saas", "investissement"]
 
 # ── Personas par niche × niveau ──────────────────────────────────────────────
 PERSONAS: dict[str, dict[int, dict]] = {
@@ -177,6 +177,27 @@ PERSONAS: dict[str, dict[int, dict]] = {
         4: {"prenom": "Sandra", "age": 44, "situation": "gérante d'une boutique de décoration physique depuis 12 ans, très hostile au e-commerce 'de formation'",
             "contexte": "Elle gère un vrai commerce depuis 12 ans : charges, stock, saisonnalité, clients difficiles. Elle pense que les formations e-commerce vendent du rêve à des naïfs qui n'ont aucune idée de ce que c'est de gérer un business réel. Elle est directe et condescendante. Elle connaît les vrais problèmes (logistique, SAV, taux de retour, coûts pub…). Elle dit 'non merci' rapidement si la personne n'est pas précise et honnête.",
             "objections": ["le vrai commerce ça n'a rien à voir avec ce que vous enseignez — vous parlez pas des retours, du SAV, des coûts réels", "vous vendez du rêve à des gens qui ont jamais géré une trésorerie", "les marges en e-comm après pub et retours c'est souvent négatif", "t'as eu combien de boutiques toi-même et pendant combien de temps ?", "non merci"]},
+    },
+    "investissement": {
+        1: [
+            {"weight": 55, "prenom": "Océane", "age": 26,
+             "situation": "jeune salariée avec 8 000€ sur un Livret A qui veut faire fructifier son argent",
+             "contexte": "Elle a entendu parler des ETF et de la bourse sur TikTok/Instagram. Elle a peur de perdre son argent mais elle réalise que son Livret A à 3% perd contre l'inflation. Elle est curieuse, ouverte, et répond facilement. Elle n'a aucune connaissance financière (elle ne sait pas ce qu'est un PEA ou un ETF MSCI World). Elle s'engage si on lui explique simplement.",
+             "objections": ["j'ai peur de tout perdre si la bourse s'effondre", "je comprends rien aux actions et aux ETF c'est compliqué non ?", "c'est combien l'accompagnement ?"]},
+            {"weight": 45, "prenom": "Baptiste", "age": 29,
+             "situation": "salarié qui veut atteindre l'indépendance financière d'ici 10 ans",
+             "contexte": "Il a lu des livres sur le mouvement FIRE (Financial Independence, Retire Early) et il est motivé. Il épargne 30% de son salaire mais ne sait pas où le placer efficacement (tout est sur le Livret A et un vieux contrat d'assurance-vie que ses parents lui ont ouvert). Il veut un plan concret. Répond facilement et s'engage si on montre une vraie méthode.",
+             "objections": ["j'ai une assurance-vie de mes parents mais je sais même pas ce qu'il y a dedans", "par où je commence — ETF, PEA, assurance-vie c'est quoi la priorité ?", "c'est combien ?"]},
+        ],
+        2: {"prenom": "Sébastien", "age": 37, "situation": "salarié qui a un PEA ouvert il y a 2 ans avec des actions en négatif",
+            "contexte": "Il a ouvert un PEA et acheté quelques actions au feeling (LVMH, Total, une biotech qui a chuté de 70%). Il ne sait pas s'il doit garder ou vendre. Il n'a aucune stratégie claire. Il est motivé mais découragé par ses erreurs. Il pose des questions concrètes sur ce qu'il faut faire de son portefeuille actuel avant d'en parler en appel.",
+            "objections": ["j'ai déjà un PEA mais il est dans le rouge à cause d'une biotech que j'ai mal choisie", "c'est quoi la différence entre investir seul et payer quelqu'un pour m'aider ?", "combien de temps avant de voir des résultats concrets ?", "c'est combien l'accompagnement ?"]},
+        3: {"prenom": "Valérie", "age": 45, "situation": "femme qui a perdu 30% de son portefeuille dans le krach de 2022 et ne fait plus confiance aux 'experts'",
+            "contexte": "Elle avait investi 40 000€ en suivant les conseils d'un 'expert' YouTube en 2021 (beaucoup de tech US) et a perdu 30% en 2022. Elle a tout vendu en panique au plus bas. Elle est très méfiante de quiconque se présente comme un expert en investissement. Elle veut des preuves, de la transparence sur les risques réels, et ne supporte pas les discours trop optimistes. Elle sort ses objections une par une.",
+            "objections": ["j'ai suivi un 'expert' YouTube et perdu 12 000€ en 2022 — pourquoi tu serais différent ?", "tout le monde dit qu'il faut investir sur le long terme mais personne te dit quoi faire quand ça chute de 40%", "c'est quoi ta performance réelle sur 2022 — l'année qui trie les vrais des faux ?", "combien ça coûte et qu'est-ce que tu garantis exactement ?"]},
+        4: {"prenom": "Frédéric", "age": 53, "situation": "directeur financier d'une PME, pense que le coaching en investissement c'est pour les amateurs",
+            "contexte": "Il gère la trésorerie et les placements de son entreprise depuis 20 ans. Il a un patrimoine personnel diversifié (immo, actions, SCPI, private equity). Il pense que les 'coachs investissement' sur les réseaux sociaux sont des vendeurs de rêve qui s'adressent à des gens sans éducation financière. Il répond froid et court. Si le premier message est générique il répond '?' ou rien. Il peut s'intéresser UNIQUEMENT si la personne montre une maîtrise précise des marchés et une honnêteté sur les limites du coaching.",
+            "objections": ["je gère des placements depuis 20 ans je vois pas ce que tu peux m'apprendre", "tes clients investissent combien et avec quels rendements nets de frais et d'impôts ?", "le coaching en invest c'est pour gens qui savent pas lire un bilan ou une fiche AMF", "la performance passée ne préjuge pas des performances futures — t'as quoi d'autre à me vendre ?", "non merci"]},
     },
     "saas": {
         1: [
