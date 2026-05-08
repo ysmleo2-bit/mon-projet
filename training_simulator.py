@@ -39,17 +39,24 @@ NIVEAUX = {
 
 NICHES = ["trading", "coaching_sportif", "coach_relationnel", "sante", "immobilier", "ecommerce", "saas", "investissement"]
 
-# ── Types de trafic ──────────────────────────────────────────────────────────
+# ── Niveau d'Awareness ───────────────────────────────────────────────────────
+AWARENESS_TYPES = {
+    "chaud": {"label": "Chaud",  "emoji": "🔥", "desc": "Fan actif · regarde tout le contenu"},
+    "tiede": {"label": "Tiède",  "emoji": "🌡️", "desc": "Suit sans trop interagir · passif"},
+    "froid": {"label": "Froid",  "emoji": "❄️", "desc": "Ne connaît pas le coach"},
+}
+
+# ── Type de trafic ────────────────────────────────────────────────────────────
 TRAFFIC_TYPES = {
     "b2c": {
         "label": "B2C",
-        "emoji": "🔥",
-        "desc":  "Abonnés du coach · 6 à 8 messages max · Accroche personnalisée",
+        "emoji": "👤",
+        "desc":  "Particuliers · abonnés ou ciblés en DM",
     },
     "b2b": {
         "label": "B2B",
-        "emoji": "🧊",
-        "desc":  "Entrepreneurs ciblés · Opener décorrélé · 3-4 msgs après pivot",
+        "emoji": "🏢",
+        "desc":  "Entrepreneurs · opener décorrélé · pivot requis",
     },
 }
 
@@ -505,13 +512,13 @@ def load_real_examples(niche: str) -> str:
     return "\n".join(lines)
 
 
-def build_prospect_system_prompt(persona: dict, niche: str, niveau: int, traffic: str = "b2c") -> str:
+def build_prospect_system_prompt(persona: dict, niche: str, niveau: int, traffic: str = "b2c", awareness: str = "chaud") -> str:
     if traffic == "b2b":
-        return _build_b2b_prompt(persona, niche, niveau)
-    return _build_b2c_prompt(persona, niche, niveau)
+        return _build_b2b_prompt(persona, niche, niveau, awareness)
+    return _build_b2c_prompt(persona, niche, niveau, awareness)
 
 
-def _build_b2b_prompt(persona: dict, niche: str, niveau: int) -> str:
+def _build_b2b_prompt(persona: dict, niche: str, niveau: int, awareness: str = "froid") -> str:
     niv = NIVEAUX[niveau]
     objections_txt = ""
     if persona.get("objections"):
@@ -561,7 +568,7 @@ APRÈS LE RDV ACCEPTÉ :
 """
 
 
-def _build_b2c_prompt(persona: dict, niche: str, niveau: int) -> str:  # noqa: E302
+def _build_b2c_prompt(persona: dict, niche: str, niveau: int, awareness: str = "chaud") -> str:
     niv = NIVEAUX[niveau]
     objections_txt = ""
     if persona["objections"]:
@@ -589,10 +596,17 @@ def _build_b2c_prompt(persona: dict, niche: str, niveau: int) -> str:  # noqa: E
         4: "Tu esquives ou tu dis non à la première proposition de RDV. Tu peux accepter seulement si la conversation a été vraiment excellente depuis le début et que ton scepticisme a été traité avec précision.",
     }
 
+    awareness_notes = {
+        "chaud": "Tu suis activement le coach. Tu regardes ses stories, tu aimes ses posts. Quand il/elle t'écrit, tu es curieux(se) mais pas surpris(e).",
+        "tiede": "Tu as vu passer du contenu du coach mais tu n'interagis pas beaucoup. Tu le/la reconnais vaguement. Tu n'es pas particulièrement engagé(e).",
+        "froid": "Tu ne suis pas le coach ou à peine. Son nom ne te dit rien de spécial. Tu traites ça comme un DM d'un inconnu.",
+    }
+    temp_note = awareness_notes.get(awareness, awareness_notes["chaud"])
     return f"""Tu joues le rôle de {persona['prenom']}, {persona['age']} ans — une vraie personne contactée par DM sur Instagram ou Facebook.
 
 TA SITUATION : {persona['situation']}
 TON CONTEXTE : {persona['contexte']}
+TON RAPPORT AU COACH : {temp_note}
 
 COMMENT TU TE COMPORTES (ABSOLUMENT ESSENTIEL) :
 - Tes messages sont TRÈS COURTS. 1 à 3 phrases maximum. Parfois juste 2-4 mots. C'est du chat, pas un email.
@@ -639,7 +653,7 @@ APRÈS LE RDV ACCEPTÉ :
 
 # ── Prompt d'évaluation ──────────────────────────────────────────────────────
 
-def build_eval_prompt(conversation: list[dict], eleve_nom: str, niche: str, niveau: int, persona: dict, traffic: str = "b2c") -> str:
+def build_eval_prompt(conversation: list[dict], eleve_nom: str, niche: str, niveau: int, persona: dict, traffic: str = "b2c", awareness: str = "chaud") -> str:
     conv_txt = "\n".join(
         f"[{'SETTER' if m['role'] == 'eleve' else 'PROSPECT'}] {m['message']}"
         for m in conversation
@@ -647,6 +661,7 @@ def build_eval_prompt(conversation: list[dict], eleve_nom: str, niche: str, nive
     niv_label = NIVEAUX[niveau]["label"]
     nb_setter = sum(1 for m in conversation if m["role"] == "eleve")
     traffic_label = TRAFFIC_TYPES.get(traffic, TRAFFIC_TYPES["b2c"])["label"]
+    awareness_label = AWARENESS_TYPES.get(awareness, AWARENESS_TYPES["chaud"])["label"]
     if traffic == "b2b":
         msg_limit_note = "B2B FROID : limite = 3-4 messages setter APRÈS le pivot (l'opener décorrélé ne compte pas)"
         accroche_note  = "ACCROCHE B2B : Le premier message DOIT être décorrélé de l'offre (localisation, contenu, activité...). Pénaliser si le premier message parle de l'offre ou du setter directement."
@@ -660,7 +675,7 @@ def build_eval_prompt(conversation: list[dict], eleve_nom: str, niche: str, nive
     return f"""Tu es un expert en Setting (appointment setting). Évalue la performance de {eleve_nom}.
 
 CONTEXTE :
-- Niche : {niche} | Niveau : {niv_label} ({niveau}/4) | Trafic : {traffic_label}
+- Niche : {niche} | Niveau : {niv_label} ({niveau}/4) | Trafic : {traffic_label} | Awareness : {awareness_label}
 - Prospect : {persona['prenom']}, {persona['age']} ans — {persona['situation']}
 - Messages envoyés par le setter : {nb_setter}
 - {msg_limit_note}
@@ -768,9 +783,9 @@ def get_prospect_reply(client, messages: list[dict], system_prompt: str) -> str:
 
 
 def evaluate_session(client, conversation: list[dict], eleve_nom: str,
-                     niche: str, niveau: int, persona: dict, traffic: str = "b2c") -> dict:
+                     niche: str, niveau: int, persona: dict, traffic: str = "b2c", awareness: str = "chaud") -> dict:
     import anthropic
-    prompt = build_eval_prompt(conversation, eleve_nom, niche, niveau, persona, traffic)
+    prompt = build_eval_prompt(conversation, eleve_nom, niche, niveau, persona, traffic, awareness)
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=800,

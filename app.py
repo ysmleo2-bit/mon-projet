@@ -50,7 +50,7 @@ INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "rivia-internal-2026")
 
 # ── Import des données du simulateur ────────────────────────────────────────
 from training_simulator import (
-    NIVEAUX, NICHES, PERSONAS, TRAFFIC_TYPES,
+    NIVEAUX, NICHES, PERSONAS, TRAFFIC_TYPES, AWARENESS_TYPES,
     build_prospect_system_prompt,
     get_prospect_reply,
     evaluate_session,
@@ -255,16 +255,19 @@ def logout():
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html", niveaux=NIVEAUX, niches=NICHES, traffic_types=TRAFFIC_TYPES)
+    return render_template("index.html", niveaux=NIVEAUX, niches=NICHES, traffic_types=TRAFFIC_TYPES, awareness_types=AWARENESS_TYPES)
 
 
 @app.route("/start", methods=["POST"])
 @login_required
 def start_session():
-    niche  = request.form.get("niche") or NICHES[0]
-    traffic = request.form.get("traffic", "b2c")
+    niche    = request.form.get("niche") or NICHES[0]
+    traffic  = request.form.get("traffic", "b2c")
+    awareness = request.form.get("awareness", "chaud")
     if traffic not in TRAFFIC_TYPES:
         traffic = "b2c"
+    if awareness not in AWARENESS_TYPES:
+        awareness = "chaud"
     try:
         niveau = int(request.form.get("niveau", 1))
         if niveau not in NIVEAUX:
@@ -284,6 +287,7 @@ def start_session():
     session["niche"]        = niche
     session["niveau"]       = niveau
     session["traffic"]      = traffic
+    session["awareness"]    = awareness
     session["persona"]      = persona
     session["conversation"] = []
     session["api_messages"] = []
@@ -313,13 +317,14 @@ def start_session():
 def chat():
     if "eleve" not in session:
         return redirect(url_for("index"))
-    eleve    = session["eleve"]
-    niche    = session["niche"]
-    niveau   = session["niveau"]
-    traffic  = session.get("traffic", "b2c")
-    persona  = session["persona"]
-    niv_info = NIVEAUX[niveau]
-    conv     = session.get("conversation", [])
+    eleve     = session["eleve"]
+    niche     = session["niche"]
+    niveau    = session["niveau"]
+    traffic   = session.get("traffic", "b2c")
+    awareness = session.get("awareness", "chaud")
+    persona   = session["persona"]
+    niv_info  = NIVEAUX[niveau]
+    conv      = session.get("conversation", [])
     return render_template(
         "chat.html",
         eleve=eleve,
@@ -327,6 +332,8 @@ def chat():
         niveau=niveau,
         traffic=traffic,
         traffic_info=TRAFFIC_TYPES.get(traffic, TRAFFIC_TYPES["b2c"]),
+        awareness=awareness,
+        awareness_info=AWARENESS_TYPES.get(awareness, AWARENESS_TYPES["chaud"]),
         niv_info=niv_info,
         persona=persona,
         conversation=conv,
@@ -352,8 +359,9 @@ def send_message():
     niche        = session.get("niche", NICHES[0])
     niveau       = session.get("niveau", 1)
     traffic      = session.get("traffic", "b2c")
+    awareness    = session.get("awareness", "chaud")
     persona      = session.get("persona", {})
-    sys_prompt   = build_prospect_system_prompt(persona, niche, niveau, traffic)
+    sys_prompt   = build_prospect_system_prompt(persona, niche, niveau, traffic, awareness)
     api_messages = session.get("api_messages", [])
     conversation = session.get("conversation", [])
 
@@ -403,6 +411,7 @@ def end_session():
     niche        = session.get("niche", NICHES[0])
     niveau       = session.get("niveau", 1)
     traffic      = session.get("traffic", "b2c")
+    awareness    = session.get("awareness", "chaud")
     persona      = session.get("persona", {})
     conversation = session.get("conversation", [])
     start_iso    = session.get("start_time", datetime.now().isoformat())
@@ -418,7 +427,7 @@ def end_session():
 
     if client:
         try:
-            scores = evaluate_session(client, conversation, eleve["nom"], niche, niveau, persona, traffic)
+            scores = evaluate_session(client, conversation, eleve["nom"], niche, niveau, persona, traffic, awareness)
         except Exception:
             scores = _default_scores()
     else:
@@ -444,6 +453,7 @@ def end_session():
             "global":             scores.get("score_global", 50),
         },
         "traffic":            traffic,
+        "awareness":          awareness,
         "rdv_pose":           scores.get("rdv_pose", False),
         "prospect_qualifie":  scores.get("prospect_qualifie", False),
         "pivot_qualite":      scores.get("pivot_qualite"),

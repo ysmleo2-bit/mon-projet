@@ -12,8 +12,9 @@
       </div>
       <div class="results-meta">
         <h2>{{ result.scores.global | score_label }}</h2>
-        {% set traffic_map = {'b2c': '🔥 B2C', 'b2b': '🧊 B2B'} %}
-        <p>{{ result.eleve_nom }} · {{ result.niche|capitalize }} · {{ niv_info.emoji }} {{ niv_info.label }} · {{ traffic_map.get(result.traffic, '🔥 B2C') }}</p>
+        {% set traffic_map = {'b2c': '👤 B2C', 'b2b': '🏢 B2B'} %}
+        {% set awareness_map = {'chaud': '🔥 Chaud', 'tiede': '🌡️ Tiède', 'froid': '❄️ Froid'} %}
+        <p>{{ result.eleve_nom }} · {{ result.niche|capitalize }} · {{ niv_info.emoji }} {{ niv_info.label }} · {{ awareness_map.get(result.awareness, '🔥 Chaud') }} · {{ traffic_map.get(result.traffic, '👤 B2C') }}</p>
         <div class="results-rdv-row">
           <p class="results-rdv {% if result.rdv_pose %}rdv-ok{% else %}rdv-ko{% endif %}">
             {% if result.rdv_pose %}✅ RDV posé{% else %}❌ Pas de RDV posé{% endif %}

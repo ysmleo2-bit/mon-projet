@@ -203,10 +203,9 @@ a:hover { text-decoration: underline; }
 .level-name { font-weight: 700; font-size: .9rem; }
 .level-desc { font-size: .72rem; color: var(--text-muted); }
 
-/* Traffic type grid — 2 cartes max, même style que niche-grid */
-.traffic-grid-2 {
-  grid-template-columns: repeat(2, 110px) !important;
-}
+/* Awareness (3 cartes) et traffic (2 cartes) — même style que niche-grid */
+.traffic-grid-2 { grid-template-columns: repeat(2, 110px) !important; }
+.traffic-grid-3 { grid-template-columns: repeat(3, 110px) !important; }
 
 /* ══ CHAT LAYOUT ═════════════════════════════════════════════ */
 .chat-layout {

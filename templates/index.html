@@ -48,6 +48,23 @@
         </div>
       </div>
 
+      <!-- Sélection niveau d'awareness -->
+      <div class="form-section">
+        <label class="form-label">Niveau d'Awareness</label>
+        <div class="niche-grid traffic-grid-3">
+          {% for key, info in awareness_types.items() %}
+          <label class="niche-card">
+            <input type="radio" name="awareness" value="{{ key }}"
+              {% if loop.first %}checked{% endif %}>
+            <div class="niche-card-inner">
+              <span class="niche-icon">{{ info.emoji }}</span>
+              <span class="niche-name">{{ info.label }}</span>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
       <!-- Sélection type de trafic -->
       <div class="form-section">
         <label class="form-label">Type de trafic</label>
