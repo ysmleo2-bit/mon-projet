@@ -49,7 +49,6 @@
       </div>
 
       <!-- Sélection type de trafic -->
-      {% set traffic_short = {'b2c': 'B2C', 'b2b': 'B2B'} %}
       <div class="form-section">
         <label class="form-label">Type de trafic</label>
         <div class="niche-grid traffic-grid-2">
@@ -59,7 +58,7 @@
               {% if loop.first %}checked{% endif %}>
             <div class="niche-card-inner">
               <span class="niche-icon">{{ info.emoji }}</span>
-              <span class="niche-name">{{ traffic_short.get(key, key|upper) }}</span>
+              <span class="niche-name">{{ info.label }}</span>
             </div>
           </label>
           {% endfor %}

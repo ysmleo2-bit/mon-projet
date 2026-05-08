@@ -42,12 +42,12 @@ NICHES = ["trading", "coaching_sportif", "coach_relationnel", "sante", "immobili
 # ── Types de trafic ──────────────────────────────────────────────────────────
 TRAFFIC_TYPES = {
     "b2c": {
-        "label": "B2C — Trafic Chaud",
+        "label": "B2C",
         "emoji": "🔥",
         "desc":  "Abonnés du coach · 6 à 8 messages max · Accroche personnalisée",
     },
     "b2b": {
-        "label": "B2B — Trafic Froid",
+        "label": "B2B",
         "emoji": "🧊",
         "desc":  "Entrepreneurs ciblés · Opener décorrélé · 3-4 msgs après pivot",
     },
