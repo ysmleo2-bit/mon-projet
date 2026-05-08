@@ -430,88 +430,87 @@ def build_eval_prompt(conversation: list[dict], eleve_nom: str, niche: str, nive
         for m in conversation
     )
     niv_label = NIVEAUX[niveau]["label"]
-    return f"""Tu es un expert en Setting (appointment setting) et tu dois évaluer la performance de {eleve_nom} lors de cet entraînement.
+    nb_setter = sum(1 for m in conversation if m["role"] == "eleve")
+    return f"""Tu es un expert en Setting (appointment setting). Évalue UNIQUEMENT ce que le setter a réellement fait dans la conversation ci-dessous.
 
 CONTEXTE :
-- Niche : {niche}
-- Niveau de difficulté : {niv_label} (niveau {niveau}/4)
+- Niche : {niche} | Niveau : {niv_label} ({niveau}/4)
 - Prospect : {persona['prenom']}, {persona['age']} ans — {persona['situation']}
+- Nombre de messages du setter : {nb_setter}
+
+RÈGLE ABSOLUE AVANT D'ÉVALUER :
+Le setter est un "closer" qui contacte des prospects en DM (Instagram/réseaux sociaux). Le prospect suit déjà le coach/créateur de contenu.
+→ NE PAS pénaliser l'absence de "présentation de soi" — elle n'a pas lieu d'être en DM.
+→ NE PAS pénaliser ce qui n'a pas encore eu lieu (si la conversation est courte, un critère non atteint = note neutre, PAS zéro).
+→ Évaluer uniquement ce qui est visible dans la conversation. Si un critère est impossible à évaluer faute d'échanges suffisants → mettre 5.
 
 CONVERSATION :
 {conv_txt}
 
-ÉVALUE la performance du SETTER (pas du prospect) sur 5 critères. Utilise les grilles ci-dessous.
+━━━ CRITÈRE 1 — accroche /10 ━━━
+Évalue uniquement le PREMIER message du setter.
+• 9-10 : Personnalisé, mentionne quelque chose de précis (contenu vu, situation spécifique), ton naturel.
+• 7-8 : Personnalisé mais légèrement générique. Donne quand même envie de répondre.
+• 5-6 : Correct mais trop centré sur l'offre, ou vague sur le "pourquoi je t'écris".
+• 3-4 : Générique ("j'ai vu ton contenu", "ça m'a parlé") sans aucun détail spécifique.
+• 1-2 : Juste "bonjour" / "salut" / "hello" OU message copier-coller commercial évident.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITÈRE 1 — accroche (note /10)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Évalue le PREMIER message du setter uniquement.
-• 9-10 : Message ultra-personnalisé qui montre que le setter connaît le contenu du prospect ET fait le lien avec une situation spécifique. Formulation naturelle, curiosité ou empathie réelle.
-• 7-8 : Message personnalisé, mentionne quelque chose de spécifique (un post, une vidéo, un sujet précis). Pas générique.
-• 5-6 : Accroche correcte mais un peu générique ou trop centrée sur ce que le setter propose.
-• 3-4 : Accroche très générique ("bonjour j'ai vu ton contenu"), aucun effort de personnalisation visible.
-• 1-2 : Message copier-coller commercial évident, ou juste "bonjour" / "salut" / "hello" sans contenu.
+━━━ CRITÈRE 2 — gestion_objections /10 ━━━
+→ Si aucune objection n'est apparue dans la conversation : mettre OBLIGATOIREMENT 5 (neutre). NE PAS mettre 0.
+→ Si des objections sont apparues :
+• 9-10 : Empathie explicite (reformulation, "je comprends") avant chaque réponse. Jamais défensif.
+• 7-8 : Empathie présente sur la plupart des objections. Réponses solides.
+• 5-6 : Répond aux objections mais mécaniquement, peu d'empathie.
+• 3-4 : Défensif, argumentatif, ou réponses floues / génériques.
+• 1-2 : Ignore les objections ou répond à côté.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITÈRE 2 — gestion_objections (note /10)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Évalue comment le setter répond aux objections ou résistances du prospect.
-• 9-10 : Empathie explicite avant chaque réponse ("je comprends", reformulation), puis réponse précise et honnête. Ne défend jamais, ne contre-attaque jamais. Transforme l'objection en curiosité ou en question.
-• 7-8 : Empathie présente dans la plupart des objections. Réponses pertinentes. Quelques petites maladresses.
-• 5-6 : Traite les objections correctement mais de façon mécanique. Peu ou pas d'empathie explicite.
-• 3-4 : Répond aux objections mais de façon défensive, argumentative ou par des généralités floues.
-• 1-2 : Ignore les objections, les balaie, ou s'énerve. Répond à côté.
-• N/A → mettre 5 si le prospect n'a soulevé aucune objection.
+━━━ CRITÈRE 3 — qualification /10 ━━━
+Les 3 SEULS éléments attendus sont : OBJECTIF · SITUATION · DOULEUR
+(Pas de présentation de soi. Pas de pitch produit. Juste comprendre le prospect.)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITÈRE 3 — qualification (note /10)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Évalue si le setter a cherché à comprendre la situation réelle du prospect. Critères précis :
-• A posé au moins 2 questions ouvertes sur la SITUATION ACTUELLE du prospect (ex: "t'es où en ce moment dans ta démarche ?", "t'as essayé quoi jusqu'ici ?" …)
-• A identifié la DOULEUR ou le problème principal (pas juste l'objectif superficiel)
-• A exploré les OBSTACLES ou tentatives passées ("qu'est-ce qui t'a bloqué ?", "t'as déjà essayé quelque chose ?" …)
-• A compris la MOTIVATION réelle ("pourquoi c'est important maintenant ?" ou "qu'est-ce qui a changé pour toi ?")
-• Note 9-10 : Les 4 éléments couverts, questions naturelles et dans l'ordre logique.
-• Note 7-8 : 3 éléments sur 4 couverts. Questions pertinentes.
-• Note 5-6 : 2 éléments sur 4. Qualification partielle ou superficielle.
-• Note 3-4 : 1 élément ou questions fermées uniquement.
-• Note 1-2 : Aucune vraie question sur la situation. Le setter parle de lui/son offre sans creuser.
+Vérifie précisément dans la conversation :
+① OBJECTIF : le setter a-t-il demandé ou obtenu ce que le prospect veut atteindre ?
+② SITUATION : le setter a-t-il demandé ou obtenu où en est le prospect aujourd'hui ?
+③ DOULEUR : le setter a-t-il demandé ou obtenu ce qui bloque / frustre / fait souffrir le prospect ?
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITÈRE 4 — rdv (note /10)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Évalue la tentative et la qualité de la prise de RDV.
-• 9-10 : RDV posé naturellement au bon moment (après qualification + traitement objections). Proposition concrète (ex : "appel de 30 min pour voir si je peux t'aider sur X"). RDV accepté par le prospect.
-• 7-8 : RDV proposé avec une accroche pertinente, accepté. Timing correct.
-• 5-6 : RDV proposé mais maladroitement ou trop tôt/tard. Accepté malgré tout, ou refusé mais tentative faite.
-• 3-4 : RDV proposé de façon très commerciale ou générique ("tu veux qu'on se parle ?"). Refusé ou hésitant.
-• 1-2 : RDV jamais proposé, ou proposé de façon si maladroite que le prospect a refusé catégoriquement.
+• Note 9-10 : Les 3 éléments obtenus, questions naturelles et dans l'ordre logique.
+• Note 7-8 : 2 éléments sur 3 clairement obtenus.
+• Note 5-6 : 1 élément obtenu, ou les 3 abordés mais en surface.
+• Note 3-4 : Aucun des 3 éléments obtenu mais au moins une question posée.
+• Note 1-2 : Aucune question sur la situation du prospect. Le setter parle de lui ou de son offre.
+→ IMPORTANT : si le prospect a donné des infos spontanément sans être questionné, créditier quand même le setter si l'info est présente dans la conversation.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITÈRE 5 — naturel (note /10)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Évalue si le langage du setter est naturel et conversationnel.
-• 9-10 : Messages courts, ton de vraie conversation, aucune impression de script. S'adapte au rythme du prospect.
-• 7-8 : Globalement naturel, quelques phrases un peu formelles ou longues.
-• 5-6 : Mélange de naturel et de formules trop commerciales ou trop longues.
-• 3-4 : Beaucoup de formules marketing ("je t'accompagne vers", "je t'aide à atteindre tes objectifs"…), messages trop longs.
-• 1-2 : Ton clairement robotique ou de script de vente. Aucune adaptation au prospect.
+━━━ CRITÈRE 4 — rdv /10 ━━━
+→ Si la conversation est trop courte pour que le RDV ait pu être posé naturellement : mettre 5 (neutre). NE PAS mettre 0.
+→ Si une tentative de RDV a eu lieu :
+• 9-10 : Proposition naturelle et au bon moment (après avoir obtenu les 3 infos), avec accroche concrète ("appel de 30 min pour voir si X"). RDV accepté.
+• 7-8 : Proposition pertinente, acceptée. Timing correct.
+• 5-6 : Proposition maladroite ou trop tôt/tard. Tentative faite même si refusée.
+• 3-4 : Proposition trop commerciale ("tu veux qu'on se parle ?") ou très mal timée.
+• 1-2 : Aucune tentative de RDV malgré une conversation complète (5+ échanges de chaque côté).
+
+━━━ CRITÈRE 5 — naturel /10 ━━━
+• 9-10 : Messages courts, ton de vraie conversation, aucune impression de script.
+• 7-8 : Globalement naturel, quelques phrases un peu longues ou formelles.
+• 5-6 : Mélange naturel/commercial. Quelques tournures trop "vendeur".
+• 3-4 : Formules marketing visibles ("je t'accompagne vers tes objectifs"…), messages longs.
+• 1-2 : Clairement robotique ou script de vente. Aucune adaptation au prospect.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Retourne UNIQUEMENT un JSON valide (sans markdown, sans commentaires) :
+Retourne UNIQUEMENT un JSON valide (sans markdown) :
 {{
   "accroche": <1-10>,
   "gestion_objections": <1-10>,
   "qualification": <1-10>,
   "rdv": <1-10>,
   "naturel": <1-10>,
-  "score_global": <0-100 — calcul exact : round(accroche*15 + gestion_objections*25 + qualification*25 + rdv*20 + naturel*15) / 10>,
-  "rdv_pose": <true si le prospect a explicitement accepté un RDV ou un appel, sinon false>,
-  "coordonnees_demandees": <true si le setter a demandé le téléphone ou l'email après que le RDV était accepté, sinon false>,
-  "points_forts": ["phrase concrète sur ce qui a bien marché", "..."],
-  "points_ameliorer": ["phrase actionnable sur ce à améliorer en priorité", "..."],
-  "conseil_principal": "1 conseil précis et actionnable pour la prochaine session (pas une généralité)"
+  "score_global": <0-100 — calcul : round((accroche*15 + gestion_objections*25 + qualification*25 + rdv*20 + naturel*15) / 10)>,
+  "rdv_pose": <true si le prospect a explicitement accepté un RDV/appel, sinon false>,
+  "coordonnees_demandees": <true si le setter a demandé téléphone ou email après acceptation du RDV, sinon false>,
+  "points_forts": ["point concret sur ce qui a bien marché — si rien, liste vide []"],
+  "points_ameliorer": ["point actionnable prioritaire — basé uniquement sur ce qui s'est passé, pas sur ce qui manquait faute de temps"],
+  "conseil_principal": "1 conseil précis et actionnable pour la prochaine session"
 }}"""
 
 
