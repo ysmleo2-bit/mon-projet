@@ -387,7 +387,8 @@ a:hover { text-decoration: underline; }
 .score-max { font-size: .75rem; color: var(--text-muted); }
 .results-meta h2 { font-size: 1.3rem; margin-bottom: .3rem; }
 .results-meta p { color: var(--text-muted); font-size: .9rem; }
-.results-rdv { margin-top: .4rem; font-weight: 700; }
+.results-rdv-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: .4rem; }
+.results-rdv { font-weight: 700; margin: 0; }
 .rdv-ok { color: var(--green); }
 .rdv-ko { color: var(--red); }
 

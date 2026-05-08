@@ -13,9 +13,14 @@
       <div class="results-meta">
         <h2>{{ result.scores.global | score_label }}</h2>
         <p>{{ result.eleve_nom }} · {{ result.niche|capitalize }} · {{ niv_info.emoji }} {{ niv_info.label }}</p>
-        <p class="results-rdv {% if result.rdv_pose %}rdv-ok{% else %}rdv-ko{% endif %}">
-          {% if result.rdv_pose %}✅ RDV posé{% else %}❌ Pas de RDV posé{% endif %}
-        </p>
+        <div class="results-rdv-row">
+          <p class="results-rdv {% if result.rdv_pose %}rdv-ok{% else %}rdv-ko{% endif %}">
+            {% if result.rdv_pose %}✅ RDV posé{% else %}❌ Pas de RDV posé{% endif %}
+          </p>
+          <p class="results-rdv {% if result.prospect_qualifie %}rdv-ok{% else %}rdv-ko{% endif %}">
+            {% if result.prospect_qualifie %}✅ Prospect qualifié{% else %}❌ Prospect non qualifié{% endif %}
+          </p>
+        </div>
       </div>
     </div>
 

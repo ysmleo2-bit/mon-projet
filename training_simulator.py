@@ -431,72 +431,86 @@ def build_eval_prompt(conversation: list[dict], eleve_nom: str, niche: str, nive
     )
     niv_label = NIVEAUX[niveau]["label"]
     nb_setter = sum(1 for m in conversation if m["role"] == "eleve")
-    return f"""Tu es un expert en Setting (appointment setting). Évalue UNIQUEMENT ce que le setter a réellement fait dans la conversation ci-dessous.
+    return f"""Tu es un expert en Setting (appointment setting). Évalue la performance de {eleve_nom}.
 
 CONTEXTE :
 - Niche : {niche} | Niveau : {niv_label} ({niveau}/4)
 - Prospect : {persona['prenom']}, {persona['age']} ans — {persona['situation']}
-- Nombre de messages du setter : {nb_setter}
+- Messages envoyés par le setter : {nb_setter}
 
-RÈGLE ABSOLUE AVANT D'ÉVALUER :
-Le setter est un "closer" qui contacte des prospects en DM (Instagram/réseaux sociaux). Le prospect suit déjà le coach/créateur de contenu.
-→ NE PAS pénaliser l'absence de "présentation de soi" — elle n'a pas lieu d'être en DM.
-→ NE PAS pénaliser ce qui n'a pas encore eu lieu (si la conversation est courte, un critère non atteint = note neutre, PAS zéro).
-→ Évaluer uniquement ce qui est visible dans la conversation. Si un critère est impossible à évaluer faute d'échanges suffisants → mettre 5.
+━━━ PHILOSOPHIE DU SETTING (LIS AVANT TOUT) ━━━
+Un bon setter est RAPIDE et EFFICACE. La conversation doit être courte.
+L'objectif est de booker un appel (RDV) tout en récoltant 3 infos clés sur le prospect :
+  ① OBJECTIF  — ce que le prospect veut atteindre
+  ② SITUATION — où il en est aujourd'hui
+  ③ DOULEUR   — ce qui le bloque / le fait souffrir
+
+GRILLE DE RÉUSSITE (détermine le plafond du score_global) :
+  ✅ RDV obtenu + 3 critères qualifiés + ≤ 8 messages setter → score peut atteindre 100
+  ✅ RDV obtenu + 3 critères qualifiés + 9-12 messages setter → plafonné à 80
+  ✅ RDV obtenu + 3 critères qualifiés + > 12 messages setter → plafonné à 65 (trop long)
+  ⚠️  RDV obtenu SANS les 3 critères qualifiés              → plafonné à 70 (prospect non qualifié)
+  ⚠️  3 critères qualifiés SANS RDV                         → plafonné à 55 (objectif manqué)
+  ❌ Ni RDV ni qualification                                → plafonné à 35
+
+NE PAS pénaliser :
+- L'absence de "présentation de soi" (inutile en DM, le prospect suit déjà le coach)
+- Un critère non atteint si la conversation est trop courte pour qu'il ait pu l'être (→ 5 neutre)
+- Les infos obtenues spontanément du prospect comptent comme si le setter les avait demandées
 
 CONVERSATION :
 {conv_txt}
 
 ━━━ CRITÈRE 1 — accroche /10 ━━━
-Évalue uniquement le PREMIER message du setter.
-• 9-10 : Personnalisé, mentionne quelque chose de précis (contenu vu, situation spécifique), ton naturel.
-• 7-8 : Personnalisé mais légèrement générique. Donne quand même envie de répondre.
-• 5-6 : Correct mais trop centré sur l'offre, ou vague sur le "pourquoi je t'écris".
-• 3-4 : Générique ("j'ai vu ton contenu", "ça m'a parlé") sans aucun détail spécifique.
-• 1-2 : Juste "bonjour" / "salut" / "hello" OU message copier-coller commercial évident.
+Premier message du setter uniquement.
+• 9-10 : Personnalisé + précis (contenu vu, situation spécifique) + ton naturel
+• 7-8 : Personnalisé mais un peu vague sur "pourquoi je t'écris"
+• 5-6 : Correct mais générique ou trop orienté offre
+• 3-4 : Très générique, aucun détail ("j'ai vu ton contenu", "ça m'a parlé")
+• 1-2 : Juste "bonjour/salut/hello" OU copier-coller commercial évident
 
 ━━━ CRITÈRE 2 — gestion_objections /10 ━━━
-→ Si aucune objection n'est apparue dans la conversation : mettre OBLIGATOIREMENT 5 (neutre). NE PAS mettre 0.
-→ Si des objections sont apparues :
-• 9-10 : Empathie explicite (reformulation, "je comprends") avant chaque réponse. Jamais défensif.
-• 7-8 : Empathie présente sur la plupart des objections. Réponses solides.
-• 5-6 : Répond aux objections mais mécaniquement, peu d'empathie.
-• 3-4 : Défensif, argumentatif, ou réponses floues / génériques.
-• 1-2 : Ignore les objections ou répond à côté.
+→ Aucune objection apparue dans la conversation = OBLIGATOIREMENT 5 (neutre, jamais 0)
+→ Si objections présentes :
+• 9-10 : Empathie explicite avant chaque réponse, jamais défensif, transforme en question
+• 7-8 : Empathie présente sur la majorité, réponses solides
+• 5-6 : Répond correctement mais mécaniquement, peu d'empathie
+• 3-4 : Défensif, argumentatif ou réponses floues
+• 1-2 : Ignore les objections ou répond à côté
 
 ━━━ CRITÈRE 3 — qualification /10 ━━━
-Les 3 SEULS éléments attendus sont : OBJECTIF · SITUATION · DOULEUR
-(Pas de présentation de soi. Pas de pitch produit. Juste comprendre le prospect.)
+Vérifie si ces 3 éléments sont présents dans la conversation (obtenus ou donnés spontanément) :
+  ① OBJECTIF  : ce que le prospect veut atteindre
+  ② SITUATION : où il en est aujourd'hui
+  ③ DOULEUR   : ce qui le bloque / frustre / fait souffrir
 
-Vérifie précisément dans la conversation :
-① OBJECTIF : le setter a-t-il demandé ou obtenu ce que le prospect veut atteindre ?
-② SITUATION : le setter a-t-il demandé ou obtenu où en est le prospect aujourd'hui ?
-③ DOULEUR : le setter a-t-il demandé ou obtenu ce qui bloque / frustre / fait souffrir le prospect ?
-
-• Note 9-10 : Les 3 éléments obtenus, questions naturelles et dans l'ordre logique.
-• Note 7-8 : 2 éléments sur 3 clairement obtenus.
-• Note 5-6 : 1 élément obtenu, ou les 3 abordés mais en surface.
-• Note 3-4 : Aucun des 3 éléments obtenu mais au moins une question posée.
-• Note 1-2 : Aucune question sur la situation du prospect. Le setter parle de lui ou de son offre.
-→ IMPORTANT : si le prospect a donné des infos spontanément sans être questionné, créditier quand même le setter si l'info est présente dans la conversation.
+• 9-10 : Les 3 obtenus, questions naturelles et fluides
+• 7-8 : 2 sur 3 clairement obtenus
+• 5-6 : 1 sur 3 obtenu
+• 3-4 : Aucun des 3 mais au moins une question posée sur le prospect
+• 1-2 : Aucune question sur le prospect — le setter parle de lui ou de son offre
 
 ━━━ CRITÈRE 4 — rdv /10 ━━━
-→ Si la conversation est trop courte pour que le RDV ait pu être posé naturellement : mettre 5 (neutre). NE PAS mettre 0.
-→ Si une tentative de RDV a eu lieu :
-• 9-10 : Proposition naturelle et au bon moment (après avoir obtenu les 3 infos), avec accroche concrète ("appel de 30 min pour voir si X"). RDV accepté.
-• 7-8 : Proposition pertinente, acceptée. Timing correct.
-• 5-6 : Proposition maladroite ou trop tôt/tard. Tentative faite même si refusée.
-• 3-4 : Proposition trop commerciale ("tu veux qu'on se parle ?") ou très mal timée.
-• 1-2 : Aucune tentative de RDV malgré une conversation complète (5+ échanges de chaque côté).
+→ Conversation trop courte pour que le RDV ait pu être tenté = 5 neutre (jamais 0)
+→ Si tentative de RDV :
+• 9-10 : Proposition naturelle APRÈS avoir obtenu les 3 infos, formulée avec un ancrage concret ("appel de 30 min pour voir si je peux t'aider sur [douleur]"). RDV accepté.
+• 7-8 : Proposition acceptée, bien timée, même si formulation légèrement perfectible
+• 5-6 : Proposition faite mais trop tôt/tard ou maladroite. Tentative présente.
+• 3-4 : Proposition très commerciale ou générique, ou RDV refusé à cause du timing
+• 1-2 : Aucune tentative malgré une conversation de 5+ échanges de chaque côté
 
 ━━━ CRITÈRE 5 — naturel /10 ━━━
-• 9-10 : Messages courts, ton de vraie conversation, aucune impression de script.
-• 7-8 : Globalement naturel, quelques phrases un peu longues ou formelles.
-• 5-6 : Mélange naturel/commercial. Quelques tournures trop "vendeur".
-• 3-4 : Formules marketing visibles ("je t'accompagne vers tes objectifs"…), messages longs.
-• 1-2 : Clairement robotique ou script de vente. Aucune adaptation au prospect.
+• 9-10 : Messages courts, ton de conversation, aucun script perceptible
+• 7-8 : Globalement naturel, quelques phrases un peu longues
+• 5-6 : Mélange naturel/commercial
+• 3-4 : Formules marketing visibles, messages trop longs
+• 1-2 : Clairement robotique ou script de vente
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Calcule le score_global ainsi :
+1. Base = round((accroche*10 + gestion_objections*15 + qualification*30 + rdv*35 + naturel*10) / 10)
+2. Applique le plafond de la grille de réussite ci-dessus (ne jamais dépasser ce plafond)
 
 Retourne UNIQUEMENT un JSON valide (sans markdown) :
 {{
@@ -505,11 +519,12 @@ Retourne UNIQUEMENT un JSON valide (sans markdown) :
   "qualification": <1-10>,
   "rdv": <1-10>,
   "naturel": <1-10>,
-  "score_global": <0-100 — calcul : round((accroche*15 + gestion_objections*25 + qualification*25 + rdv*20 + naturel*15) / 10)>,
-  "rdv_pose": <true si le prospect a explicitement accepté un RDV/appel, sinon false>,
-  "coordonnees_demandees": <true si le setter a demandé téléphone ou email après acceptation du RDV, sinon false>,
-  "points_forts": ["point concret sur ce qui a bien marché — si rien, liste vide []"],
-  "points_ameliorer": ["point actionnable prioritaire — basé uniquement sur ce qui s'est passé, pas sur ce qui manquait faute de temps"],
+  "score_global": <0-100 après application du plafond>,
+  "rdv_pose": <true si prospect a explicitement accepté un RDV/appel, sinon false>,
+  "prospect_qualifie": <true si les 3 critères objectif+situation+douleur sont présents, sinon false>,
+  "coordonnees_demandees": <true si setter a demandé téléphone ou email après RDV accepté, sinon false>,
+  "points_forts": ["point concret basé sur ce qui s'est passé"],
+  "points_ameliorer": ["point actionnable prioritaire — pas ce qui manquait faute de temps"],
   "conseil_principal": "1 conseil précis et actionnable pour la prochaine session"
 }}"""
 
