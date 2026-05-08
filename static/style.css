@@ -203,32 +203,10 @@ a:hover { text-decoration: underline; }
 .level-name { font-weight: 700; font-size: .9rem; }
 .level-desc { font-size: .72rem; color: var(--text-muted); }
 
-/* Traffic type grid */
-.traffic-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: .6rem;
+/* Traffic type grid — 2 cartes max, même style que niche-grid */
+.traffic-grid-2 {
+  grid-template-columns: repeat(2, 110px) !important;
 }
-.traffic-card input { display: none; }
-.traffic-card-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: .3rem;
-  padding: 1rem .75rem;
-  border-radius: 8px;
-  border: 2px solid var(--border);
-  cursor: pointer;
-  transition: border-color .2s, background .2s;
-  text-align: center;
-}
-.traffic-card input:checked + .traffic-card-inner {
-  border-color: var(--accent);
-  background: rgba(0,229,122,.08);
-}
-.traffic-emoji { font-size: 1.6rem; }
-.traffic-label { font-weight: 700; font-size: .9rem; }
-.traffic-desc { font-size: .72rem; color: var(--text-muted); }
 
 /* ══ CHAT LAYOUT ═════════════════════════════════════════════ */
 .chat-layout {

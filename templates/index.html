@@ -49,17 +49,17 @@
       </div>
 
       <!-- Sélection type de trafic -->
+      {% set traffic_short = {'b2c': 'B2C', 'b2b': 'B2B'} %}
       <div class="form-section">
         <label class="form-label">Type de trafic</label>
-        <div class="traffic-grid">
+        <div class="niche-grid traffic-grid-2">
           {% for key, info in traffic_types.items() %}
-          <label class="traffic-card">
+          <label class="niche-card">
             <input type="radio" name="traffic" value="{{ key }}"
               {% if loop.first %}checked{% endif %}>
-            <div class="traffic-card-inner">
-              <span class="traffic-emoji">{{ info.emoji }}</span>
-              <span class="traffic-label">{{ info.label }}</span>
-              <span class="traffic-desc">{{ info.desc }}</span>
+            <div class="niche-card-inner">
+              <span class="niche-icon">{{ info.emoji }}</span>
+              <span class="niche-name">{{ traffic_short.get(key, key|upper) }}</span>
             </div>
           </label>
           {% endfor %}
