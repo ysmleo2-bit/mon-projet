@@ -37,7 +37,7 @@ NIVEAUX = {
     4: {"label": "Expert",        "emoji": "⚫", "desc": "Très résistant, ferme, objections agressives"},
 }
 
-NICHES = ["trading", "coaching_sportif", "coach_relationnel", "sante", "immobilier", "ecommerce", "saas", "investissement"]
+NICHES = ["trading", "coaching_sportif", "coach_relationnel", "sante", "immobilier", "ecommerce", "saas", "investissement", "coach_business"]
 
 # ── Niveau d'Awareness ───────────────────────────────────────────────────────
 AWARENESS_TYPES = {
@@ -220,6 +220,34 @@ PERSONAS: dict[str, dict[int, dict]] = {
             "contexte": "Il gère la trésorerie et les placements de son entreprise depuis 20 ans. Il a un patrimoine personnel diversifié (immo, actions, SCPI, private equity). Il pense que les 'coachs investissement' sur les réseaux sociaux sont des vendeurs de rêve qui s'adressent à des gens sans éducation financière. Il répond froid et court. Si le premier message est générique il répond '?' ou rien. Il peut s'intéresser UNIQUEMENT si la personne montre une maîtrise précise des marchés et une honnêteté sur les limites du coaching.",
             "objections": ["je gère des placements depuis 20 ans je vois pas ce que tu peux m'apprendre", "tes clients investissent combien et avec quels rendements nets de frais et d'impôts ?", "le coaching en invest c'est pour gens qui savent pas lire un bilan ou une fiche AMF", "la performance passée ne préjuge pas des performances futures — t'as quoi d'autre à me vendre ?", "non merci"]},
     },
+    "coach_business": {
+        1: [
+            {"weight": 55, "prenom": "Enzo", "age": 22,
+             "situation": "étudiant en dernière année de BTS qui veut lancer un business en ligne avant de finir ses études",
+             "contexte": "Il suit des créateurs comme Matis Clouet et Jeremy Kholman depuis 6 mois. Il est convaincu qu'il peut gagner de l'argent en ligne mais ne sait pas par où commencer (dropshipping ? freelance ? coaching ?). Il est très motivé et répond facilement. Son seul frein : le budget — il est étudiant et a peu d'économies. Si on lui propose un appel il demande les dispo et si c'est payant.",
+             "objections": ["je suis encore étudiant j'ai peu de budget", "par où je commence — il y a tellement de choses", "combien ça coûte ?", "c'est vraiment possible de gagner de l'argent en ligne sans expérience ?"]},
+            {"weight": 45, "prenom": "Lucie", "age": 25,
+             "situation": "salariée en marketing digital qui veut quitter son CDI pour devenir freelance ou lancer son propre business",
+             "contexte": "Elle a des compétences (réseaux sociaux, copywriting) mais ne sait pas comment les monétiser en dehors d'un salariat. Elle suit Alec Henry et des créateurs business. Elle a peur de sauter le pas sans filet. Elle répond aux questions sur sa situation facilement. Elle s'engage si on lui montre un chemin concret et réaliste.",
+             "objections": ["j'ai peur de perdre la sécurité de mon CDI", "par où je commence pour trouver des premiers clients ?", "combien de temps avant de remplacer mon salaire ?", "c'est combien ?"]},
+        ],
+        2: {"prenom": "Dylan", "age": 28, "situation": "ex-salarié qui s'est lancé en freelance il y a 8 mois mais ne dépasse pas 1 500€/mois",
+            "contexte": "Il a quitté son CDI, s'est lancé en freelance (graphiste) mais stagne à 1 500€/mois depuis 6 mois. Il a regardé beaucoup de contenu de Steven Bos et Jeremy Kholman sur comment scaler un business de services. Il est frustré parce qu'il fait les choses mais ça ne décolle pas. Il pose des questions précises sur pourquoi il plafonne et ce qu'il faut changer concrètement.",
+            "objections": ["j'ai déjà regardé plein de formations gratuites ça m'a rien apporté", "c'est quoi la différence avec ce que je fais déjà ?", "combien de temps avant de voir des résultats ?", "c'est combien l'accompagnement ?", "t'as des résultats concrets de tes clients ?"]},
+        3: [
+            {"weight": 60, "prenom": "Romain", "age": 32,
+             "situation": "a investi 2 000€ dans une formation business en ligne et n'a rien gagné, très méfiant des 'coachs'",
+             "contexte": "Il a acheté une formation promise à 'gagner 5k/mois en 3 mois' — résultat : 0€ de revenus après 6 mois d'efforts. Il est amer. Il suit encore du contenu mais il est TRÈS méfiant de quiconque prétend l'aider à gagner de l'argent. Il pose des questions exigeantes sur les preuves. Il peut s'engager si on reconnaît honnêtement les limites et qu'on lui montre quelque chose de concret et différent.",
+             "objections": ["j'ai déjà payé 2 000€ pour une formation et j'ai rien gagné", "tout le monde promet la même chose", "c'est quoi tes résultats réels — pas les screenshots filtrés", "pourquoi ta méthode ce serait différent ?", "combien ça coûte encore ?"]},
+            {"weight": 40, "prenom": "Camille", "age": 30,
+             "situation": "manager en entreprise qui consomme du contenu business mais n'a jamais osé se lancer",
+             "contexte": "Elle suit des dizaines de créateurs depuis 2 ans (Matis Clouet, Alec Henry, etc.) mais n'a jamais rien fait. Elle s'est abonnée à plusieurs newsletters, téléchargé des guides gratuits, mais n'agit pas. Elle a peur d'échouer, de ce que les gens penseront, et de perdre son argent dans une formation inutile. Elle est analytique et prudente. Elle pose beaucoup de questions avant de s'engager.",
+             "objections": ["j'ai peur de me lancer et d'échouer", "j'ai suivi tellement de contenu sans jamais rien faire", "en quoi tu peux m'aider à vraiment passer à l'action ?", "c'est combien ?", "est-ce que tu garantis des résultats ?"]},
+        ],
+        4: {"prenom": "Nicolas", "age": 36, "situation": "entrepreneur convaincu que les 'coachs business en ligne' vendent du vent et s'enrichissent sur le dos de naïfs",
+            "contexte": "Il a lancé une vraie PME (agence web, 15 employés, 800k€ de CA). Il pense que les coachs type Matis Clouet ou Jeremy Kholman vendent des rêves à des gens qui n'ont pas le courage de faire un vrai business. Il peut être cinglant. Il ne s'intéressera QUE si la personne montre une maîtrise réelle des vrais chiffres d'un business (marges, CAC, scalabilité) et non des promesses de 'liberté et de revenus passifs'.",
+            "objections": ["ces coachs vivent de leurs formations pas de leur business", "t'as quoi comme résultats mesurables sur tes coachés — CA, croissance, pas des témoignages", "le business en ligne c'est 1% qui réussit et 99% qui payent pour des rêves", "'liberté financière' c'est le discours de tous les vendeurs de rêve", "non merci"]},
+    },
     "saas": {
         1: [
             {"weight": 55, "prenom": "Tom", "age": 27,
@@ -371,6 +399,24 @@ PERSONAS_B2B: dict[str, dict[int, dict]] = {
             "situation": "CTO d'un SaaS série A (2M€ levés), entouré d'une équipe commerciale, zéro patience",
             "contexte": "Il reçoit des DMs de setters tous les jours. Il a répondu à l'opener par curiosité. Il dit 'non' très facilement. Si tu n'as pas quelque chose de TRÈS précis sur les problèmes d'une boîte à son stade (churn, expansion revenue, go-to-market enterprise) → 'non merci'. Il a une équipe pour ça.",
             "objections": ["on a une équipe sales interne", "non merci", "t'as des clients série A ?", "..."]},
+    },
+    "coach_business": {
+        1: {"prenom": "Hugo", "age": 24,
+            "situation": "créateur de contenu lifestyle avec 15k followers qui a posté sur ses galères pour 'monétiser sa page'",
+            "contexte": "Il crée du contenu depuis 1 an, il a une vraie communauté mais ne sait pas comment gagner de l'argent avec. Il a posté sur sa frustration de bosser autant sans revenus. Il a répondu à ton opener sur son contenu récent. Si tu pars de SA frustration (contenu, audience, mais 0 revenu) → il est très ouvert. Si tu lui parles de ton offre directement → 'ok c'est pour vendre quelque chose'.",
+            "objections": ["j'ai pas de budget pour investir dans quelque chose", "c'est quoi concrètement tu peux faire pour moi ?", "combien ça coûte ?"]},
+        2: {"prenom": "Axel", "age": 29,
+            "situation": "freelance développeur à 3k€/mois qui a posté sur son envie de 'passer à autre chose' et créer quelque chose à lui",
+            "contexte": "Il gagne correctement en freelance mais se sent dépendant de ses clients. Il a posté sur son envie d'un business propre — formation, SaaS, ou agence. Il a répondu à ton opener sur son projet. Il a déjà reçu des DMs de coachs business. Il teste si tu comprends vraiment le passage freelance→business ou si tu vas sortir un pitch générique.",
+            "objections": ["j'ai déjà regardé des contenus de Matis Clouet et les autres", "c'est quoi ta valeur ajoutée par rapport à tout ce qui existe déjà ?", "combien ça coûte ?", "t'as des clients comme moi qui ont réussi la transition ?"]},
+        3: {"prenom": "Kevin", "age": 33,
+            "situation": "agency owner à 8k€/mois qui reçoit des DMs de setters toutes les semaines, très méfiant",
+            "contexte": "Il a déjà tout essayé : masterclass, formations, coachings. Il a dépensé 5 000€+ en formations business. Il reconnaît les setters immédiatement. Il peut s'intéresser UNIQUEMENT si le setter montre qu'il comprend les vrais problèmes d'une agence à son niveau (recrutement, délégation, systèmes) — pas un pitch sur 'atteindre la liberté financière'.",
+            "objections": ["soyons directs c'est quoi ton offre ?", "j'ai déjà payé des formations qui m'ont rien apporté", "t'as des clients à mon niveau de revenus ?", "non merci"]},
+        4: {"prenom": "Thomas", "age": 38,
+            "situation": "fondateur d'une agence digitale à 40k€/mois, pense que les 'coachs business' Instagram ciblent des débutants crédules",
+            "contexte": "Il a construit son agence sans coach ni formation. Il est entouré d'un CFO et d'une team ops. Il a répondu à l'opener parce que la question était honnêtement intéressante. Il voit tout immédiatement. Il dit 'non' sans hésiter. Pour qu'il reste, le setter doit trouver un angle PRÉCIS sur un problème qu'il n'a pas résolu à son échelle — pas un discours sur 'scaler ton business'.",
+            "objections": ["je scale déjà très bien sans coach", "les coachs business Instagram ciblent des débutants, pas des gens comme moi", "non merci", "..."]},
     },
     "investissement": {
         1: {"prenom": "Mathis", "age": 28,
