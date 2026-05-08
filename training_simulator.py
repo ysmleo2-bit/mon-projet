@@ -565,6 +565,9 @@ def build_prospect_system_prompt(persona: dict, niche: str, niveau: int, traffic
 
 
 def _build_b2b_prompt(persona: dict, niche: str, niveau: int, awareness: str = "froid") -> str:
+    if niche == "coach_business":
+        return _build_b2b_coach_business_prompt(persona, niveau)
+
     niv = NIVEAUX[niveau]
     objections_txt = ""
     if persona.get("objections"):
@@ -611,6 +614,75 @@ PROPOSITION DE RDV :
 APRÈS LE RDV ACCEPTÉ :
 - Tu choisis un créneau parmi ceux proposés, en un mot.
 - Si on te demande ton numéro ou email → tu les donnes naturellement.
+"""
+
+
+def _build_b2b_coach_business_prompt(persona: dict, niveau: int) -> str:
+    """Prompt B2B spécialisé Coach Business — Méthode BrandScale Appointment Center."""
+    objections_txt = ""
+    if persona.get("objections"):
+        objections_txt = "\nOBJECTIONS (sors-les naturellement, une par une) :\n" + \
+                         "\n".join(f"- \"{o}\"" for o in persona["objections"])
+
+    # Comment tu réagis à chaque phase BrandScale selon le niveau
+    opener_reaction = {
+        1: "Si l'opener est 100% relationnel (question sur ta localisation, ton contenu, une story récente) sans mention de business → tu réponds normalement, curieux. Si l'opener parle directement de business ou d'offre → 'ah ok c'est pour vendre quelque chose ?'",
+        2: "Tu as déjà reçu des DMs de setters. Tu testes : si l'opener est vraiment personnel et précis (un détail que seul quelqu'un qui suit ton contenu remarquerait) → tu réponds. Si c'est générique ('t'es d'où ?', 'belle page') → réponse courte, froide.",
+        3: "Tu reconnais les openers de setter même bien faits. Tu réponds mais tu testes rapidement : si la conversation reste relationnelle et utile après 2-3 échanges → tu restes. Si tu sens le pivot venir trop vite → 'écoute je vais être direct, t'es setter pour qui ?'",
+        4: "Tu vois tout. Un opener même excellent → tu réponds 2-3 mots max. Tu attends le pivot pour décider si ça vaut ton temps. Dès que c'est trop 'script' → '...' ou 'non merci'.",
+    }
+    transition_reaction = {
+        1: "Si la transition est douce ('au fait tu bosses sur quoi là ?') après 2-3 échanges relationnels → tu trouves ça normal et tu réponds sur ton activité. Si la transition arrive au 2e message → 'attends on se connaît même pas lol'.",
+        2: "Tu testes si la transition part de CE QUE TU AS DIT ou si c'est un script. Exemple bon : il reprend quelque chose que tu as dit → tu joues le jeu. Exemple mauvais : 'et ton activité ça avance ?' sans contexte → 'pourquoi tu me demandes ça ?'",
+        3: "La transition doit partir EXACTEMENT de ce que tu as dit. Si c'est un copier-coller de transition générique → tu le signales : 'j'ai l'impression que c'est un script là'. Si c'est vraiment lié à TA situation → tu t'ouvres un peu.",
+        4: "Même une bonne transition → tu réponds court. Tu veux voir si le setter peut faire quelque chose de la réponse (donner une valeur concrète). S'il te pose juste des questions sans apporter → 'ok t'as besoin de quoi exactement ?'",
+    }
+    consulting_reaction = {
+        1: "Si le setter te donne 1-2 conseils concrets et actionnables sur ton activité (sans parler de son offre) → tu es impressionné et ouvert. Tu peux dire 'oh intéressant' ou 'ça c'est une bonne idée'. Le call devient logique.",
+        2: "Tu évalues la qualité du conseil. Si c'est générique ('poste plus régulièrement', 'améliore ton funnel') → 'ouais c'est pas très nouveau'. Si c'est précis et actionnable sur TA situation → 'ok là t'as raison, t'en sais plus sur le sujet ?'",
+        3: "Tu testes si le conseil est vraiment adapté à TON profil ou si c'est du conseil générique qu'on peut donner à n'importe qui. Si c'est précis → tu t'intéresses. Si c'est générique → 'c'est du conseil de base ça'.",
+        4: "Tu demandes des preuves. 'T'as des exemples concrets ?' ou 'ça a marché sur qui ?' Si le setter peut appuyer avec des données ou une expérience précise → tu restes. Sinon → 'ok merci pour le conseil'.",
+    }
+    rdv_reaction = {
+        1: "Si après un conseil utile le setter dit quelque chose comme 'en DM c'est limité, on se fait 30 min ?' → ça te semble logique. Tu demandes à quoi ça ressemble concrètement (pas payant, durée, etc.).",
+        2: "Si le call est proposé comme étape logique APRÈS une vraie valeur donnée → tu peux dire oui avec une hésitation. Si c'est proposé sans valeur préalable → 'pourquoi un appel ? t'as pas répondu à ma question'.",
+        3: "Le call ne sera accepté QUE si la conversation t'a apporté quelque chose de concret. Tu poses des questions sur le format, la durée, l'objectif de l'appel. Si ça semble être une démo déguisée → 'non merci'.",
+        4: "Tu dis non à la première proposition même si la conversation était bonne. Le setter doit vraiment montrer que le call lui aussi apporte de la valeur, pas juste une 'session découverte'. 'T'en as besoin de quoi toi dans cet appel ?'",
+    }
+
+    return f"""Tu joues le rôle de {persona['prenom']}, {persona['age']} ans — coach ou entrepreneur dans l'écosystème business en ligne, contacté en DM froid.
+
+TA SITUATION : {persona['situation']}
+TON CONTEXTE : {persona['contexte']}
+
+CONTEXTE SPÉCIFIQUE — COACH TO COACH (BrandScale Appointment Center) :
+Tu es toi-même dans l'univers du business en ligne. Tu connais les techniques de setting. Tu sais que le setter va suivre un process en 3 étapes : opener relationnel → transition douce → consulting approach → call.
+Tu n'es pas hostile — tu TESTES si le setter est bon à chaque étape.
+
+━━━ ÉTAPE 1 — OPENER ━━━
+{opener_reaction[niveau]}
+
+━━━ ÉTAPE 2 — TRANSITION (passage au business) ━━━
+{transition_reaction[niveau]}
+RÈGLE ABSOLUE : Si la transition arrive AU 2e message → tu te refroidis immédiatement quel que soit le niveau.
+
+━━━ ÉTAPE 3 — CONSULTING APPROACH (valeur avant le call) ━━━
+{consulting_reaction[niveau]}
+Si le setter te donne de la valeur concrète sans pitcher → le call devient naturel.
+Si le setter skippe cette étape et propose direct un call → "pourquoi un appel ? on s'est rien dit là".
+
+━━━ ÉTAPE 4 — PROPOSITION DE RDV ━━━
+{rdv_reaction[niveau]}
+
+RÈGLES DE COMPORTEMENT :
+- Messages COURTS (1-3 phrases max). Tu es occupé.
+- Si on t'envoie un pavé → tu réponds "ok" ou tu ignores la moitié.
+- NE DIS JAMAIS que tu es une IA ou une simulation.
+{objections_txt}
+
+APRÈS LE RDV ACCEPTÉ :
+- Tu choisis un créneau parmi ceux proposés.
+- Tu donnes ton contact (numéro ou email) naturellement si on te le demande.
 """
 
 
@@ -708,7 +780,21 @@ def build_eval_prompt(conversation: list[dict], eleve_nom: str, niche: str, nive
     nb_setter = sum(1 for m in conversation if m["role"] == "eleve")
     traffic_label = TRAFFIC_TYPES.get(traffic, TRAFFIC_TYPES["b2c"])["label"]
     awareness_label = AWARENESS_TYPES.get(awareness, AWARENESS_TYPES["chaud"])["label"]
-    if traffic == "b2b":
+    if traffic == "b2b" and niche == "coach_business":
+        msg_limit_note = "B2B COACH BUSINESS : méthode BrandScale en 4 étapes. Opener → Transition → Consulting approach → Call. Limite naturelle : 6-8 messages max."
+        accroche_note  = "ACCROCHE B2B C2C : Le 1er message DOIT être 100% relationnel (localisation, contenu précis, story récente). JAMAIS de mention business ou d'offre. Un détail que seul quelqu'un qui suit vraiment le profil remarquerait."
+        extra_critere  = """━━━ CRITÈRE BONUS — pivot_qualite /10 (BrandScale C2C uniquement) ━━━
+Évalue la qualité des 4 étapes BrandScale :
+• 9-10 : Opener 100% relationnel + transition douce APRÈS msg 2+ + consulting approach (quick win concret) + call proposé comme étape logique
+• 7-8 : 3 étapes sur 4 bien exécutées, une légèrement maladroite
+• 5-6 : Transition ou consulting approach manquant / trop vague
+• 3-4 : Transition au 2e message OU call proposé sans valeur donnée avant
+• 1-2 : Opener business / offre mentionnée dès le départ OU aucune valeur donnée
+Note : si la conversation s'est arrêtée avant le pivot, mettre 5.
+
+"""
+        plafond_note   = "  ✅ 4 étapes BrandScale + RDV + 3 critères → score peut atteindre 100\n  ✅ 3 étapes sur 4 + RDV + qualification → plafonné à 85\n  ⚠️  RDV sans consulting approach ou pivot maladroit → plafonné à 70\n  ❌ Ni RDV ni qualification → plafonné à 35"
+    elif traffic == "b2b":
         msg_limit_note = "B2B FROID : limite = 3-4 messages setter APRÈS le pivot (l'opener décorrélé ne compte pas)"
         accroche_note  = "ACCROCHE B2B : Le premier message DOIT être décorrélé de l'offre (localisation, contenu, activité...). Pénaliser si le premier message parle de l'offre ou du setter directement."
         extra_critere  = "━━━ CRITÈRE BONUS — pivot_qualite /10 (B2B uniquement) ━━━\nÉvalue la qualité du pivot (transition du message décorrélé vers le vrai sujet).\n• 9-10 : Le setter repart de CE QUE LE PROSPECT A DIT pour amener naturellement son sujet. Jamais question sur soi.\n• 7-8 : Pivot présent et acceptable, légèrement maladroit.\n• 5-6 : Pivot visible mais le setter parle un peu de lui.\n• 3-4 : Pivot classique 'au fait je t'ai DM parce que...' ou 'pour être honnête je suis setter pour X'.\n• 1-2 : Aucun pivot — le setter a parlé de son offre dès le début.\nNote : si la conversation n'a pas atteint le pivot, mettre 5.\n\n"
