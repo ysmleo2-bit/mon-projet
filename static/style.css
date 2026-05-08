@@ -51,10 +51,11 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: .45rem;
 }
-.nav-logo-diamond {
-  color: var(--accent);
-  font-size: 1rem;
-  filter: drop-shadow(0 0 6px rgba(0,229,122,.6));
+.nav-logo-img {
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 0 6px rgba(0,255,127,.5));
+  flex-shrink: 0;
 }
 .nav-links { display: flex; gap: 1.5rem; align-items: center; }
 .nav-links a { color: var(--text-muted); font-size: .88rem; transition: color .2s; }

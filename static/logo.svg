@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="36" height="36">
+  <!-- Top-left chevron -->
+  <path d="M44,8 L12,28 L12,44 L44,24 Z" fill="#00FF7F" rx="3"/>
+  <!-- Top-right chevron -->
+  <path d="M56,8 L88,28 L88,44 L56,24 Z" fill="#00FF7F"/>
+  <!-- Bottom-left chevron -->
+  <path d="M44,92 L12,72 L12,56 L44,76 Z" fill="#00FF7F"/>
+  <!-- Bottom-right chevron -->
+  <path d="M56,92 L88,72 L88,56 L56,76 Z" fill="#00FF7F"/>
+</svg>
