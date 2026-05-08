@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Session {{ s.date }} — {{ s.eleve_nom }}{% endblock %}
+
+{% block content %}
+<div class="coach-page">
+  <div class="coach-header">
+    <div>
+      <a href="{{ url_for('coach_eleve', eleve_id=s.eleve_id) }}" class="back-link">← Retour</a>
+      <h1>Session du {{ s.date }}</h1>
+      <div class="coach-totals">
+        <div class="total-chip">{{ s.eleve_nom }}</div>
+        <div class="total-chip">{{ s.niche|capitalize }} · {{ niv_info.emoji }} {{ niv_info.label }}</div>
+        <div class="total-chip">{{ s.duree_minutes }} min · {{ s.nb_messages_eleve }} messages</div>
+      </div>
+    </div>
+    <div class="eleve-score-big" style="color:{{ s.scores.global | score_color }}">
+      {{ s.scores.global }}<span class="score-max">/100</span>
+      <div class="rdv-badge {% if s.rdv_pose %}rdv-ok{% else %}rdv-ko{% endif %}">
+        {% if s.rdv_pose %}✅ RDV posé{% else %}❌ Pas de RDV{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="session-detail-grid">
+
+    <!-- Scores -->
+    <div class="card">
+      <h2 class="section-title">Scores détaillés</h2>
+      {% set criteres = [
+        ('accroche','Accroche','🎣'),
+        ('gestion_objections','Gestion objections','🛡️'),
+        ('qualification','Qualification','🔍'),
+        ('rdv','Prise de RDV','📅'),
+        ('naturel','Naturel / Flow','💬'),
+      ] %}
+      {% for key, label, icon in criteres %}
+      {% set val = s.scores[key] %}
+      <div class="score-row">
+        <div class="score-row-label">{{ icon }} {{ label }}</div>
+        <div class="score-bar-wrap">
+          <div class="score-bar-fill" style="width:{{ val * 10 }}%; background:{{ val | score_color }}"></div>
+        </div>
+        <div class="score-row-val">{{ val }}/10</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Feedback -->
+    <div class="card">
+      <h2 class="section-title">Feedback</h2>
+      {% if s.points_forts %}
+      <div class="feedback-block feedback-good">
+        <div class="feedback-title">✅ Points forts</div>
+        <ul>{% for p in s.points_forts %}<li>{{ p }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+      {% if s.points_ameliorer %}
+      <div class="feedback-block feedback-improve" style="margin-top:1rem">
+        <div class="feedback-title">📈 À améliorer</div>
+        <ul>{% for p in s.points_ameliorer %}<li>{{ p }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+      {% if s.conseil_principal %}
+      <div class="conseil-box" style="margin-top:1rem">
+        <div class="conseil-title">💡 Conseil principal</div>
+        <p>{{ s.conseil_principal }}</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Conversation complète -->
+  <div class="card" style="margin-top:1.5rem">
+    <h2 class="section-title">Conversation complète</h2>
+    <div class="conv-replay">
+      {% for msg in s.conversation %}
+      <div class="replay-msg replay-{{ msg.role }}">
+        <div class="replay-meta">
+          {% if msg.role == 'eleve' %}🎯 {{ s.eleve_nom }}{% else %}👤 Prospect{% endif %}
+          <span class="replay-time">{{ msg.heure }}</span>
+        </div>
+        <div class="replay-bubble">{{ msg.message }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

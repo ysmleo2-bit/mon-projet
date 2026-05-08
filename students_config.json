@@ -1,0 +1,38 @@
+[
+  {
+    "id": "eleve_001",
+    "nom": "Marie Dupont",
+    "email": "marie.dupont@email.com",
+    "date_debut": "2026-03-01",
+    "niveau": "debutant",
+    "niche": "reconversion",
+    "objectif_rdv_jour": 3,
+    "objectif_messages_jour": 30,
+    "script_actif": "script_reconversion_v1",
+    "statut": "actif"
+  },
+  {
+    "id": "eleve_002",
+    "nom": "Thomas Martin",
+    "email": "thomas.martin@email.com",
+    "date_debut": "2026-02-15",
+    "niveau": "intermediaire",
+    "niche": "freelance",
+    "objectif_rdv_jour": 5,
+    "objectif_messages_jour": 40,
+    "script_actif": "script_freelance_v2",
+    "statut": "actif"
+  },
+  {
+    "id": "eleve_003",
+    "nom": "Camille Bernard",
+    "email": "camille.bernard@email.com",
+    "date_debut": "2026-01-10",
+    "niveau": "avance",
+    "niche": "emploi",
+    "objectif_rdv_jour": 7,
+    "objectif_messages_jour": 50,
+    "script_actif": "script_emploi_v3",
+    "statut": "actif"
+  }
+]

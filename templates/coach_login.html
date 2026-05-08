@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Accès Coach — Setting Training{% endblock %}
+
+{% block content %}
+<div class="page-center">
+  <div class="card auth-card">
+    <div class="setup-header">
+      <h1>Espace Coach</h1>
+      <p>Accès réservé. Connecte-toi pour voir les données de tes élèves.</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form action="{{ url_for('coach_login') }}" method="POST" class="auth-form">
+      <div class="form-group">
+        <label class="form-label">Identifiant</label>
+        <input type="text" name="email" required class="form-input" placeholder="Ton identifiant" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mot de passe</label>
+        <input type="password" name="password" required class="form-input" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg btn-full">Accéder au dashboard</button>
+    </form>
+
+    <p class="auth-footer">
+      <a href="{{ url_for('login') }}">Retour à l'espace élève</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

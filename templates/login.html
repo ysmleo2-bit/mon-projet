@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Connexion — Setting Training{% endblock %}
+
+{% block content %}
+<div class="page-center">
+  <div class="card auth-card">
+    <div class="setup-header">
+      <h1>Setting Training</h1>
+      <p>Connecte-toi pour accéder à ton entraînement.</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form action="{{ url_for('login') }}" method="POST" class="auth-form">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" name="email" required class="form-input" placeholder="ton@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mot de passe</label>
+        <input type="password" name="password" required class="form-input" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg btn-full">Se connecter</button>
+    </form>
+
+    <p class="auth-footer">
+      Pas encore de compte ? <a href="{{ url_for('register') }}">Créer un compte</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /home/user/mon-projet && python3 fetch_feedbacks.py 2>/dev/null | grep -E 'Nouveaux|NOUVEAU|EN_COURS' | head -5",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
