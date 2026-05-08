@@ -101,8 +101,16 @@ def save_active(data):
 
 
 def clean_active(data):
-    cutoff = (datetime.now() - timedelta(minutes=5)).isoformat()
-    return {k: v for k, v in data.items() if v.get("last_ping", "") >= cutoff}
+    cutoff = datetime.now() - timedelta(minutes=5)
+    result = {}
+    for k, v in data.items():
+        try:
+            ping = datetime.fromisoformat(v.get("last_ping", ""))
+            if ping >= cutoff:
+                result[k] = v
+        except (ValueError, TypeError):
+            pass
+    return result
 
 
 def load_feedback():
@@ -285,7 +293,7 @@ def start_session():
         "eleve_id":     eleve["id"],
         "niche":        niche,
         "niveau":       niveau,
-        "niveau_label": NIVEAUX[niveau]["label"],
+        "niveau_label": NIVEAUX.get(niveau, NIVEAUX[1])["label"],
         "nb_messages":  0,
         "start_time":   session["start_time"],
         "last_ping":    datetime.now().isoformat(),
@@ -516,7 +524,7 @@ def coach():
 
     total_sessions = sum(s["stats"]["nb"] for s in stats_list)
     total_rdv      = sum(
-        s["stats"]["nb"] * s["stats"]["rdv_pct"] // 100
+        round(s["stats"]["nb"] * s["stats"]["rdv_pct"] / 100)
         for s in stats_list if s["stats"]["nb"] > 0
     )
 
@@ -668,7 +676,7 @@ def api_dashboard():
     sess_today  = [s for s in sim_sessions if s.get("date") == today]
     rdv_today   = sum(1 for s in sess_today if s.get("rdv_pose"))
     avg_today   = (
-        sum(s["scores"]["global"] for s in sess_today) // len(sess_today)
+        round(sum(s.get("scores", {}).get("global", 0) for s in sess_today) / len(sess_today))
         if sess_today else 0
     )
 

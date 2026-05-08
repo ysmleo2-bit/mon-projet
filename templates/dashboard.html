@@ -97,7 +97,7 @@
         <tr>
           <td>{{ s.date }}</td>
           <td>{{ s.niche }}</td>
-          <td>{{ niveaux[s.niveau_difficulte].emoji }} {{ s.niveau_label }}</td>
+          <td>{{ niveaux.get(s.niveau_difficulte, niveaux[1]).emoji }} {{ s.niveau_label }}</td>
           <td style="color:{{ s.scores.global | score_color }}; font-weight:700">{{ s.scores.global }}/100</td>
           <td>{{ s.scores.accroche }}/10</td>
           <td>{{ s.scores.gestion_objections }}/10</td>

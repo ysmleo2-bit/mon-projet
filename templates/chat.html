@@ -41,7 +41,7 @@
   <!-- Zone de chat -->
   <div class="chat-main">
     <div class="chat-header">
-      <div class="chat-prospect-avatar">{{ persona.prenom[0] }}</div>
+      <div class="chat-prospect-avatar">{{ (persona.prenom or '?')[0] }}</div>
       <div class="chat-prospect-info">
         <div class="chat-prospect-name">{{ persona.prenom }}</div>
         <div class="chat-prospect-status">
@@ -62,7 +62,7 @@
         </div>
         {% else %}
         <div class="msg msg-prospect">
-          <div class="msg-avatar">{{ persona.prenom[0] }}</div>
+          <div class="msg-avatar">{{ (persona.prenom or '?')[0] }}</div>
           <div>
             <div class="msg-bubble">{{ msg.message }}</div>
             <div class="msg-time">{{ persona.prenom }} · {{ msg.heure }}</div>
