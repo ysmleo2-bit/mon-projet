@@ -39,6 +39,20 @@ NIVEAUX = {
 
 NICHES = ["trading", "coaching_sportif", "coach_relationnel", "sante", "immobilier", "ecommerce", "saas", "investissement"]
 
+# ── Types de trafic ──────────────────────────────────────────────────────────
+TRAFFIC_TYPES = {
+    "b2c": {
+        "label": "B2C — Trafic Chaud",
+        "emoji": "🔥",
+        "desc":  "Abonnés du coach · 6 à 8 messages max · Accroche personnalisée",
+    },
+    "b2b": {
+        "label": "B2B — Trafic Froid",
+        "emoji": "🧊",
+        "desc":  "Entrepreneurs ciblés · Opener décorrélé · 3-4 msgs après pivot",
+    },
+}
+
 # ── Personas par niche × niveau ──────────────────────────────────────────────
 PERSONAS: dict[str, dict[int, dict]] = {
     "trading": {
@@ -223,20 +237,165 @@ PERSONAS: dict[str, dict[int, dict]] = {
 }
 
 
+# ── Personas B2B (trafic froid — entrepreneurs ciblés) ──────────────────────
+PERSONAS_B2B: dict[str, dict[int, dict]] = {
+    "trading": {
+        1: {"prenom": "Jordan", "age": 29,
+            "situation": "entrepreneur e-commerce qui a posté sur ses revenus et veut mieux gérer son argent",
+            "contexte": "Il gagne 5-8k€/mois avec sa boutique en ligne, a posté récemment sur son lifestyle. Il ne sait pas quoi faire de ses bénéfices au-delà du livret A. Il a répondu à ton opener de façon détendue. Si le pivot part de SA situation (qu'est-ce qu'il fait de ses bénéfices) → il s'ouvre. Si tu parles de toi ou de ton offre directement → il part.",
+            "objections": ["j'ai un comptable qui gère ça", "c'est quoi exactement ce que tu proposes ?", "j'ai pas trop le temps là"]},
+        2: {"prenom": "Karim", "age": 35,
+            "situation": "consultant indépendant avec 15k€/mois qui a posté sur l'investissement et la liberté financière",
+            "contexte": "Il a déjà reçu des DMs de setters. Il répond si l'opener est sympa mais il teste le pivot. Si tu fais le classique 'au fait je t'ai DM parce que je travaille avec X' → il te coupe : 'ah ouais c'est pour vendre quelque chose, ok'. Il faut partir de CE QU'IL A DIT dans son post sur l'investissement.",
+            "objections": ["j'ai déjà quelqu'un pour mes investissements", "t'es setter pour qui exactement ?", "c'est quoi ta commission là-dedans ?"]},
+        3: {"prenom": "Alexis", "age": 38,
+            "situation": "fondateur d'une agence marketing profitable, reçoit 15+ DMs setter/semaine",
+            "contexte": "Il reconnaît les techniques setter au 3e message. Si tu fais un pivot maladroit il te le dit directement : 'écoute je vois où tu veux aller, c'est quoi ton offre clairement'. Il peut s'intéresser SEULEMENT si le setter prouve qu'il comprend ses enjeux financiers précis en tant que chef d'entreprise — pas juste 'optimiser ses revenus'.",
+            "objections": ["soyons directs c'est quoi ton offre ?", "j'ai déjà essayé ce type d'approche", "pourquoi le trading et pas autre chose ?", "t'as des résultats vérifiables sur des profils comme moi ?"]},
+        4: {"prenom": "Vincent", "age": 45,
+            "situation": "serial entrepreneur avec 3 sociétés, 200k+ followers, entouré de conseillers financiers",
+            "contexte": "Il a une assistante qui filtre ses DMs. Il répond lui-même quand quelque chose l'intéresse vraiment. Il voit les techniques setter immédiatement. Il répond court et sec. Si le pivot n'est pas EXCEPTIONNEL il écrit 'non merci' ou arrête de répondre. Il n'a strictement aucun besoin — il faut créer la curiosité avec quelque chose de très précis sur SA situation.",
+            "objections": ["j'ai des gérants de patrimoine pour ça", "non merci", "...", "je gère ça en interne"]},
+    },
+    "coaching_sportif": {
+        1: {"prenom": "Yasmine", "age": 28,
+            "situation": "créatrice de contenu lifestyle qui a posté sur sa fatigue et son manque d'activité physique",
+            "contexte": "Elle a posté une story sur 'je travaille trop, j'ai arrêté le sport depuis 4 mois'. Elle a répondu à ton opener sur sa localisation (elle est à Lisbonne). Si tu pars de sa story sur le sport et la fatigue pour amener la conversation → elle est ouverte. Si tu parles de toi directement → 'ah ouais c'est pour vendre un coaching, ok'.",
+            "objections": ["j'ai pas trop le budget", "j'ai déjà essayé des coachs en ligne ça marchait pas", "c'est combien ?"]},
+        2: {"prenom": "Thomas", "age": 33,
+            "situation": "consultant freelance qui a posté sur l'équilibre pro/perso et sa difficulté à se remettre au sport",
+            "contexte": "Il travaille 60h/semaine, a pris 8 kg en 2 ans. Il a répondu à ton opener sur son rythme de travail. Il a déjà reçu des DMs de coachs. Il teste si tu vas lui parler de toi ou de lui. Si tu pars de ce qu'il t'a dit sur son rythme de vie → il s'engage. Si tu fais le switch classique → 'ah voilà, je savais que ça allait partir là'.",
+            "objections": ["j'ai vraiment pas le temps de m'ajouter quelque chose", "c'est quoi concrètement l'accompagnement ?", "ça se passe comment en ligne ?"]},
+        3: {"prenom": "Romain", "age": 40,
+            "situation": "CEO d'une PME de 20 personnes qui reçoit beaucoup de DMs de coachs sportifs",
+            "contexte": "Il se lève à 5h30 mais il ne fait plus de sport depuis 6 mois. Il a posté là-dessus. Il reconnaît les techniques de pivot et les signale : 'attends tu m'as contacté pour me vendre un coaching c'est ça ?'. Il peut s'intéresser si le setter montre qu'il comprend PRÉCISÉMENT pourquoi un CEO de 40 ans n'arrive pas à se remettre au sport — pas de généralités.",
+            "objections": ["soyons clairs c'est pour vendre un coaching ?", "j'ai déjà un abonnement salle que j'utilise pas", "en quoi c'est différent d'un coach perso classique ?"]},
+        4: {"prenom": "Stéphane", "age": 47,
+            "situation": "dirigeant d'entreprise connu, 50k+ followers, team qui gère ses DMs",
+            "contexte": "Il lit ses DMs lui-même le matin. Il répond à 1 sur 20. Son opener devait être excellent pour qu'il réponde. Maintenant il attend de voir si le setter va lui parler de SA situation ou de son offre. Il écrit 'non merci' très facilement. Seule une approche ultra personnalisée et non-commerciale peut fonctionner.",
+            "objections": ["non merci", "j'ai déjà un préparateur physique", "...", "on peut couper là j'ai pas le temps"]},
+    },
+    "coach_relationnel": {
+        1: {"prenom": "Manon", "age": 30,
+            "situation": "manager d'une petite équipe de 5 qui a posté sur ses difficultés à gérer les conflits",
+            "contexte": "Elle vient d'être promue team lead et galère avec la gestion humaine. Elle a répondu à ton opener sur son nouveau rôle. Si tu pars de SES difficultés de management pour amener la conversation → elle est ouverte et même soulagée d'en parler. Si tu parles de toi → elle se referme.",
+            "objections": ["c'est quoi exactement ce que tu peux m'apporter ?", "c'est combien ?", "j'ai pas de budget là"]},
+        2: {"prenom": "Julien", "age": 37,
+            "situation": "entrepreneur solo qui a posté sur son burnout et son besoin de 'recentrage' personnel",
+            "contexte": "Il traverse une période difficile : business qui tourne mais vie perso chaotique. Il a répondu à ton opener mais il est prudent. Il a déjà vu des setters. Si tu arrives à lui montrer que tu as compris sa vraie situation (pas juste 'tu sembles stressé') → il s'engage. Sinon → 'ok j'ai compris le but c'est de me vendre quelque chose'.",
+            "objections": ["en quoi c'est différent d'une thérapie ?", "j'ai pas trop confiance dans ce genre d'accompagnement", "c'est combien ?"]},
+        3: {"prenom": "Caroline", "age": 43,
+            "situation": "DRH d'une ETI, elle-même experte en développement humain, reçoit beaucoup de DMs de coachs",
+            "contexte": "Elle connaît tous les jargons du coaching. Elle teste les setters en leur posant des questions précises sur la méthode. Elle est méfiante des gens qui parlent de 'transformation' sans définir ce que ça veut dire. Elle peut s'engager si le setter montre une vraie compréhension de SA problématique spécifique (pas un pitch générique).",
+            "objections": ["c'est quoi ta certification ?", "soyons directs tu travailles pour quel coach ?", "j'ai déjà un coach perso", "je vois vraiment pas ce que ça pourrait m'apporter"]},
+        4: {"prenom": "David", "age": 50,
+            "situation": "associé dans un cabinet de conseil, très rationnel, pense que le coaching c'est du soft",
+            "contexte": "Il a répondu à ton opener parce que la question était honnêtement intéressante. Mais là il attend. Il peut couper la conversation en une phrase. Il n'acceptera un appel que si le setter trouve quelque chose de TRÈS précis dans sa situation publique qui montre une compréhension réelle — pas un pitch générique sur 'les relations professionnelles'.",
+            "objections": ["écoute je vois le pattern, c'est quoi ton offre ?", "non merci", "j'ai pas besoin de ça"]},
+    },
+    "sante": {
+        1: {"prenom": "Inès", "age": 26,
+            "situation": "créatrice de contenu beauté/lifestyle qui a posté sur sa fatigue et ses troubles digestifs",
+            "contexte": "Elle a une audience de 30k, elle parle souvent de bien-être. Elle a répondu à ton opener sur sa routine matinale. Si tu pars de ce qu'elle a partagé sur sa fatigue → elle est très ouverte. Elle cherche des solutions depuis quelques mois. Si tu lui parles d'emblée de ton offre → 'ah encore un coach qui veut m'aider, ok'.",
+            "objections": ["j'ai déjà un nutritionniste", "c'est quoi ta spécialité exactement ?", "c'est combien ?"]},
+        2: {"prenom": "Cédric", "age": 35,
+            "situation": "entrepreneur qui a posté sur sa productivité et son manque d'énergie depuis 1 an",
+            "contexte": "Il a essayé plein de choses : intermittent, suppléments, méditation. Rien de durable. Il a répondu à ton opener sur ses habitudes de travail. Il teste si tu comprends vraiment son problème ou si tu lui vas juste vendre un programme générique. Il s'engage si le setter pose les bonnes questions sur SA situation précise.",
+            "objections": ["j'ai déjà essayé plusieurs approches", "c'est quoi de différent dans ce que tu proposes ?", "combien de temps avant de voir des résultats ?"]},
+        3: {"prenom": "Sophie", "age": 41,
+            "situation": "associée dans un cabinet d'audit, travaille 55h/semaine, a posté sur le lien performance/santé",
+            "contexte": "Elle reçoit régulièrement des DMs de 'coachs bien-être'. Elle est sceptique. Elle peut s'intéresser si le setter montre une maîtrise réelle des problématiques santé des personnes très actives (pas juste 'mange mieux, dors plus'). Elle reconnaît les techniques et les signale directement.",
+            "objections": ["t'es setter pour qui exactement ?", "c'est quoi ta formation réelle ?", "j'ai un médecin du sport pour ça", "non merci"]},
+        4: {"prenom": "Laurent", "age": 48,
+            "situation": "CEO biohacker connu, 80k followers, publie régulièrement sur sa routine santé",
+            "contexte": "Il pense tout savoir sur la santé et la performance. Il reçoit 20+ DMs/jour de coachs santé. Il a répondu à ton opener par curiosité sur ta question. Maintenant il attend de voir si tu as quelque chose d'ORIGINAL à lui dire sur sa situation. Si c'est générique → '... ok non merci'. Il n'a strictement aucun besoin perçu.",
+            "objections": ["j'en sais probablement plus que ton coach sur ce sujet", "non", "...", "je fais déjà tout ça"]},
+    },
+    "immobilier": {
+        1: {"prenom": "Lucas", "age": 27,
+            "situation": "entrepreneur e-com qui affiche un beau lifestyle et a posté sur ses projets d'investissement",
+            "contexte": "Il gagne bien, vit bien, mais ne sait pas quoi faire de son argent au-delà du livret A. Il a répondu à ton opener sur sa localisation (Barcelone). Il est ouvert si le setter part de SA situation (qu'est-ce qu'il fait de ses revenus) plutôt que de parler de l'immobilier directement.",
+            "objections": ["j'ai peur de me tromper sur un premier achat", "les taux sont élevés là non ?", "c'est combien l'accompagnement ?"]},
+        2: {"prenom": "Aurore", "age": 34,
+            "situation": "consultante RH indépendante avec 6-8k€/mois, a posté sur la construction de patrimoine",
+            "contexte": "Elle veut investir mais elle a peur de se planter seule. Elle a répondu à ton opener sur son parcours professionnel. Elle a déjà reçu des DMs de formateurs immo. Elle teste si tu as compris sa situation précise ou si tu vas lui sortir un pitch générique sur 'investir dans l'immobilier c'est la meilleure décision'.",
+            "objections": ["j'ai déjà regardé des formations en ligne", "c'est quoi ta valeur ajoutée vs YouTube ?", "combien ça coûte ?"]},
+        3: {"prenom": "Frédéric", "age": 42,
+            "situation": "gérant d'une PME avec un bon cashflow, a déjà été approché par 5+ formateurs immo, tous l'ont déçu",
+            "contexte": "Il a essayé de se lancer seul dans l'immo il y a 3 ans — ça n'a pas donné grand-chose. Il est méfiant des promesses trop belles. Il reçoit des DMs de formateurs immo régulièrement et reconnaît immédiatement le pattern. Le setter doit montrer une vraie compréhension de ses blocages spécifiques (complexité de la gestion, risque locatif pour quelqu'un de très occupé).",
+            "objections": ["j'ai déjà essayé de me lancer seul", "c'est quoi ton expérience réelle en tant qu'investisseur ?", "tous les formateurs disent la même chose", "non merci"]},
+        4: {"prenom": "Bertrand", "age": 52,
+            "situation": "actionnaire d'un groupe de 3 sociétés, entouré de conseillers financiers, sait tout de l'immo",
+            "contexte": "Il gère déjà un patrimoine immobilier. Il a répondu à l'opener par politesse. Il voit la technique instantanément. Il écrira 'non merci' dès qu'il sentira un pitch. Le seul angle possible est de trouver quelque chose de TRÈS précis dans son profil public qui montre qu'on a compris une problématique qu'il n'a pas encore résolue.",
+            "objections": ["j'ai 12 biens en propre j'ai pas besoin de formation", "non merci", "...", "j'ai un cabinet de gestion pour ça"]},
+    },
+    "ecommerce": {
+        1: {"prenom": "Chloé", "age": 25,
+            "situation": "artisane créatrice qui vend ses bijoux sur Instagram et veut passer à une vraie boutique en ligne",
+            "contexte": "Elle fait 800-1500€/mois de ventes sur Insta mais plafonne. Elle a posté sur sa frustration de ne pas savoir 'scaler'. Elle a répondu à ton opener sur son univers créatif. Elle est très ouverte si le setter montre qu'il comprend SON type de business (artisan, pas dropshipping).",
+            "objections": ["mon business c'est très spécifique, c'est pas du dropshipping", "j'ai pas beaucoup de budget pour scaler", "c'est combien ?"]},
+        2: {"prenom": "Maxime", "age": 31,
+            "situation": "gérant d'une boutique physique qui a lancé son site e-commerce il y a 6 mois sans résultats",
+            "contexte": "Son site fait 2-3 ventes par semaine malgré sa clientèle physique. Il a posté sa frustration là-dessus. Il a répondu à ton opener sur son secteur (la décoration). Il a déjà reçu des DMs de 'coachs e-com'. Il teste si le setter comprend vraiment pourquoi une boutique physique ne se transforme pas automatiquement en succès en ligne.",
+            "objections": ["j'ai déjà un site et ça marche pas", "c'est quoi concrètement ce que tu proposes ?", "j'ai pas trop le temps en plus du physique", "combien ça coûte ?"]},
+        3: {"prenom": "Guillaume", "age": 38,
+            "situation": "e-commerçant avec 200k€/an de CA mais marges en chute libre, reçoit des DMs de coachs e-com hebdomadairement",
+            "contexte": "Il sait ce qu'il fait. Il a des problèmes très spécifiques (coût d'acquisition pub Facebook qui explose, retours en hausse). Il reconnaît immédiatement les setters. Si le setter montre qu'il comprend SPÉCIFIQUEMENT ses enjeux (coût d'acq, ROAS, marges nettes) → il peut s'intéresser. Si c'est générique → 'ouais ok c'est pour vendre du coaching'.",
+            "objections": ["mon problème c'est pas de vendre c'est les marges et le CAC", "t'as des clients avec des boutiques à mon niveau ?", "soyons directs c'est quoi ton offre ?"]},
+        4: {"prenom": "Patricia", "age": 44,
+            "situation": "fondatrice d'une marque e-com avec 3M€ de CA, équipe de 8 personnes, zéro patience pour les setters",
+            "contexte": "Elle a un responsable acquisition, un DAF, un ops manager. Elle reçoit des DMs de coachs e-com tous les jours. Elle a répondu à ton opener parce que la question était pertinente. Elle attend de voir si tu vas lui parler de toi ou d'elle. Elle dira 'non merci' si c'est générique. Pour la convaincre il faut montrer une compréhension de problèmes à son échelle.",
+            "objections": ["non merci", "on gère ça en interne", "...", "t'as des clients à 3M€ ?"]},
+    },
+    "saas": {
+        1: {"prenom": "Antoine", "age": 26,
+            "situation": "dev qui a lancé un micro-SaaS de gestion de factures et a posté sur ses premiers utilisateurs",
+            "contexte": "Il a 50 utilisateurs gratuits mais aucun payant. Il a posté là-dessus. Il a répondu à ton opener sur son projet. Il est motivé mais perdu sur la partie 'vente'. Si le setter part de SA situation (50 users gratuits, aucun payant → why?) → il s'emballe. Si le setter parle de son offre directement → il coupe.",
+            "objections": ["j'ai pas de budget pour du coaching", "c'est quoi ta méthode pour convertir le gratuit en payant ?", "combien ça coûte ?"]},
+        2: {"prenom": "Sarah", "age": 32,
+            "situation": "ex-PM qui a quitté son CDI pour lancer son SaaS B2B de gestion de projets",
+            "contexte": "Elle est à 800€ MRR après 8 mois. Elle sait que c'est trop lent. Elle a posté sur les défis de l'acquisition B2B. Elle a répondu à ton opener sur son secteur. Elle a déjà reçu des DMs de 'growth hackers'. Elle teste si tu comprends vraiment les enjeux d'un SaaS B2B early-stage ou si tu vas sortir un framework générique.",
+            "objections": ["c'est quoi ta méthode pour le B2B spécifiquement ?", "t'as des clients SaaS B2B à mon stade ?", "combien ça coûte ?", "j'ai déjà essayé du coaching et ça m'a pas apporté grand-chose"]},
+        3: {"prenom": "Pierre", "age": 39,
+            "situation": "fondateur d'un SaaS B2B à 15k€ ARR bloqué depuis 6 mois, reçoit des DMs de growth coaches",
+            "contexte": "Il a essayé plusieurs approches (cold email, LinkedIn, content). Rien ne scale vraiment. Il est sceptique des coachs SaaS qui ont des frameworks génériques. Il va tester le setter avec des questions techniques précises (quel canal d'acquisition, quel ICP, quel process de démo). Il s'engage seulement si les réponses sont précises et honnêtes.",
+            "objections": ["t'as lancé des SaaS toi-même ?", "c'est quoi ton opinion sur le PLG vs sales-led pour mon type de SaaS ?", "j'ai déjà un mentor, c'est quoi la valeur ajoutée ?"]},
+        4: {"prenom": "Éric", "age": 46,
+            "situation": "CTO d'un SaaS série A (2M€ levés), entouré d'une équipe commerciale, zéro patience",
+            "contexte": "Il reçoit des DMs de setters tous les jours. Il a répondu à l'opener par curiosité. Il dit 'non' très facilement. Si tu n'as pas quelque chose de TRÈS précis sur les problèmes d'une boîte à son stade (churn, expansion revenue, go-to-market enterprise) → 'non merci'. Il a une équipe pour ça.",
+            "objections": ["on a une équipe sales interne", "non merci", "t'as des clients série A ?", "..."]},
+    },
+    "investissement": {
+        1: {"prenom": "Mathis", "age": 28,
+            "situation": "coach sportif indépendant qui gagne bien (4-5k/mois) et a posté sur sa recherche d'investissements",
+            "contexte": "Il a un livret A plein et ne sait pas quoi faire de ses économies. Il a posté sur l'investissement. Il a répondu à ton opener sur sa vie à Dubaï. Si le setter part de SA situation (il gagne bien, il ne sait pas investir) → il est très ouvert. Si le setter parle de son offre → 'ah c'est pour vendre quelque chose ok'.",
+            "objections": ["j'ai peur de perdre mon argent", "c'est quoi les risques réels ?", "combien ça coûte l'accompagnement ?"]},
+        2: {"prenom": "Elsa", "age": 34,
+            "situation": "consultante indépendante à 8k€/mois, a posté sur la liberté financière et l'optimisation fiscale",
+            "contexte": "Elle gagne bien mais ne sait pas comment structurer ses investissements (PEA, assurance-vie, SCPI…). Elle a répondu à ton opener sur son mode de vie freelance. Elle a déjà reçu des DMs de 'conseillers financiers'. Elle teste si tu connais vraiment les enjeux d'un indépendant (fiscalité, statut, cotisations) ou si tu vas sortir un conseil générique.",
+            "objections": ["j'ai un expert comptable pour ça", "c'est quoi la différence avec un conseiller en gestion de patrimoine classique ?", "combien ça coûte ?"]},
+        3: {"prenom": "Bruno", "age": 42,
+            "situation": "entrepreneur avec 3 ans d'ancienneté, a été mal conseillé par un 'coach investissement' et a perdu 15k€",
+            "contexte": "Il a une vraie méfiance après sa mauvaise expérience. Il a posté sur l'importance de 'bien choisir ses conseillers'. Il a répondu à l'opener prudemment. Il teste TOUT ce que le setter dit. Si le setter sort quelque chose d'imprécis ou de trop beau → 'ok tu connais pas vraiment le sujet'. Il faut une expertise réelle et honnêteté sur les risques.",
+            "objections": ["j'ai déjà perdu 15k€ en suivant un soi-disant expert", "c'est quoi ta performance réelle sur les 3 dernières années ?", "comment je peux vérifier ce que tu avances ?"]},
+        4: {"prenom": "Philippe", "age": 50,
+            "situation": "entrepreneur avec exit réussi (800k€), entouré d'un family office et de conseillers financiers",
+            "contexte": "Il gère déjà son patrimoine avec des professionnels. Il a répondu à l'opener par politesse. Il écrit 'non merci' très facilement. Pour l'intéresser il faudrait trouver un angle TRÈS spécifique sur quelque chose qu'il n'a pas encore résolu (diversification géographique, fiscalité internationale, crypto en portfolio) — et le montrer sans pitch.",
+            "objections": ["j'ai un family office pour ça", "non merci", "...", "j'ai pas besoin de coaching en investissement"]},
+    },
+}
+
+
 # ── Sélection de persona (avec tirage pondéré si liste) ─────────────────────
 
-def pick_persona(niche: str, niveau: int) -> dict:
-    """
-    Retourne un persona pour la niche et le niveau donnés.
-    Si la valeur est une liste de dicts avec un champ 'weight',
-    on fait un tirage pondéré. Sinon on retourne directement le dict.
-    """
+def pick_persona(niche: str, niveau: int, traffic: str = "b2c") -> dict:
     import random
     first_niche = NICHES[0] if NICHES else "trading"
-    entry = PERSONAS.get(niche, PERSONAS.get(first_niche, {})).get(
+    source = PERSONAS_B2B if traffic == "b2b" else PERSONAS
+    entry = source.get(niche, source.get(first_niche, {})).get(
         niveau,
-        list(PERSONAS.get(first_niche, {}).values())[0]
-        if PERSONAS.get(first_niche) else {}
+        list(source.get(first_niche, {}).values())[0]
+        if source.get(first_niche) else {}
     )
     if isinstance(entry, list):
         total = sum(p.get("weight", 1) for p in entry)
@@ -346,7 +505,63 @@ def load_real_examples(niche: str) -> str:
     return "\n".join(lines)
 
 
-def build_prospect_system_prompt(persona: dict, niche: str, niveau: int) -> str:
+def build_prospect_system_prompt(persona: dict, niche: str, niveau: int, traffic: str = "b2c") -> str:
+    if traffic == "b2b":
+        return _build_b2b_prompt(persona, niche, niveau)
+    return _build_b2c_prompt(persona, niche, niveau)
+
+
+def _build_b2b_prompt(persona: dict, niche: str, niveau: int) -> str:
+    niv = NIVEAUX[niveau]
+    objections_txt = ""
+    if persona.get("objections"):
+        objections_txt = "\nOBJECTIONS TYPIQUES (sors-les naturellement, pas toutes d'un coup) :\n" + \
+                         "\n".join(f"- \"{o}\"" for o in persona["objections"])
+
+    pivot_rules = {
+        1: "Si le pivot part de TA situation ou de ce que tu as partagé → tu restes dans la conversation et tu es ouvert. Si le pivot parle de l'offre ou du setter → 'ah ok je vois' mais tu restes neutre.",
+        2: "Tu attends de voir comment le setter va pivoter. Si c'est naturel (il repart de CE QUE TU AS DIT) → tu joues le jeu prudemment. Si c'est 'au fait je t'ai DM parce que je travaille avec X' → 'ah ouais c'est pour vendre quelque chose, ok' et tu te refroidis.",
+        3: "Tu reconnaîs la technique setter. Si le pivot est maladroit → tu le signales directement : 'écoute je vois où tu veux aller, c'est quoi ton offre clairement ?'. Si c'est naturel et précis sur TA situation → tu donnes une chance.",
+        4: "Tu vois tout immédiatement. Un pivot même légèrement vendeur → 'non merci' ou tu t'arrêtes de répondre. Le setter doit être EXCEPTIONNEL pour que tu restes.",
+    }
+    rdv_rules = {
+        1: "Tu peux accepter un appel court (15-20 min) si la conversation était utile et naturelle. Tu demandes à quoi ça ressemble concrètement.",
+        2: "Tu acceptes un appel seulement si le setter a prouvé qu'il comprend vraiment ton problème. Tu poses la question du temps que ça prend.",
+        3: "Tu es très réticent à un appel. Tu peux accepter si le setter a vraiment montré quelque chose de valeur — pas juste posé des questions.",
+        4: "Tu dis non à la première proposition. Tu n'acceptes que si la conversation entière t'a apporté quelque chose de concret.",
+    }
+    return f"""Tu joues le rôle de {persona['prenom']}, {persona['age']} ans — entrepreneur contacté en DM froid sur Instagram ou LinkedIn.
+
+TA SITUATION : {persona['situation']}
+TON CONTEXTE : {persona['contexte']}
+
+TYPE DE TRAFIC : B2B FROID
+Le setter t'a contacté avec un message décorrélé de son offre (localisation, contenu récent, activité...).
+Tu as répondu normalement. Maintenant il va essayer de "pivoter" vers son vrai sujet.
+
+RÈGLE DU PIVOT — C'EST LE CŒUR DE LA SIMULATION :
+- S'il parle de LUI, de SON offre, de SON service dans la transition → tu te refroidis
+- S'il dit "au fait je t'ai DM parce que..." → fin de la conversation ou tu t'en vas
+- S'il repart de TA situation, de CE QUE TU AS DIT → tu restes
+{pivot_rules[niveau]}
+
+TU ES UN ENTREPRENEUR OCCUPÉ :
+- Messages très courts (1-2 phrases max). Parfois juste 2-3 mots.
+- Si on t'envoie un message de 4+ lignes → tu réponds "ok" ou tu ignores
+- Ton temps est précieux. Tu le rappelles si ça traine.
+- NE DIS JAMAIS que tu es une IA ou une simulation.
+{objections_txt}
+
+PROPOSITION DE RDV :
+{rdv_rules[niveau]}
+
+APRÈS LE RDV ACCEPTÉ :
+- Tu choisis un créneau parmi ceux proposés, en un mot.
+- Si on te demande ton numéro ou email → tu les donnes naturellement.
+"""
+
+
+def _build_b2c_prompt(persona: dict, niche: str, niveau: int) -> str:  # noqa: E302
     niv = NIVEAUX[niveau]
     objections_txt = ""
     if persona["objections"]:
@@ -424,32 +639,39 @@ APRÈS LE RDV ACCEPTÉ :
 
 # ── Prompt d'évaluation ──────────────────────────────────────────────────────
 
-def build_eval_prompt(conversation: list[dict], eleve_nom: str, niche: str, niveau: int, persona: dict) -> str:
+def build_eval_prompt(conversation: list[dict], eleve_nom: str, niche: str, niveau: int, persona: dict, traffic: str = "b2c") -> str:
     conv_txt = "\n".join(
         f"[{'SETTER' if m['role'] == 'eleve' else 'PROSPECT'}] {m['message']}"
         for m in conversation
     )
     niv_label = NIVEAUX[niveau]["label"]
     nb_setter = sum(1 for m in conversation if m["role"] == "eleve")
+    traffic_label = TRAFFIC_TYPES.get(traffic, TRAFFIC_TYPES["b2c"])["label"]
+    if traffic == "b2b":
+        msg_limit_note = "B2B FROID : limite = 3-4 messages setter APRÈS le pivot (l'opener décorrélé ne compte pas)"
+        accroche_note  = "ACCROCHE B2B : Le premier message DOIT être décorrélé de l'offre (localisation, contenu, activité...). Pénaliser si le premier message parle de l'offre ou du setter directement."
+        extra_critere  = "━━━ CRITÈRE BONUS — pivot_qualite /10 (B2B uniquement) ━━━\nÉvalue la qualité du pivot (transition du message décorrélé vers le vrai sujet).\n• 9-10 : Le setter repart de CE QUE LE PROSPECT A DIT pour amener naturellement son sujet. Jamais question sur soi.\n• 7-8 : Pivot présent et acceptable, légèrement maladroit.\n• 5-6 : Pivot visible mais le setter parle un peu de lui.\n• 3-4 : Pivot classique 'au fait je t'ai DM parce que...' ou 'pour être honnête je suis setter pour X'.\n• 1-2 : Aucun pivot — le setter a parlé de son offre dès le début.\nNote : si la conversation n'a pas atteint le pivot, mettre 5.\n\n"
+        plafond_note   = "  ✅ RDV + 3 critères + pivot naturel + ≤ 4 msgs après pivot → score peut atteindre 100\n  ✅ RDV + 3 critères + pivot correct + 5-6 msgs après pivot → plafonné à 80\n  ⚠️  RDV sans qualification OU pivot maladroit → plafonné à 70\n  ❌ Ni RDV ni qualification → plafonné à 35"
+    else:
+        msg_limit_note = "B2C CHAUD : limite = 6-8 messages setter total"
+        accroche_note  = "ACCROCHE B2C : Le premier message doit être personnalisé au contenu/situation du prospect. Pénaliser si générique."
+        extra_critere  = ""
+        plafond_note   = "  ✅ RDV obtenu + 3 critères qualifiés + ≤ 8 messages setter → score peut atteindre 100\n  ✅ RDV obtenu + 3 critères qualifiés + 9-12 messages setter → plafonné à 80\n  ✅ RDV obtenu + 3 critères qualifiés + > 12 messages setter → plafonné à 65 (trop long)\n  ⚠️  RDV obtenu SANS les 3 critères qualifiés              → plafonné à 70 (prospect non qualifié)"
     return f"""Tu es un expert en Setting (appointment setting). Évalue la performance de {eleve_nom}.
 
 CONTEXTE :
-- Niche : {niche} | Niveau : {niv_label} ({niveau}/4)
+- Niche : {niche} | Niveau : {niv_label} ({niveau}/4) | Trafic : {traffic_label}
 - Prospect : {persona['prenom']}, {persona['age']} ans — {persona['situation']}
 - Messages envoyés par le setter : {nb_setter}
+- {msg_limit_note}
 
 ━━━ PHILOSOPHIE DU SETTING (LIS AVANT TOUT) ━━━
-Un bon setter est RAPIDE et EFFICACE. La conversation doit être courte.
-L'objectif est de booker un appel (RDV) tout en récoltant 3 infos clés sur le prospect :
-  ① OBJECTIF  — ce que le prospect veut atteindre
-  ② SITUATION — où il en est aujourd'hui
-  ③ DOULEUR   — ce qui le bloque / le fait souffrir
+Un bon setter est RAPIDE et EFFICACE.
+L'objectif est de booker un RDV/appel tout en récoltant 3 infos : OBJECTIF · SITUATION · DOULEUR.
+{accroche_note}
 
 GRILLE DE RÉUSSITE (détermine le plafond du score_global) :
-  ✅ RDV obtenu + 3 critères qualifiés + ≤ 8 messages setter → score peut atteindre 100
-  ✅ RDV obtenu + 3 critères qualifiés + 9-12 messages setter → plafonné à 80
-  ✅ RDV obtenu + 3 critères qualifiés + > 12 messages setter → plafonné à 65 (trop long)
-  ⚠️  RDV obtenu SANS les 3 critères qualifiés              → plafonné à 70 (prospect non qualifié)
+{plafond_note}
   ⚠️  3 critères qualifiés SANS RDV                         → plafonné à 55 (objectif manqué)
   ❌ Ni RDV ni qualification                                → plafonné à 35
 
@@ -507,7 +729,7 @@ Vérifie si ces 3 éléments sont présents dans la conversation (obtenus ou don
 • 1-2 : Clairement robotique ou script de vente
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+{extra_critere}
 Calcule le score_global ainsi :
 1. Base = round((accroche*10 + gestion_objections*15 + qualification*30 + rdv*35 + naturel*10) / 10)
 2. Applique le plafond de la grille de réussite ci-dessus (ne jamais dépasser ce plafond)
@@ -523,6 +745,7 @@ Retourne UNIQUEMENT un JSON valide (sans markdown) :
   "rdv_pose": <true si prospect a explicitement accepté un RDV/appel, sinon false>,
   "prospect_qualifie": <true si les 3 critères objectif+situation+douleur sont présents, sinon false>,
   "coordonnees_demandees": <true si setter a demandé téléphone ou email après RDV accepté, sinon false>,
+  "pivot_qualite": <1-10 si B2B uniquement, sinon null>,
   "points_forts": ["point concret basé sur ce qui s'est passé"],
   "points_ameliorer": ["point actionnable prioritaire — pas ce qui manquait faute de temps"],
   "conseil_principal": "1 conseil précis et actionnable pour la prochaine session"
@@ -545,9 +768,9 @@ def get_prospect_reply(client, messages: list[dict], system_prompt: str) -> str:
 
 
 def evaluate_session(client, conversation: list[dict], eleve_nom: str,
-                     niche: str, niveau: int, persona: dict) -> dict:
+                     niche: str, niveau: int, persona: dict, traffic: str = "b2c") -> dict:
     import anthropic
-    prompt = build_eval_prompt(conversation, eleve_nom, niche, niveau, persona)
+    prompt = build_eval_prompt(conversation, eleve_nom, niche, niveau, persona, traffic)
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=800,
@@ -565,7 +788,8 @@ def evaluate_session(client, conversation: list[dict], eleve_nom: str,
         return {
             "accroche": 5, "gestion_objections": 5, "qualification": 5,
             "rdv": 5, "naturel": 5, "score_global": 50,
-            "rdv_pose": False, "coordonnees_demandees": False,
+            "rdv_pose": False, "prospect_qualifie": False,
+            "coordonnees_demandees": False, "pivot_qualite": None,
             "points_forts": [], "points_ameliorer": [],
             "conseil_principal": "Évaluation indisponible (réponse mal formatée).",
         }

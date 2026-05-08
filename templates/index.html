@@ -22,7 +22,8 @@
             'sante':              '🏥',
             'immobilier':         '🏠',
             'ecommerce':          '🛒',
-            'saas':               '💻'
+            'saas':               '💻',
+            'investissement':     '💰'
           } %}
           {% set niche_labels = {
             'trading':            'Trading',
@@ -31,7 +32,8 @@
             'sante':              'Santé',
             'immobilier':         'Immobilier',
             'ecommerce':          'E-commerce',
-            'saas':               'SaaS'
+            'saas':               'SaaS',
+            'investissement':     'Investissement'
           } %}
           {% for n in niches %}
           <label class="niche-card">
@@ -40,6 +42,24 @@
             <div class="niche-card-inner">
               <span class="niche-icon">{{ niche_icons.get(n, '🎯') }}</span>
               <span class="niche-name">{{ niche_labels.get(n, n|capitalize) }}</span>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Sélection type de trafic -->
+      <div class="form-section">
+        <label class="form-label">Type de trafic</label>
+        <div class="traffic-grid">
+          {% for key, info in traffic_types.items() %}
+          <label class="traffic-card">
+            <input type="radio" name="traffic" value="{{ key }}"
+              {% if loop.first %}checked{% endif %}>
+            <div class="traffic-card-inner">
+              <span class="traffic-emoji">{{ info.emoji }}</span>
+              <span class="traffic-label">{{ info.label }}</span>
+              <span class="traffic-desc">{{ info.desc }}</span>
             </div>
           </label>
           {% endfor %}

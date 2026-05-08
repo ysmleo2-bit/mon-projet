@@ -50,7 +50,7 @@ INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "rivia-internal-2026")
 
 # ── Import des données du simulateur ────────────────────────────────────────
 from training_simulator import (
-    NIVEAUX, NICHES, PERSONAS,
+    NIVEAUX, NICHES, PERSONAS, TRAFFIC_TYPES,
     build_prospect_system_prompt,
     get_prospect_reply,
     evaluate_session,
@@ -255,13 +255,16 @@ def logout():
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html", niveaux=NIVEAUX, niches=NICHES)
+    return render_template("index.html", niveaux=NIVEAUX, niches=NICHES, traffic_types=TRAFFIC_TYPES)
 
 
 @app.route("/start", methods=["POST"])
 @login_required
 def start_session():
     niche  = request.form.get("niche") or NICHES[0]
+    traffic = request.form.get("traffic", "b2c")
+    if traffic not in TRAFFIC_TYPES:
+        traffic = "b2c"
     try:
         niveau = int(request.form.get("niveau", 1))
         if niveau not in NIVEAUX:
@@ -275,11 +278,12 @@ def start_session():
         "email": session.get("user_email", ""),
     }
 
-    persona = pick_persona(niche, niveau)
+    persona = pick_persona(niche, niveau, traffic)
 
     session["eleve"]        = eleve
     session["niche"]        = niche
     session["niveau"]       = niveau
+    session["traffic"]      = traffic
     session["persona"]      = persona
     session["conversation"] = []
     session["api_messages"] = []
@@ -294,6 +298,7 @@ def start_session():
         "niche":        niche,
         "niveau":       niveau,
         "niveau_label": NIVEAUX.get(niveau, NIVEAUX[1])["label"],
+        "traffic":      traffic,
         "nb_messages":  0,
         "start_time":   session["start_time"],
         "last_ping":    datetime.now().isoformat(),
@@ -311,6 +316,7 @@ def chat():
     eleve    = session["eleve"]
     niche    = session["niche"]
     niveau   = session["niveau"]
+    traffic  = session.get("traffic", "b2c")
     persona  = session["persona"]
     niv_info = NIVEAUX[niveau]
     conv     = session.get("conversation", [])
@@ -319,6 +325,8 @@ def chat():
         eleve=eleve,
         niche=niche,
         niveau=niveau,
+        traffic=traffic,
+        traffic_info=TRAFFIC_TYPES.get(traffic, TRAFFIC_TYPES["b2c"]),
         niv_info=niv_info,
         persona=persona,
         conversation=conv,
@@ -343,8 +351,9 @@ def send_message():
 
     niche        = session.get("niche", NICHES[0])
     niveau       = session.get("niveau", 1)
+    traffic      = session.get("traffic", "b2c")
     persona      = session.get("persona", {})
-    sys_prompt   = build_prospect_system_prompt(persona, niche, niveau)
+    sys_prompt   = build_prospect_system_prompt(persona, niche, niveau, traffic)
     api_messages = session.get("api_messages", [])
     conversation = session.get("conversation", [])
 
@@ -393,6 +402,7 @@ def end_session():
     eleve        = session.get("eleve", {})
     niche        = session.get("niche", NICHES[0])
     niveau       = session.get("niveau", 1)
+    traffic      = session.get("traffic", "b2c")
     persona      = session.get("persona", {})
     conversation = session.get("conversation", [])
     start_iso    = session.get("start_time", datetime.now().isoformat())
@@ -408,7 +418,7 @@ def end_session():
 
     if client:
         try:
-            scores = evaluate_session(client, conversation, eleve["nom"], niche, niveau, persona)
+            scores = evaluate_session(client, conversation, eleve["nom"], niche, niveau, persona, traffic)
         except Exception:
             scores = _default_scores()
     else:
@@ -433,8 +443,10 @@ def end_session():
             "naturel":            scores.get("naturel", 5),
             "global":             scores.get("score_global", 50),
         },
+        "traffic":            traffic,
         "rdv_pose":           scores.get("rdv_pose", False),
         "prospect_qualifie":  scores.get("prospect_qualifie", False),
+        "pivot_qualite":      scores.get("pivot_qualite"),
         "points_forts":       scores.get("points_forts", []),
         "points_ameliorer":  scores.get("points_ameliorer", []),
         "conseil_principal": scores.get("conseil_principal", ""),
