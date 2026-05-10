@@ -78,8 +78,13 @@ def load_accounts():
 
 
 def save_accounts(accounts):
-    with open(ACCOUNTS_FILE, "w", encoding="utf-8") as f:
-        json.dump(accounts, f, ensure_ascii=False, indent=2)
+    try:
+        os.makedirs(os.path.dirname(ACCOUNTS_FILE), exist_ok=True)
+        with open(ACCOUNTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(accounts, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        import logging
+        logging.getLogger("app").error(f"ERREUR save_accounts: {e} — chemin: {ACCOUNTS_FILE}")
 
 
 def load_active():
@@ -248,6 +253,33 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+# ── Route de diagnostic ──────────────────────────────────────────────────────
+
+@app.route("/health")
+def health():
+    import tempfile
+    results = {
+        "status": "ok",
+        "data_dir": DATA_DIR,
+        "accounts_file": ACCOUNTS_FILE,
+        "data_dir_exists": os.path.isdir(DATA_DIR),
+        "accounts_file_exists": os.path.exists(ACCOUNTS_FILE),
+        "nb_comptes": len(load_accounts()),
+    }
+    # Test écriture
+    try:
+        test_path = os.path.join(DATA_DIR, ".write_test")
+        with open(test_path, "w") as f:
+            f.write("ok")
+        os.remove(test_path)
+        results["data_dir_writable"] = True
+    except Exception as e:
+        results["data_dir_writable"] = False
+        results["write_error"] = str(e)
+        results["status"] = "error"
+    return jsonify(results)
 
 
 # ── Routes publiques (élèves) ────────────────────────────────────────────────
