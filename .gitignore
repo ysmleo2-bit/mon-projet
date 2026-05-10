@@ -11,3 +11,7 @@ app.pid
 monitor.log
 active_sessions.json
 .prod_config.json
+accounts.json
+sim_sessions.json
+feedback.json
+training_sessions.json
