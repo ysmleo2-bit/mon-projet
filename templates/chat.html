@@ -65,14 +65,14 @@
       {% for msg in conversation %}
         {% if msg.role == 'eleve' %}
         <div class="msg msg-eleve">
-          <div class="msg-bubble">{{ msg.message }}</div>
+          <div class="msg-bubble">{{ msg.message | replace('\n', '<br>') | safe }}</div>
           <div class="msg-time">{{ msg.heure }}</div>
         </div>
         {% else %}
         <div class="msg msg-prospect">
           <div class="msg-avatar">{{ (persona.prenom or '?')[0] }}</div>
           <div>
-            <div class="msg-bubble">{{ msg.message }}</div>
+            <div class="msg-bubble">{{ msg.message | replace('\n', '<br>') | safe }}</div>
             <div class="msg-time">{{ persona.prenom }} · {{ msg.heure }}</div>
           </div>
         </div>
@@ -193,7 +193,7 @@
 
   function escHtml(str) {
     return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-              .replace(/"/g,"&quot;").replace(/\n/g,"<br>");
+              .replace(/"/g,"&quot;").replace(/\n+/g,"<br>");
   }
 </script>
 {% endblock %}
