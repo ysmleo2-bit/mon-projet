@@ -1052,6 +1052,62 @@ a:hover { text-decoration: underline; }
 
 .fb-actions { display: flex; gap: .6rem; margin-top: .25rem; }
 
+/* ── Conseils détaillés avec exemples ────────────────────── */
+.conseils-detailles-section {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.conseils-detailles-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: .25rem;
+}
+.conseil-detail-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.conseil-detail-header {
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--accent);
+}
+.conseil-detail-text {
+  font-size: .9rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+.conseil-exemple-box {
+  background: var(--bg3);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: .65rem .9rem;
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+.exemple-label {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.exemple-message {
+  font-size: .9rem;
+  color: var(--text);
+  line-height: 1.55;
+  font-style: italic;
+}
+
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 768px) {
   .chat-layout { grid-template-columns: 1fr; }

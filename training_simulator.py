@@ -877,6 +877,13 @@ Vérifie si ces 3 éléments sont présents dans la conversation (obtenus ou don
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {extra_critere}
+━━━ CONSEILS DÉTAILLÉS AVEC EXEMPLES ━━━
+Pour le champ "conseils_detailles", génère 2 à 3 conseils sur les points les plus importants à améliorer.
+Chaque conseil DOIT contenir un exemple de message CONCRET et RÉALISTE que le setter aurait pu envoyer,
+basé sur la vraie conversation ci-dessus (reprends le contexte exact : ce que le prospect a dit, la niche, la situation).
+L'exemple doit être prêt à copier-coller, écrit en langage DM naturel (pas en bullet point, pas de guillemets multiples).
+Si le setter a bien performé sur un critère, ne crée pas de conseil inutile — 2 conseils précis valent mieux que 3 génériques.
+
 Calcule le score_global ainsi :
 1. Base = round((accroche*10 + gestion_objections*15 + qualification*30 + rdv*35 + naturel*10) / 10)
 2. Applique le plafond de la grille de réussite ci-dessus (ne jamais dépasser ce plafond)
@@ -895,7 +902,14 @@ Retourne UNIQUEMENT un JSON valide (sans markdown) :
   "pivot_qualite": <1-10 si B2B uniquement, sinon null>,
   "points_forts": ["point concret basé sur ce qui s'est passé"],
   "points_ameliorer": ["point actionnable prioritaire — pas ce qui manquait faute de temps"],
-  "conseil_principal": "1 conseil précis et actionnable pour la prochaine session"
+  "conseil_principal": "1 conseil précis et actionnable pour la prochaine session",
+  "conseils_detailles": [
+    {{
+      "critere": "nom du critère (ex: Accroche, Qualification, Gestion des objections...)",
+      "conseil": "explication courte et précise de ce qui n'allait pas ou pouvait être mieux",
+      "exemple": "Message concret mot pour mot que le setter aurait pu envoyer, basé sur la vraie conversation"
+    }}
+  ]
 }}"""
 
 
@@ -939,6 +953,7 @@ def evaluate_session(client, conversation: list[dict], eleve_nom: str,
             "coordonnees_demandees": False, "pivot_qualite": None,
             "points_forts": [], "points_ameliorer": [],
             "conseil_principal": "Évaluation indisponible (réponse mal formatée).",
+            "conseils_detailles": [],
         }
 
 

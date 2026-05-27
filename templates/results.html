@@ -40,7 +40,7 @@
       <div class="score-row">
         <div class="score-row-label">{{ icon }} {{ label }}</div>
         <div class="score-bar-wrap">
-          <div class="score-bar-fill" style="width:{{ val * 10 }}%; background:{{ val | score_color }}"></div>
+          <div class="score-bar-fill" style="width:{{ val * 10 }}%; background:{{ (val * 10) | score_color }}"></div>
         </div>
         <div class="score-row-val">{{ val }}/10</div>
       </div>
@@ -79,6 +79,23 @@
     </div>
     {% endif %}
 
+    <!-- Conseils détaillés avec exemples -->
+    {% if result.conseils_detailles %}
+    <div class="conseils-detailles-section">
+      <div class="conseils-detailles-title">🎯 Conseils détaillés avec exemples</div>
+      {% for c in result.conseils_detailles %}
+      <div class="conseil-detail-card">
+        <div class="conseil-detail-header">{{ c.critere }}</div>
+        <p class="conseil-detail-text">{{ c.conseil }}</p>
+        <div class="conseil-exemple-box">
+          <span class="exemple-label">💬 Tu aurais pu écrire :</span>
+          <div class="exemple-message">{{ c.exemple }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Statistiques de session -->
     <div class="session-stats">
       <div class="stat-item">
@@ -97,7 +114,7 @@
 
     <div class="results-actions">
       <a href="{{ url_for('index') }}" class="btn btn-primary">Nouvelle session →</a>
-      <a href="{{ url_for('coach') }}" class="btn btn-ghost">Tableau de bord coach</a>
+      <a href="{{ url_for('student_dashboard') }}" class="btn btn-ghost">Mon tableau de bord</a>
     </div>
   </div>
 </div>

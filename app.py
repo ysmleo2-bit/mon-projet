@@ -490,9 +490,10 @@ def end_session():
         "prospect_qualifie":  scores.get("prospect_qualifie", False),
         "pivot_qualite":      scores.get("pivot_qualite"),
         "points_forts":       scores.get("points_forts", []),
-        "points_ameliorer":  scores.get("points_ameliorer", []),
-        "conseil_principal": scores.get("conseil_principal", ""),
-        "conversation":      conversation,
+        "points_ameliorer":   scores.get("points_ameliorer", []),
+        "conseil_principal":  scores.get("conseil_principal", ""),
+        "conseils_detailles": scores.get("conseils_detailles", []),
+        "conversation":       conversation,
     }
     # Retrait de la session active
     active = load_active()
@@ -807,8 +808,10 @@ def _default_scores():
     return {
         "accroche": 5, "gestion_objections": 5, "qualification": 5,
         "rdv": 5, "naturel": 5, "score_global": 50,
-        "rdv_pose": False, "points_forts": [], "points_ameliorer": [],
+        "rdv_pose": False, "prospect_qualifie": False, "pivot_qualite": None,
+        "points_forts": [], "points_ameliorer": [],
         "conseil_principal": "Évaluation indisponible (clé API manquante).",
+        "conseils_detailles": [],
     }
 
 
