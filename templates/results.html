@@ -26,6 +26,46 @@
       </div>
     </div>
 
+    <!-- Analyse globale coach -->
+    {% if result.analyse_globale %}
+    <div class="analyse-globale-box">
+      <div class="analyse-globale-label">🧠 Analyse du coach</div>
+      <p class="analyse-globale-text">{{ result.analyse_globale }}</p>
+      {% set ds = result.diagnostic_style %}
+      {% if ds %}
+      <div class="diag-chips">
+        {% set longueur_map = {'adaptes': ('✅ Messages adaptés', 'chip-ok'), 'trop_longs': ('⚠️ Messages trop longs', 'chip-warn'), 'trop_courts': ('⚠️ Messages trop courts', 'chip-warn')} %}
+        {% set posture_map  = {'equilibre': ('✅ Posture équilibrée', 'chip-ok'), 'trop_commercial': ('⚠️ Trop commercial', 'chip-warn'), 'trop_passif': ('⚠️ Trop passif', 'chip-warn')} %}
+        {% set rythme_map   = {'bon': ('✅ Bon rythme', 'chip-ok'), 'trop_rapide': ('⚠️ Rythme trop rapide', 'chip-warn'), 'trop_lent': ('⚠️ Rythme trop lent', 'chip-warn')} %}
+        {% set lbl, cls = longueur_map.get(ds.longueur_messages, ('—', 'chip-ok')) %}
+        <span class="diag-chip {{ cls }}">{{ lbl }}</span>
+        {% set lbl, cls = posture_map.get(ds.posture, ('—', 'chip-ok')) %}
+        <span class="diag-chip {{ cls }}">{{ lbl }}</span>
+        {% set lbl, cls = rythme_map.get(ds.rythme, ('—', 'chip-ok')) %}
+        <span class="diag-chip {{ cls }}">{{ lbl }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Moments clés -->
+    {% if result.moments_cles %}
+    <div class="moments-cles-section">
+      <div class="moments-cles-title">⚡ Moments clés de la conversation</div>
+      {% for m in result.moments_cles %}
+      <div class="moment-card moment-{{ m.type }}">
+        <div class="moment-icon">{% if m.type == 'positif' %}✅{% else %}⚠️{% endif %}</div>
+        <div class="moment-content">
+          <p class="moment-description">{{ m.description }}</p>
+          {% if m.citation %}
+          <div class="moment-citation">"{{ m.citation }}"</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Barres de scores détaillés -->
     <div class="scores-grid">
       {% set criteres = [

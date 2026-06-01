@@ -877,6 +877,23 @@ Vérifie si ces 3 éléments sont présents dans la conversation (obtenus ou don
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {extra_critere}
+━━━ ANALYSE GLOBALE ━━━
+Rédige 2-3 phrases comme un coach qui vient de regarder la conversation en direct.
+Ton direct et bienveillant, jamais vague. Mentionne le tournant ou la décision clé qui a fait la différence.
+Exemple de ton attendu : "Tu as bien ouvert mais tu as perdu le prospect au 4e message en devenant défensif sur le prix.
+Le RDV était accessible si tu avais reformulé son objection en question."
+
+━━━ MOMENTS CLÉS ━━━
+Identifie 2-3 instants précis de la conversation (positifs ou à améliorer).
+- Cite un extrait EXACT du message concerné (quelques mots, pas inventé)
+- Explique pourquoi ce moment était crucial
+- type : "positif" si bien exécuté, "a_ameliorer" si raté ou manqué
+
+━━━ DIAGNOSTIC STYLE ━━━
+- longueur_messages : "trop_longs" si le setter envoie régulièrement des messages de 3+ lignes, "trop_courts" si réponses sèches de 1-2 mots, "adaptes" sinon
+- posture : "trop_commercial" si langage vendeur perceptible, "trop_passif" si le setter ne guide jamais la conversation, "equilibre" sinon
+- rythme : "trop_rapide" si le RDV est proposé trop tôt (< 4 échanges), "trop_lent" si la conversation s'étire sans avancer, "bon" sinon
+
 ━━━ CONSEILS DÉTAILLÉS AVEC EXEMPLES ━━━
 Pour le champ "conseils_detailles", génère 2 à 3 conseils sur les points les plus importants à améliorer.
 Chaque conseil DOIT contenir un exemple de message CONCRET et RÉALISTE que le setter aurait pu envoyer,
@@ -900,6 +917,19 @@ Retourne UNIQUEMENT un JSON valide (sans markdown) :
   "prospect_qualifie": <true si les 3 critères objectif+situation+douleur sont présents, sinon false>,
   "coordonnees_demandees": <true si setter a demandé téléphone ou email après RDV accepté, sinon false>,
   "pivot_qualite": <1-10 si B2B uniquement, sinon null>,
+  "analyse_globale": "narration coach 2-3 phrases — ce qui s'est passé, le tournant, l'impression globale",
+  "moments_cles": [
+    {{
+      "type": "positif" | "a_ameliorer",
+      "description": "ce qui s'est passé à ce moment précis et pourquoi c'est important",
+      "citation": "extrait exact court du message concerné"
+    }}
+  ],
+  "diagnostic_style": {{
+    "longueur_messages": "adaptes | trop_longs | trop_courts",
+    "posture": "equilibre | trop_commercial | trop_passif",
+    "rythme": "bon | trop_rapide | trop_lent"
+  }},
   "points_forts": ["point concret basé sur ce qui s'est passé"],
   "points_ameliorer": ["point actionnable prioritaire — pas ce qui manquait faute de temps"],
   "conseil_principal": "1 conseil précis et actionnable pour la prochaine session",
@@ -934,7 +964,7 @@ def evaluate_session(client, conversation: list[dict], eleve_nom: str,
     prompt = build_eval_prompt(conversation, eleve_nom, niche, niveau, persona, traffic, awareness)
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=800,
+        max_tokens=1500,
         messages=[{"role": "user", "content": prompt}],
     )
     raw = response.content[0].text.strip()
@@ -951,6 +981,9 @@ def evaluate_session(client, conversation: list[dict], eleve_nom: str,
             "rdv": 5, "naturel": 5, "score_global": 50,
             "rdv_pose": False, "prospect_qualifie": False,
             "coordonnees_demandees": False, "pivot_qualite": None,
+            "analyse_globale": "",
+            "moments_cles": [],
+            "diagnostic_style": {"longueur_messages": "adaptes", "posture": "equilibre", "rythme": "bon"},
             "points_forts": [], "points_ameliorer": [],
             "conseil_principal": "Évaluation indisponible (réponse mal formatée).",
             "conseils_detailles": [],
