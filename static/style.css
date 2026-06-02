@@ -1115,6 +1115,86 @@ a:hover { text-decoration: underline; }
   padding: .35rem .6rem;
 }
 
+/* ── Plan d'amélioration ─────────────────────────────────── */
+.plan-section {
+  margin-bottom: 1.5rem;
+}
+.plan-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 1rem;
+}
+.plan-items { display: flex; flex-direction: column; gap: .9rem; }
+.plan-item {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+}
+.plan-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: .8rem;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: .1rem;
+}
+.plan-body { display: flex; flex-direction: column; gap: .45rem; flex: 1; }
+.plan-critere {
+  font-size: .75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--accent);
+}
+.plan-conseil {
+  font-size: .9rem;
+  color: var(--text);
+  line-height: 1.55;
+  margin: 0;
+}
+.plan-exemple-box {
+  background: var(--bg3);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: .6rem .85rem;
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+.plan-exemple-label { font-size: .72rem; font-weight: 600; color: var(--text-muted); }
+.plan-exemple-msg   { font-size: .88rem; color: var(--text); font-style: italic; line-height: 1.5; }
+.plan-simple-list   { padding-left: 1.2rem; color: var(--text-muted); font-size: .9rem; line-height: 1.8; }
+
+/* ── Grille bas de page résultats ────────────────────────── */
+.results-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+@media (max-width: 640px) {
+  .results-bottom-grid { grid-template-columns: 1fr; }
+}
+.scores-detail-block {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+}
+.score-row-sm { gap: .4rem; }
+.score-row-sm .score-row-label { font-size: .8rem; min-width: 130px; }
+.score-row-sm .score-bar-wrap  { height: 5px; }
+.score-row-sm .score-row-val   { font-size: .8rem; min-width: 32px; }
+.stat-neutral { color: var(--text-muted) !important; }
+
 /* ── Conseils détaillés avec exemples ────────────────────── */
 .conseils-detailles-section {
   margin-top: 1.5rem;
