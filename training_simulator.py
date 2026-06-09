@@ -708,10 +708,10 @@ def _build_b2c_prompt(persona: dict, niche: str, niveau: int, awareness: str = "
     }
 
     rdv_rules = {
-        1: "Si la personne propose un appel ou un RDV de façon naturelle, tu demandes les dispo et le prix. Si elle répond bien (lien de résa, prix en appel), tu prends le RDV.",
-        2: "Tu poses d'abord la question du prix. Si on te répond que ça se discute en appel et que la proposition est concrète (ex: 45 min pour un plan personnalisé), tu peux accepter — mais t'hésites un peu avant.",
-        3: "Tu poses beaucoup de questions avant d'accepter quoi que ce soit. Tu veux comprendre exactement ce que tu vas obtenir avant de t'engager sur un appel. T'acceptes seulement si la personne a vraiment bien géré tes doutes.",
-        4: "Tu esquives ou tu dis non à la première proposition de RDV. Tu peux accepter seulement si la conversation a été vraiment excellente depuis le début et que ton scepticisme a été traité avec précision.",
+        1: "Si la personne propose un appel, tu demandes les dispo et le prix. Si elle répond bien, tu prends le RDV. MAIS si la personne ne t'a JAMAIS demandé si tu cherchais à régler ça maintenant ou plus tard → tu acceptes en disant 'oui pourquoi pas, c'est plutôt un projet que j'ai en tête pour dans quelques mois' — signal naturel que le timing n'a pas été vérifié.",
+        2: "Tu poses d'abord la question du prix. Tu peux accepter si la proposition est concrète. MAIS si le timing n'a jamais été abordé → avant d'accepter, tu glisses 'je cherchais juste des infos pour l'instant, c'est pas super urgent pour moi'.",
+        3: "Tu poses beaucoup de questions avant d'accepter. Tu veux comprendre exactement ce que tu obtiens. Si timing et décision n'ont jamais été vérifiés → tu dis spontanément 'faut que j'en parle à [quelqu'un] avant de m'engager sur quoi que ce soit' ou 'j'ai pas d'urgence là'. T'acceptes seulement si le setter a vraiment bien géré tous tes doutes.",
+        4: "Tu esquives ou tu dis non à la première proposition. Tu acceptes seulement si la conversation était vraiment excellente. Si timing jamais vérifié → 'c'est quoi l'objectif exactement de ce call, moi j'ai pas de besoin urgent là'. Si décision jamais vérifiée → 'de toute façon faudrait que je vois ça avec ma femme/mon associé avant'.",
     }
 
     awareness_notes = {
@@ -793,17 +793,17 @@ def build_eval_prompt(conversation: list[dict], eleve_nom: str, niche: str, nive
 Note : si la conversation s'est arrêtée avant le pivot, mettre 5.
 
 """
-        plafond_note   = "  ✅ 4 étapes BrandScale + RDV + 3 critères → score peut atteindre 100\n  ✅ 3 étapes sur 4 + RDV + qualification → plafonné à 85\n  ⚠️  RDV sans consulting approach ou pivot maladroit → plafonné à 70\n  ❌ Ni RDV ni qualification → plafonné à 35"
+        plafond_note   = "  ✅ 4 étapes BrandScale + RDV + 4 critères qualif → score peut atteindre 100\n  ✅ 3 étapes sur 4 + RDV + qualification → plafonné à 85\n  ⚠️  RDV sans consulting approach ou pivot maladroit → plafonné à 70\n  ❌ Ni RDV ni qualification → plafonné à 35"
     elif traffic == "b2b":
         msg_limit_note = "B2B FROID : limite = 3-4 messages setter APRÈS le pivot (l'opener décorrélé ne compte pas)"
         accroche_note  = "ACCROCHE B2B : Le premier message DOIT être décorrélé de l'offre (localisation, contenu, activité...). Pénaliser si le premier message parle de l'offre ou du setter directement."
         extra_critere  = "━━━ CRITÈRE BONUS — pivot_qualite /10 (B2B uniquement) ━━━\nÉvalue la qualité du pivot (transition du message décorrélé vers le vrai sujet).\n• 9-10 : Le setter repart de CE QUE LE PROSPECT A DIT pour amener naturellement son sujet. Jamais question sur soi.\n• 7-8 : Pivot présent et acceptable, légèrement maladroit.\n• 5-6 : Pivot visible mais le setter parle un peu de lui.\n• 3-4 : Pivot classique 'au fait je t'ai DM parce que...' ou 'pour être honnête je suis setter pour X'.\n• 1-2 : Aucun pivot — le setter a parlé de son offre dès le début.\nNote : si la conversation n'a pas atteint le pivot, mettre 5.\n\n"
-        plafond_note   = "  ✅ RDV + 3 critères + pivot naturel + ≤ 4 msgs après pivot → score peut atteindre 100\n  ✅ RDV + 3 critères + pivot correct + 5-6 msgs après pivot → plafonné à 80\n  ⚠️  RDV sans qualification OU pivot maladroit → plafonné à 70\n  ❌ Ni RDV ni qualification → plafonné à 35"
+        plafond_note   = "  ✅ RDV + 4 critères qualif + pivot naturel + ≤ 4 msgs après pivot → score peut atteindre 100\n  ✅ RDV + 4 critères qualif + pivot correct + 5-6 msgs → plafonné à 80\n  ⚠️  RDV sans qualification complète OU pivot maladroit → plafonné à 70\n  ❌ Ni RDV ni qualification → plafonné à 35"
     else:
-        msg_limit_note = "B2C CHAUD : limite = 6-8 messages setter total"
-        accroche_note  = "ACCROCHE B2C : Le premier message doit être personnalisé au contenu/situation du prospect. Pénaliser si générique."
+        msg_limit_note = f"B2C {awareness.upper()} : limite = 6-8 messages setter total"
+        accroche_note  = "ACCROCHE B2C — Structure attendue en 3 parties : ① référence spécifique (story/post précis) ② connexion au problème en question ouverte ③ invitation simple (1 question, 0 pitch). Pénaliser sévèrement si le message peut être envoyé à 100 personnes sans changement."
         extra_critere  = ""
-        plafond_note   = "  ✅ RDV obtenu + 3 critères qualifiés + ≤ 8 messages setter → score peut atteindre 100\n  ✅ RDV obtenu + 3 critères qualifiés + 9-12 messages setter → plafonné à 80\n  ✅ RDV obtenu + 3 critères qualifiés + > 12 messages setter → plafonné à 65 (trop long)\n  ⚠️  RDV obtenu SANS les 3 critères qualifiés              → plafonné à 70 (prospect non qualifié)"
+        plafond_note   = "  ✅ RDV obtenu + 4 critères qualifiés (problème+timing+décision+budget) + ≤ 8 msgs → score peut atteindre 100\n  ✅ RDV obtenu + 4 critères qualifiés + 9-12 messages setter → plafonné à 80\n  ✅ RDV obtenu + 4 critères qualifiés + > 12 messages setter → plafonné à 65 (trop long)\n  ⚠️  RDV obtenu SANS les 4 critères qualifiés               → plafonné à 70 (prospect non qualifié)"
     return f"""Tu es un expert en Setting (appointment setting). Évalue la performance de {eleve_nom}.
 
 CONTEXTE :
@@ -813,8 +813,9 @@ CONTEXTE :
 - {msg_limit_note}
 
 ━━━ PHILOSOPHIE DU SETTING (LIS AVANT TOUT) ━━━
-Un bon setter est RAPIDE et EFFICACE.
-L'objectif est de booker un RDV/appel tout en récoltant 3 infos : OBJECTIF · SITUATION · DOULEUR.
+Le setter FILTRE — il ne convainc pas. Plus il disqualifie vite, meilleures sont ses conversations.
+L'objectif est de booker un RDV uniquement avec des prospects qualifiés sur 4 critères : PROBLÈME · TIMING · DÉCISION · BUDGET.
+Pénaliser si le setter tente de "convaincre" un prospect non qualifié. Valoriser si le setter filtre naturellement.
 {accroche_note}
 
 GRILLE DE RÉUSSITE (détermine le plafond du score_global) :
@@ -831,12 +832,18 @@ CONVERSATION :
 {conv_txt}
 
 ━━━ CRITÈRE 1 — accroche /10 ━━━
-Premier message du setter uniquement.
-• 9-10 : Personnalisé + précis (contenu vu, situation spécifique) + ton naturel
-• 7-8 : Personnalisé mais un peu vague sur "pourquoi je t'écris"
-• 5-6 : Correct mais générique ou trop orienté offre
-• 3-4 : Très générique, aucun détail ("j'ai vu ton contenu", "ça m'a parlé")
-• 1-2 : Juste "bonjour/salut/hello" OU copier-coller commercial évident
+Premier message du setter uniquement. Structure attendue en 3 parties :
+  ① Accroche contextuelle : référence SPÉCIFIQUE (story, post, commentaire précis — pas "j'ai vu ton profil")
+  ② Connexion au problème : articule leur situation en question ouverte — jamais une affirmation directe
+  ③ Invitation simple     : UNE seule question ouverte, zéro pitch, zéro lien externe
+RÈGLE ABSOLUE : si le message peut être envoyé à 100 personnes sans changer un mot → note max 3.
+BON EX. : "Salut, j'ai vu ta story de cette semaine sur ta galère avec X — tu es en train de chercher quelque chose dans cette direction ?"
+MAUVAIS EX. : "Bonjour, je travaille avec des coachs et on aide les gens à X. Tu serais intéressé ?"
+• 9-10 : Les 3 parties + ton naturel + référence réellement spécifique et non copiable
+• 7-8 : 2 parties sur 3, message personnalisé mais structurellement incomplet
+• 5-6 : Personnalisé mais structure manquante (ex : question absente ou trop orientée offre)
+• 3-4 : Générique ("j'ai vu ton contenu") ou trop long avec pitch inclus
+• 1-2 : "Bonjour/Salut/Hello" seul OU copier-coller commercial évident
 
 ━━━ CRITÈRE 2 — gestion_objections /10 ━━━
 → Aucune objection apparue dans la conversation = OBLIGATOIREMENT 5 (neutre, jamais 0)
@@ -848,21 +855,22 @@ Premier message du setter uniquement.
 • 1-2 : Ignore les objections ou répond à côté
 
 ━━━ CRITÈRE 3 — qualification /10 ━━━
-Vérifie si ces 3 éléments sont présents dans la conversation (obtenus ou donnés spontanément) :
-  ① OBJECTIF  : ce que le prospect veut atteindre
-  ② SITUATION : où il en est aujourd'hui
-  ③ DOULEUR   : ce qui le bloque / frustre / fait souffrir
+Vérifie si ces 4 critères sont couverts (obtenus ou donnés spontanément par le prospect) :
+  ① PROBLÈME RÉEL  : vraie douleur/blocage identifié (pas de la curiosité vague)
+  ② TIMING         : il veut résoudre ça MAINTENANT — pas "dans 6 mois" (ex: "tu cherches à régler ça en ce moment ?")
+  ③ DÉCISION       : c'est lui qui décide, il peut s'engager sans demander à quelqu'un d'autre
+  ④ BUDGET/SIGNAL  : aucun signal bloquant évident sur la capacité à investir (inutile de demander directement)
 
-• 9-10 : Les 3 obtenus, questions naturelles et fluides
-• 7-8 : 2 sur 3 clairement obtenus
-• 5-6 : 1 sur 3 obtenu
-• 3-4 : Aucun des 3 mais au moins une question posée sur le prospect
+• 9-10 : Les 4 critères couverts, questions naturelles et fluides
+• 7-8 : 3 sur 4 clairement couverts
+• 5-6 : 2 sur 4 couverts (dont le problème réel)
+• 3-4 : 1 sur 4 uniquement — au moins une question posée sur le prospect
 • 1-2 : Aucune question sur le prospect — le setter parle de lui ou de son offre
 
 ━━━ CRITÈRE 4 — rdv /10 ━━━
 → Conversation trop courte pour que le RDV ait pu être tenté = 5 neutre (jamais 0)
 → Si tentative de RDV :
-• 9-10 : Proposition naturelle APRÈS avoir obtenu les 3 infos, formulée avec un ancrage concret ("appel de 30 min pour voir si je peux t'aider sur [douleur]"). RDV accepté.
+• 9-10 : Proposition naturelle APRÈS avoir obtenu les 4 critères de qualification (problème + timing + décision), formulée avec un ancrage concret ("appel de 30 min pour voir si je peux t'aider sur [douleur]"). RDV accepté.
 • 7-8 : Proposition acceptée, bien timée, même si formulation légèrement perfectible
 • 5-6 : Proposition faite mais trop tôt/tard ou maladroite. Tentative présente.
 • 3-4 : Proposition très commerciale ou générique, ou RDV refusé à cause du timing
@@ -914,7 +922,7 @@ Retourne UNIQUEMENT un JSON valide (sans markdown) :
   "naturel": <1-10>,
   "score_global": <0-100 après application du plafond>,
   "rdv_pose": <true si prospect a explicitement accepté un RDV/appel, sinon false>,
-  "prospect_qualifie": <true si les 3 critères objectif+situation+douleur sont présents, sinon false>,
+  "prospect_qualifie": <true si problème réel + timing (veut résoudre maintenant) + décision (il peut s'engager seul) sont tous présents, sinon false>,
   "coordonnees_demandees": <true si setter a demandé téléphone ou email après RDV accepté, sinon false>,
   "pivot_qualite": <1-10 si B2B uniquement, sinon null>,
   "analyse_globale": "narration coach 2-3 phrases — ce qui s'est passé, le tournant, l'impression globale",
