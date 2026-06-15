@@ -43,6 +43,7 @@ SIM_FILE      = os.path.join(DATA_DIR, "sim_sessions.json")
 ACCOUNTS_FILE = os.path.join(DATA_DIR, "accounts.json")
 ACTIVE_FILE    = os.path.join(DATA_DIR, "active_sessions.json")
 FEEDBACK_FILE  = os.path.join(DATA_DIR, "feedback.json")
+CONV_DIR = os.path.join(DATA_DIR, "active_convs")
 
 COACH_EMAIL    = os.environ.get("COACH_EMAIL", "leo")
 COACH_PASSWORD = os.environ.get("COACH_PASSWORD", "coach2026")
@@ -143,6 +144,36 @@ def update_feedback_status(fb_id, statut):
             break
     with open(FEEDBACK_FILE, "w", encoding="utf-8") as f:
         json.dump(items, f, ensure_ascii=False, indent=2)
+
+
+def _conv_path(session_id: str) -> str:
+    os.makedirs(CONV_DIR, exist_ok=True)
+    return os.path.join(CONV_DIR, f"{session_id}.json")
+
+
+def _load_conv(session_id: str) -> dict:
+    path = _conv_path(session_id)
+    if not os.path.exists(path):
+        return {"conversation": [], "api_messages": []}
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"conversation": [], "api_messages": []}
+
+
+def _save_conv(session_id: str, data: dict) -> None:
+    path = _conv_path(session_id)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+
+def _delete_conv(session_id: str) -> None:
+    path = _conv_path(session_id)
+    try:
+        os.remove(path)
+    except OSError:
+        pass
 
 
 def get_client():
@@ -321,10 +352,9 @@ def start_session():
     session["traffic"]      = traffic
     session["awareness"]    = awareness
     session["persona"]      = persona
-    session["conversation"] = []
-    session["api_messages"] = []
     session["start_time"]   = datetime.now().isoformat()
     session["session_id"]   = f"sim_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{eleve['id']}"
+    _save_conv(session["session_id"], {"conversation": [], "api_messages": []})
 
     # Enregistrement session active (live tracking)
     active = clean_active(load_active())
@@ -356,7 +386,8 @@ def chat():
     awareness = session.get("awareness", "chaud")
     persona   = session["persona"]
     niv_info  = NIVEAUX[niveau]
-    conv      = session.get("conversation", [])
+    sid  = session.get("session_id", "")
+    conv = _load_conv(sid)["conversation"] if sid else []
     return render_template(
         "chat.html",
         eleve=eleve,
@@ -394,8 +425,10 @@ def send_message():
     awareness    = session.get("awareness", "chaud")
     persona      = session.get("persona", {})
     sys_prompt   = build_prospect_system_prompt(persona, niche, niveau, traffic, awareness)
-    api_messages = session.get("api_messages", [])
-    conversation = session.get("conversation", [])
+    sid = session.get("session_id", "")
+    conv_data = _load_conv(sid) if sid else {"conversation": [], "api_messages": []}
+    api_messages = conv_data["api_messages"]
+    conversation = conv_data["conversation"]
 
     api_messages.append({"role": "user", "content": message})
     conversation.append({
@@ -404,8 +437,10 @@ def send_message():
         "heure":   datetime.now().strftime("%H:%M:%S"),
     })
 
+    # Only send last 20 messages to the API to avoid token overflow
+    api_window = api_messages[-20:]
     try:
-        reply = get_prospect_reply(client, api_messages, sys_prompt)
+        reply = get_prospect_reply(client, api_window, sys_prompt)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -416,12 +451,10 @@ def send_message():
         "heure":   datetime.now().strftime("%H:%M:%S"),
     })
 
-    session["api_messages"] = api_messages
-    session["conversation"]  = conversation
-    session.modified = True
+    if sid:
+        _save_conv(sid, {"conversation": conversation, "api_messages": api_messages})
 
     # Ping session active
-    sid = session.get("session_id")
     if sid:
         active = load_active()
         if sid in active:
@@ -445,9 +478,10 @@ def end_session():
     traffic      = session.get("traffic", "b2c")
     awareness    = session.get("awareness", "chaud")
     persona      = session.get("persona", {})
-    conversation = session.get("conversation", [])
     start_iso    = session.get("start_time", datetime.now().isoformat())
     session_id   = session.get("session_id", f"sim_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{eleve['id']}")
+    conv_data    = _load_conv(session_id)
+    conversation = conv_data["conversation"]
 
     if len(conversation) < 2:
         return redirect(url_for("index"))
@@ -504,6 +538,7 @@ def end_session():
     save_active(active)
 
     save_sim_session(sim_session)
+    _delete_conv(session_id)
 
     session["last_result"] = sim_session
     session.modified = True
