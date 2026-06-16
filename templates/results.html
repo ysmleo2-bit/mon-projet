@@ -30,6 +30,14 @@
       </div>
     </div>
 
+    <!-- ── Verdict final ─────────────────────────────────── -->
+    {% if result.verdict_final %}
+    <div class="verdict-banner">
+      <span class="verdict-icon">💬</span>
+      <span class="verdict-text">{{ result.verdict_final }}</span>
+    </div>
+    {% endif %}
+
     <!-- ── Analyse du coach ──────────────────────────────── -->
     {% if result.analyse_globale %}
     <div class="analyse-globale-box">
@@ -49,6 +57,36 @@
         <span class="diag-chip {{ cls }}">{{ lbl }}</span>
       </div>
       {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ── Analyse par phase ─────────────────────────────── -->
+    {% if result.analyse_par_phase %}
+    <div class="phases-section">
+      <div class="phases-title">🗂️ Analyse phase par phase</div>
+      <div class="phases-list">
+        {% for ph in result.analyse_par_phase %}
+        <div class="phase-card phase-{{ ph.statut }}">
+          <div class="phase-header">
+            <span class="phase-emoji">{{ ph.emoji }}</span>
+            <span class="phase-name">{{ ph.phase }}</span>
+            <span class="phase-badge phase-badge-{{ ph.statut }}">
+              {% if ph.statut == 'bon' %}✅ Bon{% elif ph.statut == 'moyen' %}⚠️ Moyen{% else %}❌ À revoir{% endif %}
+            </span>
+          </div>
+          <p class="phase-observation">{{ ph.observation }}</p>
+          {% if ph.citation %}
+          <div class="phase-citation">"{{ ph.citation }}"</div>
+          {% endif %}
+          {% if ph.alternative %}
+          <div class="phase-alternative">
+            <span class="phase-alt-label">Tu aurais pu dire :</span>
+            <span class="phase-alt-text">{{ ph.alternative }}</span>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
     </div>
     {% endif %}
 
@@ -120,6 +158,7 @@
           ('rdv',                'Prise de RDV',       '📅'),
           ('naturel',            'Naturel / Flow',     '💬'),
         ] %}
+        {% set sc = result.score_commentaire or {} %}
         {% for key, label, icon in criteres %}
         {% set val = result.scores[key] %}
         <div class="score-row score-row-sm">
@@ -129,6 +168,9 @@
           </div>
           <div class="score-row-val">{{ val }}/10</div>
         </div>
+        {% if sc.get(key) %}
+        <div class="score-comment">{{ sc[key] }}</div>
+        {% endif %}
         {% endfor %}
       </div>
 

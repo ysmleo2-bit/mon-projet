@@ -938,6 +938,27 @@ basé sur la vraie conversation ci-dessus (reprends le contexte exact : ce que l
 L'exemple doit être prêt à copier-coller, écrit en langage DM naturel (pas en bullet point, pas de guillemets multiples).
 Si le setter a bien performé sur un critère, ne crée pas de conseil inutile — 2 conseils précis valent mieux que 3 génériques.
 
+━━━ VERDICT FINAL ━━━
+Une phrase percutante qui résume le résultat de la session. Directe, honnête, pas condescendante.
+Basée sur le fait réel le plus saillant : ce qui a fait la différence (en bien ou en mal).
+Ex : "Tu as bien accroché mais tu as sauté sur le RDV sans vérifier le timing — le prospect a décroché."
+Ex : "Session solide : qualification complète, RDV obtenu naturellement, ton excellent tout au long."
+
+━━━ SCORE COMMENTÉ PAR CRITÈRE ━━━
+Pour chaque critère, rédige UNE phrase qui justifie la note avec un fait précis de la conversation.
+Cite un mot ou une formulation réelle si possible. Jamais de généralité type "bonne performance".
+
+━━━ ANALYSE PAR PHASE ━━━
+Découpe la conversation en 2 à 4 phases clés (selon ce qui s'est vraiment passé).
+Phases possibles : Accroche, Découverte, Gestion des objections, Proposition RDV, Conclusion.
+Pour chaque phase :
+- "phase" : nom de la phase
+- "emoji" : emoji représentatif (🎣 Accroche, 🔍 Découverte, 🛡️ Objections, 📅 RDV, ✅ Conclusion)
+- "statut" : "bon" | "moyen" | "rate"
+- "observation" : 1-2 phrases précises sur ce qui s'est passé dans cette phase
+- "citation" : extrait EXACT d'un message de cette phase (4-10 mots, pas inventé)
+- "alternative" : SI statut "moyen" ou "rate", propose une reformulation concrète que le setter aurait pu envoyer, sinon null
+
 Calcule le score_global ainsi :
 1. Base = round((accroche*10 + gestion_objections*15 + qualification*30 + rdv*35 + naturel*10) / 10)
 2. Applique le plafond de la grille de réussite ci-dessus (ne jamais dépasser ce plafond)
@@ -954,6 +975,24 @@ Retourne UNIQUEMENT un JSON valide (sans markdown) :
   "prospect_qualifie": <true si problème réel + timing (veut résoudre maintenant) + décision (il peut s'engager seul) sont tous présents, sinon false>,
   "coordonnees_demandees": <true si setter a demandé téléphone ou email après RDV accepté, sinon false>,
   "pivot_qualite": <1-10 si B2B uniquement, sinon null>,
+  "verdict_final": "Une phrase percutante qui résume le résultat — fait précis, pas de généralité",
+  "score_commentaire": {{
+    "accroche": "justification en 1 phrase avec fait précis de la conversation",
+    "gestion_objections": "justification en 1 phrase avec fait précis",
+    "qualification": "justification en 1 phrase avec fait précis",
+    "rdv": "justification en 1 phrase avec fait précis",
+    "naturel": "justification en 1 phrase avec fait précis"
+  }},
+  "analyse_par_phase": [
+    {{
+      "phase": "nom de la phase",
+      "emoji": "emoji",
+      "statut": "bon | moyen | rate",
+      "observation": "1-2 phrases précises sur ce qui s'est passé",
+      "citation": "extrait exact du message (4-10 mots)",
+      "alternative": "reformulation concrète si statut moyen/rate, sinon null"
+    }}
+  ],
   "analyse_globale": "narration coach 2-3 phrases — ce qui s'est passé, le tournant, l'impression globale",
   "moments_cles": [
     {{
@@ -1000,8 +1039,8 @@ def evaluate_session(client, conversation: list[dict], eleve_nom: str,
     import anthropic
     prompt = build_eval_prompt(conversation, eleve_nom, niche, niveau, persona, traffic, awareness)
     response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1500,
+        model="claude-sonnet-4-6",
+        max_tokens=3000,
         messages=[{"role": "user", "content": prompt}],
     )
     raw = response.content[0].text.strip()

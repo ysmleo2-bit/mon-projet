@@ -530,6 +530,9 @@ def end_session():
         "points_ameliorer":   scores.get("points_ameliorer", []),
         "conseil_principal":  scores.get("conseil_principal", ""),
         "conseils_detailles": scores.get("conseils_detailles", []),
+        "verdict_final":      scores.get("verdict_final", ""),
+        "score_commentaire":  scores.get("score_commentaire", {}),
+        "analyse_par_phase":  scores.get("analyse_par_phase", []),
         "conversation":       conversation,
     }
     # Retrait de la session active
@@ -853,6 +856,9 @@ def _default_scores():
         "points_forts": [], "points_ameliorer": [],
         "conseil_principal": "Évaluation indisponible (clé API manquante).",
         "conseils_detailles": [],
+        "verdict_final": "",
+        "score_commentaire": {},
+        "analyse_par_phase": [],
     }
 
 

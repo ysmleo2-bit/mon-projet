@@ -1261,3 +1261,116 @@ a:hover { text-decoration: underline; }
   .session-detail-grid { grid-template-columns: 1fr; }
   .students-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Verdict final ──────────────────────────────────────────── */
+.verdict-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  background: linear-gradient(135deg, rgba(99,102,241,.12), rgba(168,85,247,.08));
+  border: 1px solid rgba(99,102,241,.3);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.verdict-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  margin-top: .1rem;
+}
+.verdict-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.5;
+  font-style: italic;
+}
+
+/* ── Analyse par phase ──────────────────────────────────────── */
+.phases-section {
+  margin-bottom: 1.5rem;
+}
+.phases-title {
+  font-size: .8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  margin-bottom: .75rem;
+}
+.phases-list {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+.phase-card {
+  border-radius: 10px;
+  padding: .9rem 1.1rem;
+  border-left: 4px solid transparent;
+}
+.phase-bon  { background: rgba(34,197,94,.07);  border-color: #22c55e; }
+.phase-moyen { background: rgba(245,158,11,.07); border-color: #f59e0b; }
+.phase-rate  { background: rgba(239,68,68,.07);  border-color: #ef4444; }
+.phase-header {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .5rem;
+}
+.phase-emoji  { font-size: 1.1rem; }
+.phase-name   { font-weight: 700; font-size: .95rem; color: var(--text); }
+.phase-badge  {
+  margin-left: auto;
+  font-size: .72rem;
+  font-weight: 700;
+  padding: .2rem .55rem;
+  border-radius: 99px;
+}
+.phase-badge-bon   { background: rgba(34,197,94,.15);  color: #22c55e; }
+.phase-badge-moyen { background: rgba(245,158,11,.15); color: #f59e0b; }
+.phase-badge-rate  { background: rgba(239,68,68,.15);  color: #ef4444; }
+.phase-observation {
+  font-size: .88rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0 0 .4rem 0;
+}
+.phase-citation {
+  font-size: .85rem;
+  color: var(--text);
+  font-style: italic;
+  background: var(--bg3);
+  border-radius: 6px;
+  padding: .35rem .6rem;
+  display: inline-block;
+  margin-bottom: .4rem;
+}
+.phase-alternative {
+  font-size: .84rem;
+  color: var(--text-muted);
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-top: .3rem;
+}
+.phase-alt-label {
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.phase-alt-text {
+  font-style: italic;
+  line-height: 1.45;
+}
+
+/* ── Score commenté ─────────────────────────────────────────── */
+.score-comment {
+  font-size: .78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: -.2rem 0 .6rem 0;
+  padding-left: .5rem;
+  border-left: 2px solid var(--border);
+  font-style: italic;
+}
