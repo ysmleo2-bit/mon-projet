@@ -485,6 +485,20 @@ def save_sim_session(session: dict) -> None:
         json.dump(sessions, f, ensure_ascii=False, indent=2)
 
 
+def update_sim_session(session_id: str, updated: dict) -> None:
+    sessions = load_sim_sessions()
+    found = False
+    for i, s in enumerate(sessions):
+        if s["id"] == session_id:
+            sessions[i] = updated
+            found = True
+            break
+    if not found:
+        sessions.append(updated)
+    with open(SIM_FILE, "w", encoding="utf-8") as f:
+        json.dump(sessions, f, ensure_ascii=False, indent=2)
+
+
 def sim_stats_eleve(sim_sessions: list[dict], eleve_id: str) -> dict:
     ss = [s for s in sim_sessions if s["eleve_id"] == eleve_id]
     if not ss:

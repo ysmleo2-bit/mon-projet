@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Analyse en cours… — Setting Training{% endblock %}
+
+{% block content %}
+<div class="page-center">
+  <div class="card waiting-card">
+    <div class="waiting-spinner">
+      <div class="spinner-ring"></div>
+    </div>
+    <h2 class="waiting-title">Analyse de ta session en cours…</h2>
+    <p class="waiting-sub">Le coach IA analyse ta conversation en détail.<br>Cela prend généralement <strong>30 à 60 secondes</strong>.</p>
+    <div class="waiting-bar-wrap">
+      <div class="waiting-bar-fill" id="waitingBar"></div>
+    </div>
+    <p class="waiting-hint" id="waitingHint">Évaluation des critères…</p>
+  </div>
+</div>
+
+<script>
+  const SESSION_ID = {{ session_id | tojson }};
+  const HINTS = [
+    "Évaluation de l'accroche…",
+    "Analyse de la qualification…",
+    "Vérification de la gestion des objections…",
+    "Calcul des scores par critère…",
+    "Rédaction du feedback personnalisé…",
+    "Annotation de tes messages…",
+    "Finalisation du bilan…",
+  ];
+  let checks  = 0;
+  let hintIdx = 0;
+  const MAX_CHECKS = 80;
+
+  const bar  = document.getElementById('waitingBar');
+  const hint = document.getElementById('waitingHint');
+
+  function setHint() {
+    hint.textContent = HINTS[hintIdx % HINTS.length];
+    hintIdx++;
+  }
+  setHint();
+
+  function updateBar() {
+    const pct = Math.min(95, (checks / MAX_CHECKS) * 100);
+    bar.style.width = pct + '%';
+  }
+
+  async function checkStatus() {
+    checks++;
+    updateBar();
+
+    if (checks % 3 === 0) setHint();
+
+    if (checks >= MAX_CHECKS) {
+      hint.textContent = "L'analyse prend plus de temps que prévu — rafraîchis la page dans quelques instants.";
+      return;
+    }
+
+    try {
+      const res  = await fetch('/api/result-status/' + SESSION_ID, { credentials: 'same-origin' });
+      const data = await res.json();
+      if (data.status === 'ready') {
+        bar.style.width = '100%';
+        hint.textContent = 'Analyse terminée — chargement des résultats…';
+        setTimeout(() => { window.location.href = '/results'; }, 400);
+        return;
+      }
+    } catch (e) { /* network glitch, retry */ }
+
+    setTimeout(checkStatus, 2500);
+  }
+
+  setTimeout(checkStatus, 2500);
+</script>
+{% endblock %}

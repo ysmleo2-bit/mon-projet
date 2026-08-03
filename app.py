@@ -12,7 +12,9 @@ Usage :
 import argparse
 import hashlib
 import json
+import logging
 import os
+import threading
 import uuid
 from datetime import date, datetime, timedelta
 from functools import wraps
@@ -58,6 +60,7 @@ from training_simulator import (
     sim_stats_eleve,
     load_sim_sessions,
     save_sim_session,
+    update_sim_session,
     pick_persona,
 )
 
@@ -182,6 +185,60 @@ def get_client():
         return None
     import anthropic
     return anthropic.Anthropic(api_key=api_key)
+
+
+def _evaluate_and_save(session_id: str, sim_session: dict, conversation: list,
+                        eleve_nom: str, niche: str, niveau: int, persona: dict,
+                        traffic: str, awareness: str) -> None:
+    log = logging.getLogger("eval_thread")
+    try:
+        client = get_client()
+        if client:
+            try:
+                scores = evaluate_session(client, conversation, eleve_nom, niche, niveau, persona, traffic, awareness)
+            except Exception as e:
+                log.error(f"evaluate_session failed: {e}", exc_info=True)
+                scores = _default_scores()
+        else:
+            scores = _default_scores()
+    except Exception as e:
+        log.error(f"_evaluate_and_save outer error: {e}", exc_info=True)
+        scores = _default_scores()
+
+    if scores.get("rdv_pose"):
+        scores["score_global"] = max(70, scores.get("score_global", 70))
+
+    sim_session.update({
+        "status":             "ready",
+        "scores": {
+            "accroche":           scores.get("accroche", 5),
+            "gestion_objections": scores.get("gestion_objections", 5),
+            "qualification":      scores.get("qualification", 5),
+            "rdv":                scores.get("rdv", 5),
+            "naturel":            scores.get("naturel", 5),
+            "global":             scores.get("score_global", 50),
+        },
+        "rdv_pose":           scores.get("rdv_pose", False),
+        "prospect_qualifie":  scores.get("prospect_qualifie", False),
+        "pivot_qualite":      scores.get("pivot_qualite"),
+        "analyse_globale":    scores.get("analyse_globale", ""),
+        "moments_cles":       scores.get("moments_cles", []),
+        "diagnostic_style":   scores.get("diagnostic_style", {}),
+        "points_forts":       scores.get("points_forts", []),
+        "points_ameliorer":   scores.get("points_ameliorer", []),
+        "conseil_principal":  scores.get("conseil_principal", ""),
+        "conseils_detailles": scores.get("conseils_detailles", []),
+        "verdict_final":      scores.get("verdict_final", ""),
+        "score_commentaire":  scores.get("score_commentaire", {}),
+        "analyse_par_phase":  scores.get("analyse_par_phase", []),
+        "annotations_messages": scores.get("annotations_messages", []),
+    })
+
+    try:
+        update_sim_session(session_id, sim_session)
+        log.info(f"Eval complete for {session_id}")
+    except Exception as e:
+        log.error(f"update_sim_session failed for {session_id}: {e}", exc_info=True)
 
 
 # ── Auth helpers ─────────────────────────────────────────────────────────────
@@ -480,7 +537,6 @@ def end_session():
     if "eleve" not in session:
         return redirect(url_for("index"))
 
-    client       = get_client()
     eleve        = session.get("eleve", {})
     niche        = session.get("niche", NICHES[0])
     niveau       = session.get("niveau", 1)
@@ -500,22 +556,10 @@ def end_session():
     nb_msgs    = sum(1 for m in conversation if m["role"] == "eleve")
     niv_info   = NIVEAUX[niveau]
 
-    if client:
-        try:
-            scores = evaluate_session(client, conversation, eleve["nom"], niche, niveau, persona, traffic, awareness)
-        except Exception as _eval_err:
-            import logging
-            logging.getLogger("app").error(f"evaluate_session failed: {_eval_err}", exc_info=True)
-            scores = _default_scores()
-    else:
-        scores = _default_scores()
-
-    # Plancher de score : si le RDV est décroché → minimum 70
-    if scores.get("rdv_pose"):
-        scores["score_global"] = max(70, scores.get("score_global", 70))
-
+    # Sauvegarde immédiate avec statut "pending" — l'évaluation se fait en arrière-plan
     sim_session = {
         "id":                session_id,
+        "status":            "pending",
         "eleve_id":          eleve["id"],
         "eleve_nom":         eleve["nom"],
         "date":              date.today().isoformat(),
@@ -525,32 +569,19 @@ def end_session():
         "niveau_label":      niv_info["label"],
         "duree_minutes":     duree,
         "nb_messages_eleve": nb_msgs,
-        "scores": {
-            "accroche":           scores.get("accroche", 5),
-            "gestion_objections": scores.get("gestion_objections", 5),
-            "qualification":      scores.get("qualification", 5),
-            "rdv":                scores.get("rdv", 5),
-            "naturel":            scores.get("naturel", 5),
-            "global":             scores.get("score_global", 50),
-        },
-        "traffic":            traffic,
-        "awareness":          awareness,
-        "rdv_pose":           scores.get("rdv_pose", False),
-        "prospect_qualifie":  scores.get("prospect_qualifie", False),
-        "pivot_qualite":      scores.get("pivot_qualite"),
-        "analyse_globale":    scores.get("analyse_globale", ""),
-        "moments_cles":       scores.get("moments_cles", []),
-        "diagnostic_style":   scores.get("diagnostic_style", {}),
-        "points_forts":       scores.get("points_forts", []),
-        "points_ameliorer":   scores.get("points_ameliorer", []),
-        "conseil_principal":  scores.get("conseil_principal", ""),
-        "conseils_detailles": scores.get("conseils_detailles", []),
-        "verdict_final":      scores.get("verdict_final", ""),
-        "score_commentaire":  scores.get("score_commentaire", {}),
-        "analyse_par_phase":  scores.get("analyse_par_phase", []),
-        "annotations_messages": scores.get("annotations_messages", []),
-        "conversation":       conversation,
+        "traffic":           traffic,
+        "awareness":         awareness,
+        "conversation":      conversation,
+        # Scores par défaut, remplacés dès que l'évaluation se termine
+        "scores": {"accroche": 0, "gestion_objections": 0, "qualification": 0,
+                   "rdv": 0, "naturel": 0, "global": 0},
+        "rdv_pose": False, "prospect_qualifie": False, "pivot_qualite": None,
+        "analyse_globale": "", "moments_cles": [], "diagnostic_style": {},
+        "points_forts": [], "points_ameliorer": [], "conseil_principal": "",
+        "conseils_detailles": [], "verdict_final": "", "score_commentaire": {},
+        "analyse_par_phase": [], "annotations_messages": [],
     }
+
     # Retrait de la session active
     active = load_active()
     active.pop(session_id, None)
@@ -559,7 +590,16 @@ def end_session():
     save_sim_session(sim_session)
     _delete_conv(session_id)
 
-    # Stocker seulement l'ID dans le cookie (le full result est trop gros)
+    # Démarrage de l'évaluation en background (évite le timeout Railway)
+    t = threading.Thread(
+        target=_evaluate_and_save,
+        args=(session_id, sim_session, conversation, eleve["nom"], niche, niveau, persona, traffic, awareness),
+        daemon=True,
+        name=f"eval-{session_id[-8:]}",
+    )
+    t.start()
+
+    # Stocker l'ID dans le cookie et rediriger immédiatement
     session["last_result_id"] = session_id
     session.modified = True
 
@@ -580,8 +620,20 @@ def results():
     result = next((s for s in sim_sessions if s["id"] == result_id), None)
     if not result:
         return redirect(url_for("index"))
+    if result.get("status") == "pending":
+        return render_template("waiting.html", session_id=result_id)
     niv_info = NIVEAUX.get(result.get("niveau_difficulte", 1), NIVEAUX[1])
     return render_template("results.html", result=result, niv_info=niv_info)
+
+
+@app.route("/api/result-status/<session_id>")
+@login_required
+def api_result_status(session_id):
+    sim_sessions = load_sim_sessions()
+    s = next((x for x in sim_sessions if x["id"] == session_id), None)
+    if not s:
+        return jsonify({"status": "not_found"}), 404
+    return jsonify({"status": s.get("status", "ready")})
 
 
 # ── Routes coach ─────────────────────────────────────────────────────────────

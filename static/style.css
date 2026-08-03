@@ -1439,3 +1439,57 @@ a:hover { text-decoration: underline; }
 .replay-ann-mauvais { background: rgba(239,68,68,.09); border: 1px solid rgba(239,68,68,.25); }
 .replay-ann-badge  { flex-shrink: 0; font-size: .9rem; }
 .replay-ann-text   { color: var(--text); font-style: italic; }
+
+/* ── Waiting / analyse en cours ────────────────────────────── */
+.waiting-card {
+  max-width: 480px;
+  margin: 4rem auto;
+  text-align: center;
+  padding: 3rem 2.5rem;
+}
+.waiting-spinner {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.8rem;
+}
+.spinner-ring {
+  width: 56px;
+  height: 56px;
+  border: 4px solid var(--bg3);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.waiting-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: .6rem;
+}
+.waiting-sub {
+  font-size: .95rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 1.8rem;
+}
+.waiting-bar-wrap {
+  height: 6px;
+  background: var(--bg3);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: .8rem;
+}
+.waiting-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 99px;
+  transition: width 0.6s ease;
+}
+.waiting-hint {
+  font-size: .82rem;
+  color: var(--text-muted);
+  font-style: italic;
+  min-height: 1.2em;
+}
