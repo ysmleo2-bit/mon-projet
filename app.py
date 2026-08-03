@@ -351,10 +351,10 @@ def start_session():
     session["niveau"]       = niveau
     session["traffic"]      = traffic
     session["awareness"]    = awareness
-    session["persona"]      = persona
     session["start_time"]   = datetime.now().isoformat()
     session["session_id"]   = f"sim_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{eleve['id']}"
-    _save_conv(session["session_id"], {"conversation": [], "api_messages": []})
+    # persona stockée dans le fichier conv, pas dans le cookie (trop gros → overflow)
+    _save_conv(session["session_id"], {"conversation": [], "api_messages": [], "persona": persona})
 
     # Enregistrement session active (live tracking)
     active = clean_active(load_active())
@@ -386,8 +386,10 @@ def chat():
     awareness = session.get("awareness", "chaud")
     persona   = session["persona"]
     niv_info  = NIVEAUX[niveau]
-    sid  = session.get("session_id", "")
-    conv = _load_conv(sid)["conversation"] if sid else []
+    sid       = session.get("session_id", "")
+    conv_data = _load_conv(sid) if sid else {"conversation": [], "api_messages": [], "persona": {}}
+    conv      = conv_data["conversation"]
+    persona   = conv_data.get("persona") or persona
     return render_template(
         "chat.html",
         eleve=eleve,
@@ -423,10 +425,10 @@ def send_message():
     niveau       = session.get("niveau", 1)
     traffic      = session.get("traffic", "b2c")
     awareness    = session.get("awareness", "chaud")
-    persona      = session.get("persona", {})
+    sid          = session.get("session_id", "")
+    conv_data    = _load_conv(sid) if sid else {"conversation": [], "api_messages": [], "persona": {}}
+    persona      = conv_data.get("persona") or session.get("persona", {})
     sys_prompt   = build_prospect_system_prompt(persona, niche, niveau, traffic, awareness)
-    sid = session.get("session_id", "")
-    conv_data = _load_conv(sid) if sid else {"conversation": [], "api_messages": []}
     api_messages = conv_data["api_messages"]
     conversation = conv_data["conversation"]
 
@@ -452,7 +454,7 @@ def send_message():
     })
 
     if sid:
-        _save_conv(sid, {"conversation": conversation, "api_messages": api_messages})
+        _save_conv(sid, {"conversation": conversation, "api_messages": api_messages, "persona": persona})
 
     # Ping session active
     if sid:
@@ -477,11 +479,11 @@ def end_session():
     niveau       = session.get("niveau", 1)
     traffic      = session.get("traffic", "b2c")
     awareness    = session.get("awareness", "chaud")
-    persona      = session.get("persona", {})
     start_iso    = session.get("start_time", datetime.now().isoformat())
     session_id   = session.get("session_id", f"sim_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{eleve['id']}")
     conv_data    = _load_conv(session_id)
     conversation = conv_data["conversation"]
+    persona      = conv_data.get("persona") or session.get("persona", {})
 
     if len(conversation) < 2:
         return redirect(url_for("index"))
