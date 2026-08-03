@@ -569,7 +569,11 @@ def end_session():
 @app.route("/results")
 @login_required
 def results():
-    result_id = session.get("last_result_id") or session.get("last_result", {}).get("id")
+    result_id = session.get("last_result_id")
+    if not result_id:
+        last = session.get("last_result")
+        if isinstance(last, dict):
+            result_id = last.get("id")
     if not result_id:
         return redirect(url_for("index"))
     sim_sessions = load_sim_sessions()
