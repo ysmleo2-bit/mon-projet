@@ -959,6 +959,15 @@ Pour chaque phase :
 - "citation" : extrait EXACT d'un message de cette phase (4-10 mots, pas inventé)
 - "alternative" : SI statut "moyen" ou "rate", propose une reformulation concrète que le setter aurait pu envoyer, sinon null
 
+━━━ ANNOTATIONS MESSAGE PAR MESSAGE (SETTER UNIQUEMENT) ━━━
+Pour CHAQUE message envoyé par le SETTER (pas le prospect), donne une annotation courte.
+Numérotation : compte uniquement les messages du SETTER dans l'ordre (1 = son 1er message).
+- "index" : numéro du message setter (1-based)
+- "note_type" : "bon" si bien exécuté, "moyen" si perfectible, "mauvais" si erreur claire
+- "commentaire" : UNE phrase max, précise, avec le fait exact du message concerné
+- "extrait" : 3-6 mots exacts du message setter concerné
+RÈGLE : ne dis JAMAIS "c'est bien" de façon vague — cite toujours un fait précis.
+
 Calcule le score_global ainsi :
 1. Base = round((accroche*10 + gestion_objections*15 + qualification*30 + rdv*35 + naturel*10) / 10)
 2. Applique le plafond de la grille de réussite ci-dessus (ne jamais dépasser ce plafond)
@@ -1015,6 +1024,14 @@ Retourne UNIQUEMENT un JSON valide (sans markdown) :
       "conseil": "explication courte et précise de ce qui n'allait pas ou pouvait être mieux",
       "exemple": "Message concret mot pour mot que le setter aurait pu envoyer, basé sur la vraie conversation"
     }}
+  ],
+  "annotations_messages": [
+    {{
+      "index": <numéro du message setter, 1-based>,
+      "note_type": "bon | moyen | mauvais",
+      "commentaire": "UNE phrase précise avec fait exact",
+      "extrait": "3-6 mots exacts du message"
+    }}
   ]
 }}"""
 
@@ -1037,21 +1054,26 @@ def get_prospect_reply(client, messages: list[dict], system_prompt: str) -> str:
 def evaluate_session(client, conversation: list[dict], eleve_nom: str,
                      niche: str, niveau: int, persona: dict, traffic: str = "b2c", awareness: str = "chaud") -> dict:
     import anthropic
+    import re
+    import logging
+    log = logging.getLogger("evaluate_session")
     prompt = build_eval_prompt(conversation, eleve_nom, niche, niveau, persona, traffic, awareness)
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=3000,
+        max_tokens=5000,
         messages=[{"role": "user", "content": prompt}],
     )
     raw = response.content[0].text.strip()
-    # Extraire le JSON même s'il est entouré de markdown ou de texte
-    import re
+    log.info(f"eval raw length={len(raw)} stop_reason={response.stop_reason}")
+    if response.stop_reason == "max_tokens":
+        log.warning("Réponse tronquée — tentative d'extraction partielle")
     json_match = re.search(r'\{[\s\S]*\}', raw)
     if json_match:
         raw = json_match.group(0)
     try:
         return json.loads(raw)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        log.error(f"JSON parse error: {e} — raw[:300]={raw[:300]}")
         return {
             "accroche": 5, "gestion_objections": 5, "qualification": 5,
             "rdv": 5, "naturel": 5, "score_global": 50,

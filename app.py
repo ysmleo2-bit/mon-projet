@@ -494,10 +494,16 @@ def end_session():
     if client:
         try:
             scores = evaluate_session(client, conversation, eleve["nom"], niche, niveau, persona, traffic, awareness)
-        except Exception:
+        except Exception as _eval_err:
+            import logging
+            logging.getLogger("app").error(f"evaluate_session failed: {_eval_err}", exc_info=True)
             scores = _default_scores()
     else:
         scores = _default_scores()
+
+    # Plancher de score : si le RDV est décroché → minimum 70
+    if scores.get("rdv_pose"):
+        scores["score_global"] = max(70, scores.get("score_global", 70))
 
     sim_session = {
         "id":                session_id,
@@ -533,6 +539,7 @@ def end_session():
         "verdict_final":      scores.get("verdict_final", ""),
         "score_commentaire":  scores.get("score_commentaire", {}),
         "analyse_par_phase":  scores.get("analyse_par_phase", []),
+        "annotations_messages": scores.get("annotations_messages", []),
         "conversation":       conversation,
     }
     # Retrait de la session active
@@ -859,6 +866,7 @@ def _default_scores():
         "verdict_final": "",
         "score_commentaire": {},
         "analyse_par_phase": [],
+        "annotations_messages": [],
     }
 
 

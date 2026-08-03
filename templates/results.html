@@ -176,6 +176,48 @@
 
     </div>
 
+    <!-- ── Replay annoté ────────────────────────────────── -->
+    {% if result.conversation %}
+    <div class="replay-section">
+      <div class="replay-section-title">🎬 Replay annoté de ta conversation</div>
+      {% set annotations = {} %}
+      {% if result.annotations_messages %}
+        {% set setter_idx = namespace(val=0) %}
+        {% for ann in result.annotations_messages %}
+          {% set _ = annotations.update({ann.index: ann}) %}
+        {% endfor %}
+      {% endif %}
+      {% set setter_counter = namespace(val=0) %}
+      <div class="replay-conv">
+        {% for msg in result.conversation %}
+          {% if msg.role == 'eleve' %}
+            {% set setter_counter.val = setter_counter.val + 1 %}
+            {% set ann = annotations.get(setter_counter.val) %}
+            <div class="replay-row replay-setter">
+              <div class="replay-bubble-wrap">
+                <div class="replay-bubble replay-bubble-setter">{{ msg.message }}</div>
+                <div class="replay-time-label">Toi · {{ msg.heure }}</div>
+              </div>
+              {% if ann %}
+              <div class="replay-annotation replay-ann-{{ ann.note_type }}">
+                <span class="replay-ann-badge">
+                  {% if ann.note_type == 'bon' %}✅{% elif ann.note_type == 'moyen' %}⚠️{% else %}❌{% endif %}
+                </span>
+                <span class="replay-ann-text">{{ ann.commentaire }}</span>
+              </div>
+              {% endif %}
+            </div>
+          {% else %}
+            <div class="replay-row replay-prospect">
+              <div class="replay-bubble replay-bubble-prospect">{{ msg.message }}</div>
+              <div class="replay-time-label">Prospect · {{ msg.heure }}</div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- ── Actions ───────────────────────────────────────── -->
     <div class="results-actions">
       <a href="{{ url_for('index') }}" class="btn btn-primary">Nouvelle session →</a>
