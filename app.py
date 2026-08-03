@@ -384,12 +384,11 @@ def chat():
     niveau    = session["niveau"]
     traffic   = session.get("traffic", "b2c")
     awareness = session.get("awareness", "chaud")
-    persona   = session["persona"]
     niv_info  = NIVEAUX[niveau]
     sid       = session.get("session_id", "")
     conv_data = _load_conv(sid) if sid else {"conversation": [], "api_messages": [], "persona": {}}
     conv      = conv_data["conversation"]
-    persona   = conv_data.get("persona") or persona
+    persona   = conv_data.get("persona") or session.get("persona", {})
     return render_template(
         "chat.html",
         eleve=eleve,
