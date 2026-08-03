@@ -354,7 +354,11 @@ def start_session():
     session["start_time"]   = datetime.now().isoformat()
     session["session_id"]   = f"sim_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{eleve['id']}"
     # persona stockée dans le fichier conv, pas dans le cookie (trop gros → overflow)
-    _save_conv(session["session_id"], {"conversation": [], "api_messages": [], "persona": persona})
+    try:
+        _save_conv(session["session_id"], {"conversation": [], "api_messages": [], "persona": persona})
+    except Exception as _e:
+        import logging
+        logging.getLogger("app").error(f"_save_conv failed in start_session: {_e}")
 
     # Enregistrement session active (live tracking)
     active = clean_active(load_active())
@@ -453,7 +457,11 @@ def send_message():
     })
 
     if sid:
-        _save_conv(sid, {"conversation": conversation, "api_messages": api_messages, "persona": persona})
+        try:
+            _save_conv(sid, {"conversation": conversation, "api_messages": api_messages, "persona": persona})
+        except Exception as _e:
+            import logging
+            logging.getLogger("app").error(f"_save_conv failed in send_message: {_e}")
 
     # Ping session active
     if sid:
@@ -551,7 +559,8 @@ def end_session():
     save_sim_session(sim_session)
     _delete_conv(session_id)
 
-    session["last_result"] = sim_session
+    # Stocker seulement l'ID dans le cookie (le full result est trop gros)
+    session["last_result_id"] = session_id
     session.modified = True
 
     return redirect(url_for("results"))
@@ -560,9 +569,13 @@ def end_session():
 @app.route("/results")
 @login_required
 def results():
-    if "last_result" not in session:
+    result_id = session.get("last_result_id") or session.get("last_result", {}).get("id")
+    if not result_id:
         return redirect(url_for("index"))
-    result   = session["last_result"]
+    sim_sessions = load_sim_sessions()
+    result = next((s for s in sim_sessions if s["id"] == result_id), None)
+    if not result:
+        return redirect(url_for("index"))
     niv_info = NIVEAUX.get(result.get("niveau_difficulte", 1), NIVEAUX[1])
     return render_template("results.html", result=result, niv_info=niv_info)
 
