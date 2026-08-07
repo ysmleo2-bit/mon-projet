@@ -28,6 +28,27 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "setting-training-secret-2026")
 
+# ── Sécurité cookies ─────────────────────────────────────────────────────────
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+# Secure uniquement en production (HTTPS)
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("RAILWAY_ENVIRONMENT") is not None
+
+# ── Rate-limiting login (in-memory, par IP) ──────────────────────────────────
+_login_attempts: dict = {}   # { ip: [timestamp, ...] }
+_RATE_LOCK = threading.Lock()
+_MAX_ATTEMPTS = 10            # tentatives autorisées
+_RATE_WINDOW  = 300           # fenêtre en secondes (5 min)
+
+def _is_rate_limited(ip: str) -> bool:
+    """Retourne True si l'IP a dépassé le seuil de tentatives."""
+    now = datetime.now().timestamp()
+    with _RATE_LOCK:
+        attempts = [t for t in _login_attempts.get(ip, []) if now - t < _RATE_WINDOW]
+        attempts.append(now)
+        _login_attempts[ip] = attempts
+        return len(attempts) > _MAX_ATTEMPTS
+
 # Démarrage de l'agent GDoc en background (une seule fois, pas avec le reloader Flask)
 try:
     import gdoc_agent
@@ -288,8 +309,8 @@ def register():
             error = "Tous les champs sont obligatoires."
         elif password != confirm:
             error = "Les mots de passe ne correspondent pas."
-        elif len(password) < 6:
-            error = "Le mot de passe doit faire au moins 6 caractères."
+        elif len(password) < 8:
+            error = "Le mot de passe doit faire au moins 8 caractères."
         else:
             accounts = load_accounts()
             if any(a["email"] == email for a in accounts):
@@ -320,6 +341,11 @@ def login():
 
     error = None
     if request.method == "POST":
+        ip = request.remote_addr or "unknown"
+        if _is_rate_limited(ip):
+            error = "Trop de tentatives. Réessaie dans quelques minutes."
+            return render_template("login.html", error=error), 429
+
         email    = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
 
@@ -347,27 +373,18 @@ def logout():
 
 @app.route("/health")
 def health():
-    import tempfile
-    results = {
-        "status": "ok",
-        "data_dir": DATA_DIR,
-        "accounts_file": ACCOUNTS_FILE,
-        "data_dir_exists": os.path.isdir(DATA_DIR),
-        "accounts_file_exists": os.path.exists(ACCOUNTS_FILE),
-        "nb_comptes": len(load_accounts()),
-    }
-    # Test écriture
+    """Endpoint de santé — accessible sans auth mais sans info sensibles."""
+    status = "ok"
+    writable = False
     try:
         test_path = os.path.join(DATA_DIR, ".write_test")
         with open(test_path, "w") as f:
             f.write("ok")
         os.remove(test_path)
-        results["data_dir_writable"] = True
-    except Exception as e:
-        results["data_dir_writable"] = False
-        results["write_error"] = str(e)
-        results["status"] = "error"
-    return jsonify(results)
+        writable = True
+    except Exception:
+        status = "error"
+    return jsonify({"status": status, "storage": "ok" if writable else "error"})
 
 
 # ── Routes publiques (élèves) ────────────────────────────────────────────────

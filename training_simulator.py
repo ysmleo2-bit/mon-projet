@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import sys
+import threading
 from datetime import datetime, date
 from dotenv import load_dotenv
 
@@ -25,6 +26,9 @@ DATA_DIR       = "/data" if os.path.isdir("/data") else BASE_DIR
 
 STUDENTS_FILE  = os.path.join(BASE_DIR, "students_config.json")
 SIM_FILE       = os.path.join(DATA_DIR, "sim_sessions.json")
+
+# Verrou global pour éviter les corruptions d'écriture concurrente
+_SIM_LOCK = threading.Lock()
 
 SEP  = "=" * 68
 SEP2 = "-" * 68
@@ -479,24 +483,26 @@ def load_sim_sessions() -> list[dict]:
 
 
 def save_sim_session(session: dict) -> None:
-    sessions = load_sim_sessions()
-    sessions.append(session)
-    with open(SIM_FILE, "w", encoding="utf-8") as f:
-        json.dump(sessions, f, ensure_ascii=False, indent=2)
+    with _SIM_LOCK:
+        sessions = load_sim_sessions()
+        sessions.append(session)
+        with open(SIM_FILE, "w", encoding="utf-8") as f:
+            json.dump(sessions, f, ensure_ascii=False, indent=2)
 
 
 def update_sim_session(session_id: str, updated: dict) -> None:
-    sessions = load_sim_sessions()
-    found = False
-    for i, s in enumerate(sessions):
-        if s["id"] == session_id:
-            sessions[i] = updated
-            found = True
-            break
-    if not found:
-        sessions.append(updated)
-    with open(SIM_FILE, "w", encoding="utf-8") as f:
-        json.dump(sessions, f, ensure_ascii=False, indent=2)
+    with _SIM_LOCK:
+        sessions = load_sim_sessions()
+        found = False
+        for i, s in enumerate(sessions):
+            if s["id"] == session_id:
+                sessions[i] = updated
+                found = True
+                break
+        if not found:
+            sessions.append(updated)
+        with open(SIM_FILE, "w", encoding="utf-8") as f:
+            json.dump(sessions, f, ensure_ascii=False, indent=2)
 
 
 def sim_stats_eleve(sim_sessions: list[dict], eleve_id: str) -> dict:
