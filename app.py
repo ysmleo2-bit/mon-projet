@@ -11,9 +11,11 @@ Usage :
 
 import argparse
 import hashlib
+import hmac
 import json
 import logging
 import os
+import re
 import threading
 import uuid
 from datetime import date, datetime, timedelta
@@ -22,17 +24,26 @@ from functools import wraps
 from dotenv import load_dotenv
 from flask import (Flask, jsonify, redirect, render_template,
                    request, session, url_for)
+from werkzeug.security import check_password_hash, generate_password_hash
 
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET", "setting-training-secret-2026")
+_secret = os.environ.get("FLASK_SECRET", "setting-training-secret-2026")
+if _secret == "setting-training-secret-2026":
+    logging.getLogger("app").warning(
+        "FLASK_SECRET non définie — clé par défaut utilisée. "
+        "Définissez FLASK_SECRET en production avec secrets.token_hex(32)."
+    )
+app.secret_key = _secret
 
 # ── Sécurité cookies ─────────────────────────────────────────────────────────
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-# Secure uniquement en production (HTTPS)
-app.config["SESSION_COOKIE_SECURE"] = os.environ.get("RAILWAY_ENVIRONMENT") is not None
+app.config["SESSION_COOKIE_SECURE"] = (
+    os.environ.get("RAILWAY_ENVIRONMENT") is not None
+    or os.environ.get("PRODUCTION") == "1"
+)
 
 # ── Rate-limiting login (in-memory, par IP) ──────────────────────────────────
 _login_attempts: dict = {}   # { ip: [timestamp, ...] }
@@ -48,6 +59,8 @@ def _is_rate_limited(ip: str) -> bool:
         attempts.append(now)
         _login_attempts[ip] = attempts
         return len(attempts) > _MAX_ATTEMPTS
+
+_SESSION_ID_RE = re.compile(r'^sim_\d{8}_\d{6}_[a-zA-Z0-9_-]{1,32}$')
 
 # Démarrage de l'agent GDoc en background (une seule fois, pas avec le reloader Flask)
 try:
@@ -68,9 +81,13 @@ ACTIVE_FILE    = os.path.join(DATA_DIR, "active_sessions.json")
 FEEDBACK_FILE  = os.path.join(DATA_DIR, "feedback.json")
 CONV_DIR = os.path.join(DATA_DIR, "active_convs")
 
-COACH_EMAIL    = os.environ.get("COACH_EMAIL", "leo")
-COACH_PASSWORD = os.environ.get("COACH_PASSWORD", "coach2026")
+COACH_EMAIL      = os.environ.get("COACH_EMAIL", "leo")
+COACH_PASSWORD   = os.environ.get("COACH_PASSWORD", "coach2026")
 INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "rivia-internal-2026")
+if COACH_PASSWORD == "coach2026":
+    logging.getLogger("app").warning(
+        "COACH_PASSWORD utilise la valeur par défaut. Définissez-la via COACH_PASSWORD."
+    )
 
 # ── Import des données du simulateur ────────────────────────────────────────
 from training_simulator import (
@@ -171,8 +188,15 @@ def update_feedback_status(fb_id, statut):
 
 
 def _conv_path(session_id: str) -> str:
+    """Retourne le chemin du fichier conv après validation stricte du format."""
+    if not _SESSION_ID_RE.match(session_id):
+        raise ValueError(f"session_id invalide : {session_id!r}")
     os.makedirs(CONV_DIR, exist_ok=True)
-    return os.path.join(CONV_DIR, f"{session_id}.json")
+    path = os.path.join(CONV_DIR, f"{session_id}.json")
+    # Vérification supplémentaire contre path traversal
+    if not os.path.realpath(path).startswith(os.path.realpath(CONV_DIR)):
+        raise ValueError("Path traversal détecté")
+    return path
 
 
 def _load_conv(session_id: str) -> dict:
@@ -264,8 +288,21 @@ def _evaluate_and_save(session_id: str, sim_session: dict, conversation: list,
 
 # ── Auth helpers ─────────────────────────────────────────────────────────────
 
-def hash_password(password):
+def hash_password(password: str) -> str:
+    """Hache un mot de passe avec scrypt via werkzeug (salé, étirable)."""
+    return generate_password_hash(password, method="scrypt")
+
+
+def _sha256(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
+
+
+def verify_password(stored_hash: str, password: str) -> bool:
+    """Vérifie un MDP — supporte les anciens hashes SHA-256 et les nouveaux werkzeug."""
+    if stored_hash.startswith("scrypt:") or stored_hash.startswith("pbkdf2:"):
+        return check_password_hash(stored_hash, password)
+    # Ancien format SHA-256 — comparaison en temps constant
+    return hmac.compare_digest(stored_hash, _sha256(password))
 
 
 def login_required(f):
@@ -352,9 +389,14 @@ def login():
         accounts = load_accounts()
         account  = next((a for a in accounts if a["email"] == email), None)
 
-        if not account or account.get("password_hash") != hash_password(password):
+        if not account or not verify_password(account.get("password_hash", ""), password):
             error = "Email ou mot de passe incorrect."
         else:
+            # Migration silencieuse SHA-256 → scrypt
+            stored = account.get("password_hash", "")
+            if not (stored.startswith("scrypt:") or stored.startswith("pbkdf2:")):
+                account["password_hash"] = hash_password(password)
+                save_accounts(accounts)
             session["user_id"]    = account["id"]
             session["user_nom"]   = account["nom"]
             session["user_email"] = account["email"]
@@ -399,6 +441,8 @@ def index():
 @login_required
 def start_session():
     niche    = request.form.get("niche") or NICHES[0]
+    if niche not in NICHES:
+        niche = NICHES[0]
     traffic  = request.form.get("traffic", "b2c")
     awareness = request.form.get("awareness", "chaud")
     if traffic not in TRAFFIC_TYPES:
@@ -484,7 +528,7 @@ def chat():
 
 @app.route("/send", methods=["POST"])
 def send_message():
-    if "eleve" not in session:
+    if "eleve" not in session or "user_id" not in session:
         return jsonify({"error": "Session expirée"}), 401
 
     data = request.get_json(silent=True)
@@ -521,7 +565,8 @@ def send_message():
     try:
         reply = get_prospect_reply(client, api_window, sys_prompt)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logging.getLogger("app").error(f"get_prospect_reply error: {e}", exc_info=True)
+        return jsonify({"error": "Une erreur est survenue. Réessaie dans quelques secondes."}), 500
 
     api_messages.append({"role": "assistant", "content": reply})
     conversation.append({
@@ -646,9 +691,16 @@ def results():
 @app.route("/api/result-status/<session_id>")
 @login_required
 def api_result_status(session_id):
+    # Validation stricte du format session_id (évite path traversal)
+    if not _SESSION_ID_RE.match(session_id):
+        return jsonify({"status": "not_found"}), 404
     sim_sessions = load_sim_sessions()
     s = next((x for x in sim_sessions if x["id"] == session_id), None)
     if not s:
+        return jsonify({"status": "not_found"}), 404
+    # Ownership check : seul le propriétaire ou le coach peut consulter
+    user_id = session.get("user_id")
+    if not session.get("coach_logged_in") and s.get("eleve_id") != user_id:
         return jsonify({"status": "not_found"}), 404
     return jsonify({"status": s.get("status", "ready")})
 
@@ -662,11 +714,18 @@ def coach_login():
 
     error = None
     if request.method == "POST":
+        ip = request.remote_addr or "unknown"
+        if _is_rate_limited(ip):
+            error = "Trop de tentatives. Réessaie dans quelques minutes."
+            return render_template("coach_login.html", error=error), 429
+
         email    = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
 
-        if (email == COACH_EMAIL.lower() and
-                hash_password(password) == hash_password(COACH_PASSWORD)):
+        # Comparaison en temps constant (évite timing oracle)
+        email_ok    = hmac.compare_digest(email, COACH_EMAIL.lower())
+        password_ok = hmac.compare_digest(_sha256(password), _sha256(COACH_PASSWORD))
+        if email_ok and password_ok:
             session["coach_logged_in"] = True
             session["user_id"]         = "coach"
             session["user_nom"]        = "Coach"
@@ -916,7 +975,7 @@ def api_dashboard():
 
 @app.route("/api/internal/feedbacks")
 def api_internal_feedbacks():
-    key = request.args.get("key") or request.headers.get("X-Internal-Key")
+    key = request.headers.get("X-Internal-Key")
     if key != INTERNAL_API_KEY:
         return jsonify({"error": "Unauthorized"}), 401
     items = sorted(load_feedback(), key=lambda x: x.get("created_at", ""), reverse=True)
@@ -930,7 +989,7 @@ def api_internal_feedbacks():
 
 @app.route("/api/internal/feedback/<fb_id>/resolve", methods=["POST"])
 def api_internal_feedback_resolve(fb_id):
-    key = request.args.get("key") or request.headers.get("X-Internal-Key")
+    key = request.headers.get("X-Internal-Key")
     if key != INTERNAL_API_KEY:
         return jsonify({"error": "Unauthorized"}), 401
     update_feedback_status(fb_id, "résolu")

@@ -300,6 +300,7 @@ a:hover { text-decoration: underline; }
   font-size: .92rem;
   line-height: 1.5;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 .msg-eleve .msg-bubble {
   background: var(--accent);
