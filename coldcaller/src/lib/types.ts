@@ -15,7 +15,7 @@ export interface Lead {
   notes: string;
   lastContact?: string;   // ISO date
   rdvDate?: string;       // ISO date
-  source: "google_maps" | "manual" | "import";
+  source: "google_maps" | "manual" | "import" | "openstreetmap";
   detectedAt: string;
   callCount: number;
 }

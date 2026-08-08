@@ -1,74 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbUpsertLeads } from "@/lib/db";
+import { geocodeCity, searchOverpass, osmToLead } from "@/lib/overpass";
 import type { Lead } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-// Noms réalistes par secteur
-const NAMES_BY_CAT: Record<string, string[]> = {
-  Plombier:      ["Dupont Plomberie","Martin Sanitaire","Lefèvre Plomb","Bernard Eau","Rousseau Plomb"],
-  Électricien:   ["Élec Martin","Voltaire Elec","Girard Électricité","Petit Courant","Simon Elec"],
-  Maçon:         ["Maçonnerie Blanc","Bâtisseurs Moreau","Murs & Co","Bernard TP","Solide Béton"],
-  Serrurier:     ["Serrurier Express","Cléo Serrurerie","Ouverture Rapide","Fontaine Serrures","24h Serrurerie"],
-  Peintre:       ["Peinture Élégance","Couleurs Moreau","Décor Dubois","Peint'Art","Brosse & Co"],
-  Couvreur:      ["Toitures Bernard","Ardoise & Tuile","Couverture Martin","Sous la Pluie","Toits du Rhône"],
-  Carreleur:     ["Carrelage Fontaine","Mosaïc Pro","Sol & Mur","Granit Pose","Carrel'Art"],
-  Menuisier:     ["Menuiserie Girard","Bois & Design","Ébénisterie Petit","Chêne & Noyer","Artisans du Bois"],
-  Chauffagiste:  ["Chauffage Rousseau","Clim & Chauf","Confort Thermique","Chaleur Pro","Héat Expert"],
-  Paysagiste:    ["Paysages Blanc","Vert Nature","Jardins du Rhône","Espaces Verts Pro","Flore & Jardin"],
-  Nettoyage:     ["Nettoyage Pro","Éclat Net","Shine & Clean","Propreté Martin","Net Express"],
-  Restaurant:    ["Le Bistrot du Coin","La Table Française","Chez Marco","Le Gourmet","Saveurs & Co"],
-  Boulangerie:   ["Boulangerie Dupont","Au Bon Pain","La Mie Dorée","Pains Artisanaux","Farine & Beurre"],
-  Coiffeur:      ["Coiff'Art","Les Ciseaux d'Or","Hair Studio","Atelier Cheveux","Coiffure Élégance"],
-  Comptable:     ["Cabinet Legrand","Chiffres & Co","Expert Compta","Fiscal Pro","Révision Comptable"],
-};
-
-const STREETS = [
-  "rue de la Paix","avenue du Général de Gaulle","boulevard Victor Hugo",
-  "chemin des Acacias","impasse des Lilas","rue Gambetta","avenue Foch",
-  "rue du Commerce","place de la République","rue de la Liberté",
-  "avenue Jean Jaurès","rue Henri IV","boulevard des Brotteaux",
-];
-
-function phone(): string {
-  const parts = [
-    "06","07"
-  ][Math.floor(Math.random()*2)];
-  const tail = Array.from({length:4},()=>String(Math.floor(10+Math.random()*90))).join(" ");
-  return `${parts} ${tail}`;
-}
-
-function generateLeads(niche: string, city: string, count: number): Lead[] {
-  const pool  = NAMES_BY_CAT[niche] ?? [`${niche} Expert`];
-  const now   = new Date().toISOString();
-  const leads: Lead[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const baseName = pool[i % pool.length];
-    const suffix   = i >= pool.length ? ` ${i + 1}` : "";
-    const hasWeb   = Math.random() > 0.45;
-    leads.push({
-      id:           `sc-${Date.now()}-${i}`,
-      name:         baseName + suffix,
-      category:     niche,
-      phone:        phone(),
-      address:      `${Math.floor(1+Math.random()*200)} ${STREETS[i%STREETS.length]}`,
-      city,
-      rating:       Math.round((3.2 + Math.random() * 1.8) * 10) / 10,
-      reviewCount:  Math.floor(3 + Math.random() * 600),
-      website:      hasWeb ? `${baseName.toLowerCase().replace(/[^a-z0-9]/g,"-").replace(/-+/g,"-")}.fr` : undefined,
-      status:       "new",
-      notes:        "",
-      detectedAt:   now,
-      source:       "google_maps",
-      callCount:    0,
-    });
-  }
-  return leads;
-}
-
 // POST /api/scrape
-// Body: { niche, city, radius, minRating }
+// Body: { niche, city, radius (km), minRating }
 export async function POST(req: NextRequest) {
   const { niche, city, radius = 20, minRating = 0 } = await req.json();
 
@@ -76,19 +14,41 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "niche and city are required" }, { status: 400 });
   }
 
-  // Simule un délai réseau réaliste (scraping)
-  await new Promise((r) => setTimeout(r, 1200 + Math.random() * 800));
+  // ── 1. Géocoder la ville ──────────────────────────────────────────────────
+  const coords = await geocodeCity(city);
+  if (!coords) {
+    return NextResponse.json({ error: `Ville introuvable : ${city}` }, { status: 422 });
+  }
 
-  const raw   = generateLeads(niche, city, Math.floor(60 + Math.random() * 440));
-  const leads = raw.filter((l) => l.rating >= minRating);
+  // ── 2. Requête Overpass ───────────────────────────────────────────────────
+  const radiusM   = Math.round(radius * 1000); // km → mètres
+  const elements  = await searchOverpass(coords.lat, coords.lon, radiusM, niche, 150);
 
-  // Persister automatiquement dans la DB
-  dbUpsertLeads(leads);
+  // ── 3. Mapper OSM → Lead ──────────────────────────────────────────────────
+  const allLeads: Lead[] = [];
+  for (const el of elements) {
+    const lead = osmToLead(el, niche, city);
+    if (lead) allLeads.push(lead);
+  }
+
+  // Déduplication par id OSM (au cas où)
+  const seen  = new Set<string>();
+  const leads: Lead[] = [];
+  for (const l of allLeads) {
+    if (!seen.has(l.id)) { seen.add(l.id); leads.push(l); }
+  }
+
+  // Filtrer par note min si demandé (OSM n'a pas de notes, on ignore dans ce cas)
+  const filtered = minRating > 0 ? leads.filter((l) => l.rating >= minRating) : leads;
+
+  // ── 4. Persister dans la DB ───────────────────────────────────────────────
+  if (filtered.length) dbUpsertLeads(filtered);
 
   return NextResponse.json({
-    leads,
-    total:  leads.length,
-    query:  { niche, city, radius, minRating },
-    source: "google_maps_simulation",
+    leads:   filtered,
+    total:   filtered.length,
+    query:   { niche, city, radius, minRating },
+    source:  "openstreetmap",
+    coords,
   });
 }
