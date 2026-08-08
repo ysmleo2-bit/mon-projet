@@ -11,71 +11,9 @@ import Navbar from "@/components/Navbar";
 import { NICHES, CITIES } from "@/lib/mock-data";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { clientGeocode, clientSearchOsm, clientSearchSirene } from "@/lib/search-client";
 
 type SortKey = "rating" | "reviews" | "name";
-
-// ── Types + helpers Overpass (appelé côté navigateur) ────────────────────────
-interface OsmElement {
-  type: "node" | "way" | "relation"; id: number;
-  lat?: number; lon?: number;
-  center?: { lat: number; lon: number };
-  tags?: Record<string, string>;
-}
-
-const OSM_TAGS: Record<string, string[]> = {
-  Plombier:["craft=plumber","craft=hvac_technician"],Électricien:["craft=electrician"],
-  Maçon:["craft=mason","craft=construction","craft=bricklayer"],
-  Serrurier:["craft=locksmith","shop=locksmith"],Peintre:["craft=painter"],
-  Couvreur:["craft=roofer"],Carreleur:["craft=tiler","craft=floor_layer"],
-  Menuisier:["craft=carpenter","craft=joiner"],Chauffagiste:["craft=hvac_technician","craft=heating_engineer"],
-  Paysagiste:["craft=gardener"],Nettoyage:["shop=cleaning_service"],
-  Restaurant:["amenity=restaurant","amenity=fast_food","amenity=cafe"],
-  Boulangerie:["shop=bakery","craft=bakery"],Coiffeur:["shop=hairdresser","shop=beauty"],
-  Comptable:["office=accountant","office=tax_advisor"],
-};
-const OSM_KW: Record<string, string> = {
-  Plombier:"plombier|plomberie",Électricien:"électricien|electricien",
-  Maçon:"maçon|maçonnerie",Serrurier:"serrurier|serrurerie",Peintre:"peintre|peinture",
-  Couvreur:"couvreur|toiture",Carreleur:"carreleur|carrelage",
-  Menuisier:"menuisier|menuiserie",Chauffagiste:"chauffagiste|chauffage",
-  Paysagiste:"paysagiste|jardinage",Nettoyage:"nettoyage|propreté",
-  Restaurant:"restaurant|brasserie",Boulangerie:"boulangerie|boulanger",
-  Coiffeur:"coiffeur|barbier",Comptable:"comptable|comptabilité",
-};
-
-function buildOverpassQuery(lat: number, lon: number, radiusM: number, niche: string): string {
-  const r   = Math.min(radiusM, 40000);
-  const kw  = OSM_KW[niche] ?? "";
-  const parts: string[] = [];
-  for (const tag of (OSM_TAGS[niche] ?? [])) {
-    const [k,v] = tag.split("=");
-    parts.push(`node["${k}"="${v}"](around:${r},${lat},${lon});`);
-    parts.push(`way["${k}"="${v}"](around:${r},${lat},${lon});`);
-  }
-  if (kw) {
-    parts.push(`node["name"~"${kw}",i](around:${r},${lat},${lon});`);
-    parts.push(`way["name"~"${kw}",i](around:${r},${lat},${lon});`);
-  }
-  if (!parts.length) return "";
-  return `data=${encodeURIComponent(`[out:json][timeout:25][maxsize:6000000];\n(\n${parts.join("\n")}\n);\nout center tags 200;`)}`;
-}
-
-function osmElementToLead(el: OsmElement, niche: string, city: string): Lead | null {
-  const t = el.tags ?? {};
-  const name = t.name ?? t["name:fr"] ?? t.operator ?? null;
-  if (!name) return null;
-  const phone = t.phone ?? t["contact:phone"] ?? t["contact:mobile"] ?? null;
-  const lat = el.lat ?? el.center?.lat;
-  const lon = el.lon ?? el.center?.lon;
-  const addr = [t["addr:housenumber"],t["addr:street"]].filter(Boolean).join(" ") || t["addr:full"] || `${lat?.toFixed(4)??""}, ${lon?.toFixed(4)??""}`;
-  const website = (t.website ?? t["contact:website"])?.replace(/^https?:\/\//,"");
-  return {
-    id:`osm-${el.type}-${el.id}`,name,category:niche,
-    phone: phone ? phone.replace(/^\+33\s?/,"0").replace(/\s+/g," ").trim() : "(pas de tél.)",
-    address:addr,city,rating:0,reviewCount:0,website,status:"new",notes:"",
-    detectedAt:new Date().toISOString(),source:"openstreetmap",callCount:0,
-  };
-}
 
 // ── Badge téléphone ───────────────────────────────────────────────────────────
 function PhoneBadge({ phone }: { phone: string }) {
@@ -107,7 +45,7 @@ export default function LeadsPage() {
   const [detailLead, setDetailLead] = useState<Lead | null>(null);
   const [error,      setError]      = useState<string | null>(null);
 
-  // ── Recherche hybride : Geocode+SIRENE server-side (rapide), OSM client-side ─
+  // ── Recherche 100 % navigateur — aucun timeout Vercel possible ────────────
   const handleSearch = useCallback(async () => {
     setLoading(true);
     setSearched(true);
@@ -118,67 +56,37 @@ export default function LeadsPage() {
     setError(null);
     setProgress(10);
 
-    const interval = setInterval(() => setProgress((p) => Math.min(p + 4, 80)), 250);
+    const interval = setInterval(() => setProgress((p) => Math.min(p + 4, 82)), 300);
 
     try {
-      // ── 1. Geocodage (route rapide, < 2 s) ────────────────────────────────
-      const geoRes = await fetch("/api/geocode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city }),
-      });
-
-      if (!geoRes.ok) {
-        setError(`Ville introuvable : ${city}`);
-        setLeads([]);
+      // 1. Géocodage — api-adresse.data.gouv.fr (CORS natif, API officielle FR)
+      const geo = await clientGeocode(city);
+      if (!geo) {
+        setError(`Ville introuvable : "${city}". Essaie une autre ville.`);
         return;
       }
-      const geo = await geoRes.json() as { lat: number; lon: number; dept?: string };
-      setProgress(30);
+      setProgress(25);
 
-      // ── 2. SIRENE via serveur (rapide, < 5 s) + OSM via navigateur ─────────
-      const osmPromise: Promise<Lead[]> = fetch("https://overpass-api.de/api/interpreter", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: buildOverpassQuery(geo.lat, geo.lon, radius * 1000, niche),
-      })
-        .then((r) => r.json())
-        .then((j: { elements: OsmElement[] }) =>
-          (j.elements ?? []).map((el) => osmElementToLead(el, niche, city)).filter(Boolean) as Lead[]
-        )
-        .catch(() => [] as Lead[]);
+      // 2. Annuaire des Entreprises + OpenStreetMap en parallèle (CORS *)
+      const [sireneLeads, osmLeads] = await Promise.all([
+        clientSearchSirene(niche, geo.dept, geo.lat, geo.lon, radius),
+        clientSearchOsm(geo.lat, geo.lon, radius * 1000, niche, city),
+      ]);
+      setProgress(95);
 
-      const sireneRes = await fetch("/api/scrape-sirene", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dept: geo.dept, lat: geo.lat, lon: geo.lon, radius, niche }),
-      });
-      const sireneData = sireneRes.ok ? await sireneRes.json() : { leads: [] };
-      const sireneLeads: Lead[] = sireneData.leads ?? [];
-      setProgress(70);
+      // 3. Fusionner — OSM en priorité (a les téléphones)
+      const seen = new Map<string, Lead>();
+      for (const l of osmLeads)    seen.set(l.id, l);
+      for (const l of sireneLeads) if (!seen.has(l.id)) seen.set(l.id, l);
 
-      // Afficher d'abord les leads SIRENE (disponibles maintenant)
-      const seenMap = new Map<string, Lead>();
-      for (const l of sireneLeads) seenMap.set(l.id, l);
-
-      const sireneFinal = minRating > 0
-        ? sireneLeads.filter((l) => l.rating >= minRating)
-        : sireneLeads;
-      setLeads(sireneFinal);
-      setStats({ osm: 0, sirene: sireneLeads.length });
-      setProgress(80);
-
-      // ── 3. Attendre OSM et fusionner ─────────────────────────────────────
-      const osmLeads = await osmPromise;
-      for (const l of osmLeads) seenMap.set(l.id, l);
-      const all = Array.from(seenMap.values());
+      const all      = Array.from(seen.values());
       const filtered = minRating > 0 ? all.filter((l) => l.rating >= minRating) : all;
 
       setLeads(filtered);
       setStats({ osm: osmLeads.length, sirene: sireneLeads.length });
       setProgress(100);
 
-      // ── 4. Sauvegarder en DB ──────────────────────────────────────────────
+      // 4. Sauvegarder en DB en arrière-plan
       if (filtered.length) {
         fetch("/api/leads", {
           method: "POST",
@@ -187,8 +95,8 @@ export default function LeadsPage() {
         }).catch(() => {});
       }
     } catch (e) {
-      console.error("Erreur :", e);
-      setError("Erreur lors de la recherche. Vérifiez votre connexion.");
+      console.error("Erreur recherche :", e);
+      setError("Erreur lors de la recherche. Vérifiez votre connexion internet.");
     } finally {
       clearInterval(interval);
       setLoading(false);
