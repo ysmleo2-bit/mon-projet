@@ -15,6 +15,31 @@ import { clientGeocode, clientSearchOsm, clientSearchSirene } from "@/lib/search
 
 type SortKey = "phone" | "rating" | "reviews" | "name";
 
+// ── Enrichissement téléphone depuis le site web ───────────────────────────────
+async function enrichPhones(
+  leadsToEnrich: { id: string; website: string }[],
+  onFound: (id: string, phone: string) => void
+) {
+  // Par batch de 5 simultanés pour ne pas surcharger
+  const BATCH = 5;
+  for (let i = 0; i < leadsToEnrich.length; i += BATCH) {
+    const batch = leadsToEnrich.slice(i, i + BATCH);
+    await Promise.all(
+      batch.map(async ({ id, website }) => {
+        try {
+          const res = await fetch("/api/enrich-phone", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: website }),
+          });
+          const data = await res.json();
+          if (data.phone) onFound(id, data.phone);
+        } catch { /* silencieux */ }
+      })
+    );
+  }
+}
+
 // ── Badge téléphone ───────────────────────────────────────────────────────────
 function PhoneBadge({ phone }: { phone: string }) {
   if (!phone) {
@@ -65,7 +90,9 @@ export default function LeadsPage() {
   const [progress,   setProgress]   = useState(0);
   const [sortBy,     setSortBy]     = useState<SortKey>("phone");
   const [stats,      setStats]      = useState<{ osm: number; sirene: number; withPhone: number } | null>(null);
-  const [showOnlyPhone, setShowOnlyPhone] = useState(false);
+  const [showOnlyPhone,  setShowOnlyPhone]  = useState(false);
+  const [enriching,      setEnriching]      = useState(false);
+  const [enrichedCount,  setEnrichedCount]  = useState(0);
 
   // ── Sélection multiple ────────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -86,6 +113,8 @@ export default function LeadsPage() {
     setStats(null);
     setError(null);
     setProgress(10);
+    setEnriching(false);
+    setEnrichedCount(0);
 
     const interval = setInterval(() => setProgress((p) => Math.min(p + 4, 82)), 300);
 
@@ -117,6 +146,7 @@ export default function LeadsPage() {
       setLeads(filtered);
       setStats({ osm: osmLeads.length, sirene: sireneLeads.length, withPhone });
       setProgress(100);
+      setEnrichedCount(0);
 
       // 4. Sauvegarder en DB en arrière-plan
       if (filtered.length) {
@@ -125,6 +155,24 @@ export default function LeadsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(filtered),
         }).catch(() => {});
+      }
+
+      // 5. Enrichissement téléphone depuis sites web (en arrière-plan)
+      const toEnrich = filtered.filter((l) => !l.phone && l.website);
+      if (toEnrich.length > 0) {
+        setEnriching(true);
+        enrichPhones(
+          toEnrich.map((l) => ({ id: l.id, website: l.website! })),
+          (id, phone) => {
+            setLeads((prev) =>
+              prev.map((l) => l.id === id ? { ...l, phone } : l)
+            );
+            setStats((prev) =>
+              prev ? { ...prev, withPhone: prev.withPhone + 1 } : prev
+            );
+            setEnrichedCount((n) => n + 1);
+          }
+        ).finally(() => setEnriching(false));
       }
     } catch (e) {
       console.error("Erreur recherche :", e);
@@ -286,9 +334,11 @@ export default function LeadsPage() {
                 <Loader2 className="w-6 h-6 animate-spin text-brand-400 mx-auto mb-3" />
                 <p className="text-white font-semibold mb-1">Extraction en cours…</p>
                 <p className="text-xs text-white/40">
-                  {progress < 30 ? "Géolocalisation de la ville…"
-                    : progress < 75 ? "Annuaire des Entreprises + OpenStreetMap…"
-                    : "Finalisation et tri par téléphone…"}
+                  {progress < 30
+                    ? "Géolocalisation de la ville…"
+                    : progress < 75
+                    ? "OpenStreetMap · Annuaire des Entreprises…"
+                    : "Tri par téléphone · enrichissement depuis sites web…"}
                 </p>
                 <div className="mt-3 h-1.5 bg-white/[0.06] rounded-full overflow-hidden max-w-xs mx-auto">
                   <div className="h-full bg-brand-500 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
@@ -314,12 +364,23 @@ export default function LeadsPage() {
                       {sortedAndFiltered.length} résultat{sortedAndFiltered.length !== 1 ? "s" : ""}
                     </span>
                     {stats && (
-                      <span className="flex items-center gap-2 text-xs">
+                      <span className="flex items-center gap-2 text-xs flex-wrap">
                         <span className="flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5 text-emerald-400">
                           <Phone className="w-3 h-3" /> {stats.withPhone} avec tél.
                         </span>
-                        {stats.osm > 0 && <span className="text-brand-400/60">{stats.osm} OSM</span>}
-                        {stats.sirene > 0 && <span className="text-amber-400/60">{stats.sirene} Annuaire</span>}
+                        {enriching && (
+                          <span className="flex items-center gap-1 text-brand-400/70 animate-pulse">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Enrichissement tél. en cours…
+                          </span>
+                        )}
+                        {!enriching && enrichedCount > 0 && (
+                          <span className="text-emerald-400/60 text-[10px]">
+                            +{enrichedCount} tél. trouvé{enrichedCount > 1 ? "s" : ""} via sites web
+                          </span>
+                        )}
+                        {stats.osm > 0 && <span className="text-white/20">{stats.osm} OSM</span>}
+                        {stats.sirene > 0 && <span className="text-white/20">{stats.sirene} Annuaire</span>}
                       </span>
                     )}
                     {/* Filtre téléphone */}
