@@ -436,42 +436,119 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto p-4 space-y-3">
 
-            {/* Coordonnées */}
-            <div className="p-4 space-y-3 border-b border-white/[0.06]">
-              <ContactRow icon={<Phone className="w-3.5 h-3.5 text-brand-400" />} iconBg="bg-brand-500/15" label="Téléphone">
-                <a href={`tel:${selected.phone.replace(/\s/g, "")}`}
-                  className="text-sm font-mono text-brand-300 hover:text-brand-200">{selected.phone}</a>
-              </ContactRow>
+            {/* ── Grandes cartes de contact ── */}
+            <BigContactCard
+              icon={<Phone className="w-5 h-5 text-white" />}
+              iconBg="bg-brand-500"
+              label="Téléphone">
+              <a href={`tel:${selected.phone.replace(/\s/g, "")}`}
+                className="text-base font-semibold text-white hover:text-brand-200 break-all">
+                {selected.phone}
+              </a>
+            </BigContactCard>
 
-              {selected.email && (
-                <ContactRow icon={<Mail className="w-3.5 h-3.5 text-violet-400" />} iconBg="bg-violet-500/15" label="Email">
-                  <a href={`mailto:${selected.email}`}
-                    className="text-xs text-violet-300 hover:text-violet-200 break-all">{selected.email}</a>
-                </ContactRow>
-              )}
+            {selected.email && (
+              <BigContactCard
+                icon={<Mail className="w-5 h-5 text-white" />}
+                iconBg="bg-sky-500"
+                label="Email">
+                <a href={`mailto:${selected.email}`}
+                  className="text-base font-semibold text-white hover:text-sky-200 break-all">
+                  {selected.email}
+                </a>
+              </BigContactCard>
+            )}
 
-              <ContactRow icon={<MapPin className="w-3.5 h-3.5 text-white/40" />} iconBg="bg-white/[0.06]" label="Ville">
-                <span className="text-sm text-white/70">{selected.city}</span>
-              </ContactRow>
+            <BigContactCard
+              icon={<MapPin className="w-5 h-5 text-white" />}
+              iconBg="bg-violet-500"
+              label="Ville">
+              <span className="text-base font-semibold text-white">{selected.city}</span>
+            </BigContactCard>
 
-              {selected.website && (
-                <ContactRow icon={<Globe className="w-3.5 h-3.5 text-white/40" />} iconBg="bg-white/[0.06]" label="Site">
-                  <a href={`https://${selected.website}`} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-brand-400 hover:underline truncate">{selected.website}</a>
-                </ContactRow>
-              )}
+            {selected.website && (
+              <BigContactCard
+                icon={<Globe className="w-5 h-5 text-white" />}
+                iconBg="bg-slate-500"
+                label="Site web">
+                <a href={`https://${selected.website}`} target="_blank" rel="noopener noreferrer"
+                  className="text-sm font-semibold text-white hover:text-brand-200 break-all">
+                  {selected.website}
+                </a>
+              </BigContactCard>
+            )}
+
+            {/* ── Notes ── */}
+            <div>
+              <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2">Notes</p>
+              {selected.notes ? (
+                <div className="rounded-2xl bg-white/[0.06] border border-white/[0.08] p-4 text-sm text-white/75 leading-relaxed mb-2">
+                  {selected.notes}
+                </div>
+              ) : null}
+              <textarea
+                value={noteInput}
+                onChange={(e) => setNoteInput(e.target.value)}
+                placeholder="Ajouter une note…"
+                rows={3}
+                className="input text-sm resize-none rounded-2xl"
+              />
+              <button onClick={() => saveNote(selected.id)} disabled={saving}
+                className="mt-2 w-full text-sm btn-primary py-2.5 flex items-center justify-center gap-1.5 rounded-xl">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {saving ? "Sauvegarde…" : "Sauvegarder"}
+              </button>
             </div>
 
-            {/* Changer statut */}
-            <div className="p-4 border-b border-white/[0.06]">
-              <p className="text-[9px] text-white/25 uppercase tracking-wider mb-2">Déplacer vers</p>
-              <div className="grid grid-cols-3 gap-1">
+            {/* ── Historique d'appels ── */}
+            {(selected.callHistory?.length ?? 0) > 0 && (
+              <div>
+                <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2">
+                  Historique d&apos;appels
+                </p>
+                <div className="space-y-2">
+                  {[...(selected.callHistory ?? [])].reverse().map((rec, i) => {
+                    const oc = OUTCOME_LABELS[rec.outcome] ?? { label: rec.outcome, color: "text-white/40" };
+                    return (
+                      <div key={i} className="rounded-2xl bg-white/[0.06] border border-white/[0.08] px-4 py-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-white/50">
+                            {new Date(rec.at).toLocaleDateString("fr-FR", { year:"numeric", month:"2-digit", day:"2-digit" })}
+                            {" "}{formatTime(rec.at)}
+                          </span>
+                          <span className="text-sm font-mono text-white/50 font-semibold">
+                            {formatDuration(rec.duration)}
+                          </span>
+                        </div>
+                        <span className={cn(
+                          "text-xs font-semibold px-3 py-1 rounded-full border",
+                          oc.color,
+                          // border couleur assortie
+                          rec.outcome === "interested"     ? "border-emerald-500/40 bg-emerald-500/10" :
+                          rec.outcome === "rdv"            ? "border-violet-500/40 bg-violet-500/10"   :
+                          rec.outcome === "callback"       ? "border-amber-500/40 bg-amber-500/10"     :
+                          rec.outcome === "not_interested" ? "border-red-500/40 bg-red-500/10"         :
+                                                             "border-white/[0.12] bg-white/[0.04]"
+                        )}>
+                          {oc.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Changer statut ── */}
+            <div>
+              <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2">Déplacer vers</p>
+              <div className="grid grid-cols-3 gap-1.5">
                 {(Object.entries(STATUS_CFG) as [LeadStatus, (typeof STATUS_CFG)[LeadStatus]][]).map(([id, cfg]) => (
                   <button key={id} onClick={() => moveLead(selected.id, id)}
                     className={cn(
-                      "text-[9px] font-bold py-1.5 px-1 rounded-lg border transition-all truncate",
+                      "text-[10px] font-bold py-2 px-1 rounded-xl border transition-all truncate",
                       selected.status === id
                         ? cn(cfg.bg, cfg.border, cfg.color)
                         : "border-white/[0.06] text-white/25 hover:text-white hover:border-white/20"
@@ -482,69 +559,20 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Notes */}
-            <div className="p-4 border-b border-white/[0.06]">
-              <p className="text-[9px] text-white/25 uppercase tracking-wider mb-2">Notes</p>
-              {selected.notes && (
-                <div className="glass rounded-xl p-3 mb-2 text-xs text-white/55 italic leading-relaxed">
-                  {selected.notes}
-                </div>
-              )}
-              <textarea
-                value={noteInput}
-                onChange={(e) => setNoteInput(e.target.value)}
-                placeholder="Ajouter une note…"
-                rows={3}
-                className="input text-xs resize-none"
-              />
-              <button onClick={() => saveNote(selected.id)} disabled={saving}
-                className="mt-2 w-full text-xs btn-primary py-2 flex items-center justify-center gap-1.5">
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                {saving ? "Sauvegarde…" : "Sauvegarder"}
-              </button>
-            </div>
-
-            {/* Historique d'appels */}
-            {(selected.callHistory?.length ?? 0) > 0 && (
-              <div className="p-4 border-b border-white/[0.06]">
-                <p className="text-[9px] text-white/25 uppercase tracking-wider mb-2">
-                  Historique d&apos;appels
-                </p>
-                <div className="space-y-1.5">
-                  {[...(selected.callHistory ?? [])].reverse().map((rec, i) => {
-                    const oc = OUTCOME_LABELS[rec.outcome] ?? { label: rec.outcome, color: "text-white/40" };
-                    return (
-                      <div key={i} className="glass rounded-xl p-2.5 flex items-center justify-between gap-2">
-                        <div>
-                          <p className="text-[10px] text-white/35">
-                            {formatDate(rec.at)} · {formatTime(rec.at)}
-                          </p>
-                          <p className={cn("text-[10px] font-semibold mt-0.5", oc.color)}>{oc.label}</p>
-                        </div>
-                        <span className="text-[10px] font-mono text-white/30 shrink-0">
-                          {formatDuration(rec.duration)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="p-4 space-y-2">
+            {/* ── Actions ── */}
+            <div className="space-y-2 pb-4">
               <a href={`tel:${selected.phone.replace(/\s/g, "")}`}
-                className="btn-primary flex items-center justify-center gap-2 text-sm w-full py-3">
+                className="flex items-center justify-center gap-2 text-sm w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold transition-colors">
                 <Phone className="w-4 h-4" /> Appeler maintenant
               </a>
               {selected.email && (
                 <a href={`mailto:${selected.email}`}
-                  className="btn-outline flex items-center justify-center gap-2 text-sm w-full">
+                  className="btn-outline flex items-center justify-center gap-2 text-sm w-full py-3 rounded-xl">
                   <Mail className="w-4 h-4" /> Envoyer email
                 </a>
               )}
               <a href="/app"
-                className="btn-outline flex items-center justify-center gap-2 text-xs w-full">
+                className="btn-outline flex items-center justify-center gap-2 text-xs w-full py-3 rounded-xl">
                 Interface d&apos;appel complète
               </a>
               <button onClick={() => deleteLead(selected.id)}
@@ -567,17 +595,17 @@ export default function DashboardPage() {
   );
 }
 
-// ── Composant ligne coordonnée ────────────────────────────────────────────────
-function ContactRow({ icon, iconBg, label, children }: {
+// ── Grande carte de contact ───────────────────────────────────────────────────
+function BigContactCard({ icon, iconBg, label, children }: {
   icon: React.ReactNode; iconBg: string; label: string; children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3">
-      <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5", iconBg)}>
+    <div className="flex items-center gap-4 rounded-2xl bg-white/[0.06] border border-white/[0.08] px-4 py-3.5">
+      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shrink-0", iconBg)}>
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-[9px] text-white/25 mb-0.5">{label}</p>
+        <p className="text-xs text-white/40 mb-0.5">{label}</p>
         {children}
       </div>
     </div>
