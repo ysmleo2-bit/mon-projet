@@ -1,81 +1,176 @@
 /**
- * Base de données persistante — fichier JSON sur le serveur.
- * Toutes les données survivent aux rechargements et redémarrages.
+ * db.ts — abstraction de base de données
+ * • En production (POSTGRES_URL défini) : Neon Postgres
+ * • En développement local (pas de POSTGRES_URL) : fichier JSON local
  */
-import fs   from "fs";
-import path from "path";
-import type { Lead } from "./types";
 
-const DB_DIR  = path.join(process.cwd(), "data");
-const DB_FILE = path.join(DB_DIR, "leads.json");
+import type { Lead } from "@/lib/types";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers partagés ─────────────────────────────────────────────────────────
+function newId() {
+  return `m-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
 
-function read(): { leads: Lead[] } {
-  if (!fs.existsSync(DB_DIR))  fs.mkdirSync(DB_DIR, { recursive: true });
-  if (!fs.existsSync(DB_FILE)) {
-    const seed = { leads: seedLeads() };
-    fs.writeFileSync(DB_FILE, JSON.stringify(seed, null, 2));
-    return seed;
+// ── Implémentation Postgres (Neon) ────────────────────────────────────────────
+interface PgResult { rows: Record<string, unknown>[]; rowCount: number }
+
+async function pgQuery(sql: string, params: unknown[] = []): Promise<PgResult> {
+  const { neon } = await import("@neondatabase/serverless");
+  const db  = neon(process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "");
+  const res = await db.query(sql, params);
+  // neon() returns NeonQueryResult which has rows + rowCount
+  return res as unknown as PgResult;
+}
+
+async function ensureTable() {
+  await pgQuery(`
+    CREATE TABLE IF NOT EXISTS leads (
+      id          TEXT PRIMARY KEY,
+      data        JSONB NOT NULL,
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      updated_at  TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+}
+
+// ── Implémentation JSON locale ────────────────────────────────────────────────
+function localPath() {
+  const path = require("path") as typeof import("path");
+  return path.join(process.cwd(), "data", "leads.json");
+}
+
+function readJson(): Lead[] {
+  const fs   = require("fs") as typeof import("fs");
+  const path = localPath();
+  if (!fs.existsSync(path)) {
+    fs.mkdirSync(require("path").dirname(path), { recursive: true });
+    fs.writeFileSync(path, "[]");
+    return [];
   }
-  return JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
+  try { return JSON.parse(fs.readFileSync(path, "utf-8")); }
+  catch { return []; }
 }
 
-function write(data: { leads: Lead[] }) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+function writeJson(leads: Lead[]) {
+  const fs = require("fs") as typeof import("fs");
+  fs.writeFileSync(localPath(), JSON.stringify(leads, null, 2));
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── Détection du mode ─────────────────────────────────────────────────────────
+const USE_PG = !!(process.env.POSTGRES_URL || process.env.DATABASE_URL);
 
-export function dbGetLeads(): Lead[] {
-  return read().leads;
+// ── API publique ──────────────────────────────────────────────────────────────
+
+export async function dbGetLeads(filter?: { status?: string; category?: string }): Promise<Lead[]> {
+  if (USE_PG) {
+    await ensureTable();
+    let sql = "SELECT data FROM leads";
+    const params: string[] = [];
+    const conds: string[]  = [];
+    if (filter?.status) {
+      params.push(filter.status);
+      conds.push(`data->>'status' = $${params.length}`);
+    }
+    if (filter?.category) {
+      params.push(filter.category);
+      conds.push(`data->>'category' = $${params.length}`);
+    }
+    if (conds.length) sql += " WHERE " + conds.join(" AND ");
+    sql += " ORDER BY created_at DESC";
+    const result = await pgQuery(sql, params);
+    return result.rows.map((r) => (r as { data: Lead }).data);
+  } else {
+    let leads = readJson();
+    if (filter?.status)   leads = leads.filter((l) => l.status === filter.status);
+    if (filter?.category) leads = leads.filter((l) => l.category === filter.category);
+    return leads;
+  }
 }
 
-export function dbGetLead(id: string): Lead | undefined {
-  return read().leads.find((l) => l.id === id);
+export async function dbGetLead(id: string): Promise<Lead | undefined> {
+  if (USE_PG) {
+    await ensureTable();
+    const result = await pgQuery("SELECT data FROM leads WHERE id = $1", [id]);
+    return (result.rows[0] as { data: Lead } | undefined)?.data;
+  } else {
+    return readJson().find((l) => l.id === id);
+  }
 }
 
-export function dbUpsertLeads(incoming: Lead[]): Lead[] {
-  const data  = read();
-  const byId  = new Map(data.leads.map((l) => [l.id, l]));
-  for (const lead of incoming) byId.set(lead.id, lead);
-  data.leads  = Array.from(byId.values());
-  write(data);
-  return data.leads;
+export async function dbUpsertLeads(incoming: Lead[]): Promise<Lead[]> {
+  if (USE_PG) {
+    await ensureTable();
+    for (const lead of incoming) {
+      await pgQuery(
+        `INSERT INTO leads (id, data) VALUES ($1, $2)
+         ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
+        [lead.id, JSON.stringify(lead)]
+      );
+    }
+    return incoming;
+  } else {
+    const existing = readJson();
+    const map      = new Map(existing.map((l) => [l.id, l]));
+    incoming.forEach((l) => map.set(l.id, { ...map.get(l.id), ...l }));
+    const result = Array.from(map.values());
+    writeJson(result);
+    return incoming;
+  }
 }
 
-export function dbUpdateLead(id: string, patch: Partial<Lead>): Lead | null {
-  const data = read();
-  const idx  = data.leads.findIndex((l) => l.id === id);
-  if (idx < 0) return null;
-  data.leads[idx] = { ...data.leads[idx], ...patch };
-  write(data);
-  return data.leads[idx];
+export async function dbUpdateLead(id: string, patch: Partial<Lead>): Promise<Lead | null> {
+  if (USE_PG) {
+    await ensureTable();
+    const existing = await dbGetLead(id);
+    if (!existing) return null;
+    const updated  = { ...existing, ...patch };
+    await pgQuery(
+      `UPDATE leads SET data = $2, updated_at = NOW() WHERE id = $1`,
+      [id, JSON.stringify(updated)]
+    );
+    return updated;
+  } else {
+    const leads   = readJson();
+    const idx     = leads.findIndex((l) => l.id === id);
+    if (idx === -1) return null;
+    leads[idx]    = { ...leads[idx], ...patch };
+    writeJson(leads);
+    return leads[idx];
+  }
 }
 
-export function dbDeleteLead(id: string): boolean {
-  const data = read();
-  const before = data.leads.length;
-  data.leads = data.leads.filter((l) => l.id !== id);
-  write(data);
-  return data.leads.length < before;
+export async function dbDeleteLead(id: string): Promise<boolean> {
+  if (USE_PG) {
+    await ensureTable();
+    const result = await pgQuery("DELETE FROM leads WHERE id = $1", [id]);
+    return (result.rowCount ?? 0) > 0;
+  } else {
+    const leads = readJson();
+    const next  = leads.filter((l) => l.id !== id);
+    if (next.length === leads.length) return false;
+    writeJson(next);
+    return true;
+  }
 }
 
-// ── Seed data ─────────────────────────────────────────────────────────────────
-
-function ago(min: number) { return new Date(Date.now() - min * 60_000).toISOString(); }
-
-function seedLeads(): Lead[] {
-  return [
-    { id:"s001", name:"Plomberie Dupont",      category:"Plombier",     phone:"06 12 34 56 78", address:"12 rue Victor Hugo",   city:"Lyon",        rating:4.3, reviewCount:87,  website:"plomberie-dupont.fr",    status:"new",       notes:"",                                       detectedAt:ago(5),   source:"google_maps", callCount:0 },
-    { id:"s002", name:"Électricité Martin",     category:"Électricien",  phone:"06 87 65 43 21", address:"45 av. Berthelot",     city:"Lyon",        rating:4.7, reviewCount:134, website:"elec-martin.fr",         status:"new",       notes:"",                                       detectedAt:ago(8),   source:"google_maps", callCount:0 },
-    { id:"s003", name:"Maçonnerie Lefèvre",     category:"Maçon",        phone:"06 55 44 33 22", address:"8 impasse des Lilas",  city:"Villeurbanne",rating:3.9, reviewCount:23,                                    status:"new",       notes:"",                                       detectedAt:ago(12),  source:"google_maps", callCount:0 },
-    { id:"s004", name:"Serrurier Express Lyon", category:"Serrurier",    phone:"06 11 22 33 44", address:"5 rue Garibaldi",      city:"Lyon",        rating:4.5, reviewCount:210,                                   status:"contacted", notes:"Pas répondu — rappeler en fin d'après-midi", lastContact:ago(120), detectedAt:ago(180), source:"google_maps", callCount:1 },
-    { id:"s005", name:"Peinture Moreau",        category:"Peintre",      phone:"06 99 88 77 66", address:"23 bd des Brotteaux", city:"Lyon",        rating:4.2, reviewCount:56,                                    status:"contacted", notes:"Intéressé mais occupé. Rappeler jeudi",      lastContact:ago(240), detectedAt:ago(300), source:"google_maps", callCount:2 },
-    { id:"s006", name:"Chauffage Rousseau",     category:"Chauffagiste", phone:"06 22 33 44 55", address:"6 bd Vivier-Merle",   city:"Lyon",        rating:4.6, reviewCount:189,                                   status:"interested",notes:"Veut une démo. Rappeler lundi 10h",          lastContact:ago(1440),detectedAt:ago(1500),source:"google_maps", callCount:3 },
-    { id:"s007", name:"Isolation Petit",        category:"Artisan RGE",  phone:"06 44 55 66 77", address:"14 rue Paul Bert",    city:"Lyon",        rating:4.9, reviewCount:421,                                   status:"interested",notes:"Très chaud. Envoyer offre par mail",         lastContact:ago(1080),detectedAt:ago(1200),source:"google_maps", callCount:2 },
-    { id:"s008", name:"Paysagiste Blanc",       category:"Paysagiste",   phone:"06 66 77 88 99", address:"3 chemin des Chênes", city:"Caluire",     rating:4.5, reviewCount:96,                                    status:"rdv",       notes:"RDV Teams mercredi 14h ✅",                  rdvDate:new Date(Date.now()+2*86400000).toISOString(), lastContact:ago(720), detectedAt:ago(2880), source:"google_maps", callCount:4 },
-    { id:"s009", name:"Nettoyage Pro Dubois",   category:"Nettoyage",    phone:"06 11 33 55 77", address:"7 rue Tête d'Or",    city:"Lyon",        rating:4.7, reviewCount:203,                                   status:"client",    notes:"Abonné Starter depuis 2 semaines 🎉",       lastContact:ago(7200),detectedAt:ago(10080),source:"google_maps",callCount:5 },
-    { id:"s010", name:"Plomberie Richard",      category:"Plombier",     phone:"06 22 44 66 88", address:"11 rue de Sèze",     city:"Lyon",        rating:3.6, reviewCount:12,                                    status:"lost",      notes:"Pas intéressé pour le moment",               lastContact:ago(4320),detectedAt:ago(5760), source:"google_maps", callCount:2 },
-  ];
+export async function dbAddLead(partial: Partial<Lead>): Promise<Lead> {
+  const lead: Lead = {
+    id:          partial.id ?? newId(),
+    name:        partial.name ?? "",
+    category:    partial.category ?? "",
+    phone:       partial.phone ?? "",
+    address:     partial.address ?? "",
+    city:        partial.city ?? "",
+    rating:      partial.rating ?? 0,
+    reviewCount: partial.reviewCount ?? 0,
+    website:     partial.website,
+    email:       partial.email,
+    status:      partial.status ?? "new",
+    notes:       partial.notes ?? "",
+    source:      partial.source ?? "manual",
+    detectedAt:  partial.detectedAt ?? new Date().toISOString(),
+    callCount:   partial.callCount ?? 0,
+  };
+  await dbUpsertLeads([lead]);
+  return lead;
 }

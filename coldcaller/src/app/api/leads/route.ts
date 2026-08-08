@@ -4,23 +4,20 @@ import type { Lead } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/leads
+// GET /api/leads?status=new&category=Plombier
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const status   = searchParams.get("status");
-  const category = searchParams.get("category");
+  const status   = searchParams.get("status")   ?? undefined;
+  const category = searchParams.get("category") ?? undefined;
 
-  let leads = dbGetLeads();
-  if (status)   leads = leads.filter((l) => l.status   === status);
-  if (category) leads = leads.filter((l) => l.category === category);
-
+  const leads = await dbGetLeads({ status, category });
   return NextResponse.json({ leads, total: leads.length });
 }
 
-// POST /api/leads — batch upsert (import depuis le scraper)
+// POST /api/leads — batch upsert
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const incoming: Lead[] = Array.isArray(body) ? body : [body];
-  const leads = dbUpsertLeads(incoming);
-  return NextResponse.json({ leads, total: leads.length }, { status: 201 });
+  const body = await req.json() as Lead[];
+  const leads = Array.isArray(body) ? body : [body];
+  await dbUpsertLeads(leads);
+  return NextResponse.json({ ok: true, count: leads.length });
 }

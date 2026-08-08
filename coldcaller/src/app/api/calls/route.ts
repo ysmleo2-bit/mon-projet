@@ -14,10 +14,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "leadId and outcome are required" }, { status: 400 });
   }
 
-  const existing = dbGetLead(leadId);
+  const existing = await dbGetLead(leadId);
   if (!existing) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
 
-  // Mapper outcome → statut lead
   const STATUS_MAP: Record<CallOutcome, LeadStatus> = {
     no_answer:      "contacted",
     interested:     "interested",
@@ -43,6 +42,6 @@ export async function POST(req: NextRequest) {
     callHistory: [...(existing.callHistory ?? []), record],
   };
 
-  const lead = dbUpdateLead(leadId, patch);
+  const lead = await dbUpdateLead(leadId, patch);
   return NextResponse.json({ lead, duration });
 }
