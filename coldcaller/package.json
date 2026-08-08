@@ -10,9 +10,12 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@sparticuz/chromium-min": "^149.0.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.30.0",
     "next": "14.2.35",
+    "playwright-core": "^1.62.1",
+    "puppeteer-core": "^25.5.0",
     "react": "^18",
     "react-dom": "^18",
     "tailwind-merge": "^3.6.0"

@@ -1,9 +1,29 @@
 /**
- * search-client.ts — scraping 100 % navigateur (CORS OK pour toutes les sources)
- * • api-adresse.data.gouv.fr  → géocodage (officiel français, rapide, CORS)
+ * search-client.ts — scraping côté navigateur + appels aux routes API
+ * • /api/scrape-maps          → Google Maps (Playwright bot ou Google Places API)
+ * • api-adresse.data.gouv.fr  → géocodage officiel français
  * • recherche-entreprises.api.gouv.fr → Annuaire des Entreprises (CORS)
- * • overpass-api.de           → OpenStreetMap (CORS: *)
+ * • overpass-api.de           → OpenStreetMap (CORS *)
  */
+
+// ── Google Maps (via notre bot serveur) ───────────────────────────────────────
+export async function clientSearchMaps(
+  niche: string, city: string, radius: number, maxResults = 20
+): Promise<Lead[]> {
+  try {
+    const res = await fetch("/api/scrape-maps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ niche, city, radius, maxResults }),
+      signal: AbortSignal.timeout(55_000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as { leads: Lead[] };
+    return data.leads ?? [];
+  } catch {
+    return [];
+  }
+}
 
 import type { Lead } from "@/lib/types";
 
