@@ -5,6 +5,8 @@ import { searchSirene } from "@/lib/sirene";
 import type { Lead } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+// Vercel Pro : 60 s max — on fixe 55 s pour laisser de la marge
+export const maxDuration = 55;
 
 export async function POST(req: NextRequest) {
   const { niche, city, radius = 20, minRating = 0 } = await req.json();
@@ -22,28 +24,32 @@ export async function POST(req: NextRequest) {
   const radiusM  = radius * 1000;
 
   // ── 2. Sources en parallèle : OSM + Annuaire des Entreprises ─────────────
-  const [osmElements, sireneLeads] = await Promise.allSettled([
-    searchOverpass(coords.lat, coords.lon, radiusM, niche, 200),
-    searchSirene(niche, coords.dept ?? "", coords.lat, coords.lon, radiusKm, 100),
+  // Race each source against a 20 s guard so neither can block the entire response
+  function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
+    return Promise.race([
+      p,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+    ]);
+  }
+
+  const [osmResult, sireneResult] = await Promise.all([
+    withTimeout(searchOverpass(coords.lat, coords.lon, radiusM, niche, 200), 20_000),
+    withTimeout(searchSirene(niche, coords.dept ?? "", coords.lat, coords.lon, radiusKm, 100), 20_000),
   ]);
 
   // ── 3. Convertir OSM → Lead ───────────────────────────────────────────────
   const osmLeads: Lead[] = [];
-  if (osmElements.status === "fulfilled") {
-    for (const el of osmElements.value) {
-      const lead = osmToLead(el, niche, city);
-      if (lead) osmLeads.push(lead);
-    }
+  for (const el of osmResult ?? []) {
+    const lead = osmToLead(el, niche, city);
+    if (lead) osmLeads.push(lead);
   }
 
   // ── 4. Fusionner : OSM en priorité (a les téléphones), SIRENE en complément
   const seen = new Map<string, Lead>();
 
-  // D'abord les leads OSM (ont des vrais téléphones)
   for (const l of osmLeads) seen.set(l.id, l);
 
-  // Ensuite SIRENE (on ajoute seulement si pas déjà trouvé par nom similaire)
-  const sLeads = sireneLeads.status === "fulfilled" ? sireneLeads.value : [];
+  const sLeads = sireneResult ?? [];
   for (const l of sLeads) {
     if (!seen.has(l.id)) seen.set(l.id, l);
   }

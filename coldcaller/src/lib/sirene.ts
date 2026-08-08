@@ -55,14 +55,34 @@ interface SireneResult {
   activite_principale: string;
 }
 
-async function fetchPage(naf: string, dept: string, page: number): Promise<{ results: SireneResult[]; total: number }> {
-  const url = `https://recherche-entreprises.api.gouv.fr/search?activite_principale=${encodeURIComponent(naf)}&departement=${dept}&page=${page}&per_page=25&statut_diffusion_etablissement=O`;
-  const res = await fetch(url, {
-    headers: { Accept: "application/json", "User-Agent": "ColdCaller/1.0" },
-  });
-  if (!res.ok) return { results: [], total: 0 };
-  const json = await res.json() as { results: SireneResult[]; total_results: number };
-  return { results: json.results ?? [], total: json.total_results ?? 0 };
+// Timeout de 8 s par appel pour éviter de bloquer la route
+async function fetchPage(
+  naf: string,
+  dept: string,
+  page: number,
+): Promise<SireneResult[]> {
+  if (!dept) return [];                           // dept vide → on ne filtre pas par dept
+  const url =
+    `https://recherche-entreprises.api.gouv.fr/search` +
+    `?activite_principale=${encodeURIComponent(naf)}` +
+    `&departement=${dept}&page=${page}&per_page=25` +
+    `&statut_diffusion_etablissement=O`;
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8_000);
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { Accept: "application/json", "User-Agent": "ColdCaller/1.0" },
+    });
+    if (!res.ok) return [];
+    const json = await res.json() as { results: SireneResult[] };
+    return json.results ?? [];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ── Chercher des entreprises via l'Annuaire ────────────────────────────────
@@ -75,34 +95,30 @@ export async function searchSirene(
   maxResults = 60,
 ): Promise<Lead[]> {
   const nafCodes = NICHE_TO_NAF[niche] ?? [];
-  if (!nafCodes.length) return [];
+  if (!nafCodes.length || !dept) return [];
 
-  const allResults: SireneResult[] = [];
-
-  // Pour chaque code NAF, chercher jusqu'à 3 pages
+  // Lancer toutes les pages en parallèle (page 1 + 2 par NAF) — max 8 appels simultanés
+  const pages: Array<Promise<SireneResult[]>> = [];
   for (const naf of nafCodes) {
-    const first = await fetchPage(naf, dept, 1);
-    allResults.push(...first.results);
-
-    const totalPages = Math.min(3, Math.ceil(first.total / 25));
-    for (let p = 2; p <= totalPages; p++) {
-      const page = await fetchPage(naf, dept, p);
-      allResults.push(...page.results);
-    }
+    pages.push(fetchPage(naf, dept, 1));
+    pages.push(fetchPage(naf, dept, 2));
   }
+
+  const settled = await Promise.all(pages);
+  const allResults = settled.flat();
 
   // Dédupliquer par SIREN
   const seen = new Set<string>();
   const unique = allResults.filter((r) => {
-    if (seen.has(r.siren)) return false;
+    if (!r?.siren || seen.has(r.siren)) return false;
     seen.add(r.siren);
     return true;
   });
 
   // Filtrer par distance si coordonnées disponibles
   const inRadius = unique.filter((r) => {
-    const lat = r.siege.latitude;
-    const lon = r.siege.longitude;
+    const lat = r.siege?.latitude;
+    const lon = r.siege?.longitude;
     if (!lat || !lon) return true; // garder si pas de coordonnées
     return distKm(cityLat, cityLon, lat, lon) <= radiusKm;
   });
@@ -123,7 +139,7 @@ export async function searchSirene(
       reviewCount: 0,
       status:      "new",
       notes:       "",
-      source:      "openstreetmap", // sera "sirene" in UI
+      source:      "openstreetmap",
       detectedAt:  now,
       callCount:   0,
     };
