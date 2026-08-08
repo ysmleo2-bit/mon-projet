@@ -109,7 +109,68 @@ export const NICHES = [
 ];
 
 export const CITIES = [
-  "Paris", "Lyon", "Marseille", "Toulouse", "Nice", "Nantes", "Strasbourg",
-  "Montpellier", "Bordeaux", "Lille", "Rennes", "Reims", "Le Havre",
-  "Saint-Étienne", "Toulon", "Grenoble", "Dijon", "Angers", "Nîmes", "Villeurbanne",
-];
+  // ── Île-de-France ─────────────────────────────────────────────────────────
+  "Paris", "Boulogne-Billancourt", "Saint-Denis", "Argenteuil", "Montreuil",
+  "Nanterre", "Vitry-sur-Seine", "Créteil", "Colombes", "Versailles",
+  "Asnières-sur-Seine", "Courbevoie", "Rueil-Malmaison", "Champigny-sur-Marne",
+  "Saint-Maur-des-Fossés", "Noisy-le-Grand", "Levallois-Perret",
+  "Issy-les-Moulineaux", "Clichy", "Aubervilliers", "Ivry-sur-Seine",
+  "Vincennes", "Fontenay-sous-Bois", "Villejuif", "Pantin", "Bobigny",
+  "Aulnay-sous-Bois", "Bondy", "Drancy", "Épinay-sur-Seine", "Gennevilliers",
+  "Clamart", "Sartrouville", "Maisons-Alfort", "Sarcelles", "Cergy",
+  "Évry-Courcouronnes", "Massy", "Meaux", "Melun", "Corbeil-Essonnes",
+  "Poissy", "Antony", "Chelles", "Mantes-la-Jolie", "Châtenay-Malabry",
+  "Gagny", "Le Blanc-Mesnil", "Rosny-sous-Bois", "Châtillon",
+  "Bagnolet", "La Courneuve", "Stains", "Villepinte", "Torcy",
+  // ── Auvergne-Rhône-Alpes ──────────────────────────────────────────────────
+  "Lyon", "Grenoble", "Saint-Étienne", "Villeurbanne", "Clermont-Ferrand",
+  "Chambéry", "Annecy", "Bourg-en-Bresse", "Valence", "Vienne",
+  "Roanne", "Oyonnax", "Romans-sur-Isère", "Montélimar", "Voiron",
+  "Villefranche-sur-Saône", "Thonon-les-Bains", "Annemasse", "Cluses",
+  "Mâcon", "Chalon-sur-Saône", "Aurillac", "Moulins", "Le Puy-en-Velay",
+  // ── Provence-Alpes-Côte d'Azur ───────────────────────────────────────────
+  "Marseille", "Nice", "Toulon", "Aix-en-Provence", "Avignon",
+  "Antibes", "Cannes", "La Seyne-sur-Mer", "Hyères", "Fréjus",
+  "Aubagne", "Martigues", "Salon-de-Provence", "Arles", "Grasse",
+  "Menton", "Cagnes-sur-Mer", "Draguignan", "Manosque", "Marignane",
+  "Six-Fours-les-Plages", "Orange", "Carpentras", "Gap", "Digne-les-Bains",
+  // ── Occitanie ─────────────────────────────────────────────────────────────
+  "Toulouse", "Montpellier", "Nîmes", "Perpignan", "Narbonne",
+  "Sète", "Alès", "Béziers", "Albi", "Montauban", "Tarbes",
+  "Castres", "Carcassonne", "Rodez", "Millau", "Agen", "Auch",
+  "Cahors", "Mende", "Foix",
+  // ── Nouvelle-Aquitaine ────────────────────────────────────────────────────
+  "Bordeaux", "Limoges", "La Rochelle", "Pau", "Bayonne", "Mérignac",
+  "Pessac", "Angoulême", "Périgueux", "Brive-la-Gaillarde",
+  "Niort", "La Roche-sur-Yon", "Poitiers", "Châtellerault",
+  "Rochefort", "Saintes", "Mont-de-Marsan", "Dax", "Agen", // (Agen partagé)
+  "Guéret", "Tulle",
+  // ── Grand Est ─────────────────────────────────────────────────────────────
+  "Strasbourg", "Reims", "Metz", "Nancy", "Mulhouse", "Colmar",
+  "Troyes", "Châlons-en-Champagne", "Thionville", "Forbach",
+  "Haguenau", "Sarreguemines", "Épinal", "Saint-Dié-des-Vosges",
+  "Montbéliard", "Belfort", "Vesoul", "Lons-le-Saunier",
+  "Bar-le-Duc", "Verdun", "Saint-Dizier", "Lunéville", "Sélestat",
+  // ── Hauts-de-France ───────────────────────────────────────────────────────
+  "Lille", "Roubaix", "Tourcoing", "Valenciennes", "Dunkerque",
+  "Calais", "Amiens", "Arras", "Douai", "Lens", "Béthune",
+  "Boulogne-sur-Mer", "Maubeuge", "Cambrai", "Saint-Omer",
+  "Soissons", "Compiègne", "Beauvais", "Creil", "Laon",
+  // ── Normandie ─────────────────────────────────────────────────────────────
+  "Rouen", "Le Havre", "Caen", "Cherbourg-en-Cotentin", "Évreux",
+  "Alençon", "Dieppe", "Fécamp", "Lisieux", "Saint-Lô", "Bayeux",
+  // ── Bretagne ──────────────────────────────────────────────────────────────
+  "Rennes", "Brest", "Quimper", "Lorient", "Vannes", "Saint-Brieuc",
+  "Saint-Malo", "Lannion", "Concarneau", "Vitré", "Fougères",
+  // ── Pays de la Loire ──────────────────────────────────────────────────────
+  "Nantes", "Angers", "Saint-Nazaire", "La Roche-sur-Yon", "Le Mans",
+  "Laval", "Cholet", "Saint-Herblain", "Rezé", "Les Sables-d'Olonne",
+  // ── Centre-Val de Loire ───────────────────────────────────────────────────
+  "Orléans", "Tours", "Chartres", "Bourges", "Blois",
+  "Châteauroux", "Vierzon", "Dreux", "Vendôme", "Montargis",
+  // ── Bourgogne-Franche-Comté ───────────────────────────────────────────────
+  "Dijon", "Besançon", "Chalon-sur-Saône", "Auxerre", "Nevers",
+  "Montceau-les-Mines", "Le Creusot", "Sens", "Mâcon",
+  // ── Corse ─────────────────────────────────────────────────────────────────
+  "Ajaccio", "Bastia",
+].filter((v, i, a) => a.indexOf(v) === i).sort();

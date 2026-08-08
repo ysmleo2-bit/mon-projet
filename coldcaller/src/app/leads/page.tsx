@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   Search, MapPin, Phone, Globe, Download,
   Loader2, ChevronDown, Zap, Check, Database,
@@ -42,8 +42,34 @@ export default function LeadsPage() {
   const [bulkAdded,   setBulkAdded]   = useState(false);
 
   // ── Panneau de détail ─────────────────────────────────────────────────────
-  const [detailLead, setDetailLead] = useState<Lead | null>(null);
-  const [error,      setError]      = useState<string | null>(null);
+  const [detailLead,   setDetailLead]   = useState<Lead | null>(null);
+  const [error,        setError]        = useState<string | null>(null);
+  // ── Autocomplétion ville ──────────────────────────────────────────────────
+  const [cityInput,    setCityInput]    = useState("Lyon");
+  const [suggestions,  setSuggestions]  = useState<string[]>([]);
+  const [showSuggest,  setShowSuggest]  = useState(false);
+  const cityRef = useRef<HTMLDivElement>(null);
+
+  function onCityInput(val: string) {
+    setCityInput(val);
+    setCity(val);
+    if (val.length >= 2) {
+      const q = val.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      const matches = CITIES.filter((c) => {
+        const n = c.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+        return n.startsWith(q);
+      }).slice(0, 8);
+      setSuggestions(matches);
+      setShowSuggest(matches.length > 0);
+    } else {
+      setShowSuggest(false);
+    }
+  }
+  function pickCity(c: string) {
+    setCityInput(c);
+    setCity(c);
+    setShowSuggest(false);
+  }
 
   // ── Recherche 100 % navigateur — aucun timeout Vercel possible ────────────
   const handleSearch = useCallback(async () => {
@@ -197,11 +223,32 @@ export default function LeadsPage() {
                 </div>
                 <div>
                   <label className="text-xs text-white/40 mb-1.5 block">Ville</label>
-                  <div className="relative">
-                    <select value={city} onChange={(e) => setCity(e.target.value)} className="select pr-8">
-                      {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 pointer-events-none" />
+                  <div className="relative" ref={cityRef}>
+                    <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={cityInput}
+                      onChange={(e) => onCityInput(e.target.value)}
+                      onFocus={() => cityInput.length >= 2 && setShowSuggest(suggestions.length > 0)}
+                      onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { setShowSuggest(false); if (!loading) handleSearch(); }
+                        if (e.key === "Escape") setShowSuggest(false);
+                      }}
+                      placeholder="Ex: Bordeaux, Metz…"
+                      className="select pl-8 w-full"
+                    />
+                    {/* Suggestions */}
+                    {showSuggest && (
+                      <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-ink-900 border border-white/[0.1] rounded-xl overflow-hidden shadow-xl">
+                        {suggestions.map((s) => (
+                          <button key={s} onMouseDown={() => pickCity(s)}
+                            className="w-full text-left px-3 py-2 text-sm text-white/80 hover:bg-white/[0.07] hover:text-white transition-colors flex items-center gap-2">
+                            <MapPin className="w-3 h-3 text-brand-400 shrink-0" />{s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>
