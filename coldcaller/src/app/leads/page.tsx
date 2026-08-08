@@ -11,6 +11,7 @@ import Navbar from "@/components/Navbar";
 import { NICHES, CITIES } from "@/lib/mock-data";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { clientGeocode, clientSearchOsm, clientSearchSirene } from "@/lib/search-client";
 
 type SortKey = "rating" | "reviews" | "name";
 
@@ -43,7 +44,7 @@ export default function LeadsPage() {
   // ── Panneau de détail ─────────────────────────────────────────────────────
   const [detailLead, setDetailLead] = useState<Lead | null>(null);
 
-  // ── Recherche (3 appels séparés pour rester sous la limite Vercel Hobby 10 s) ──
+  // ── Recherche 100 % côté navigateur (évite les timeouts Vercel) ─────────────
   const handleSearch = useCallback(async () => {
     setLoading(true);
     setSearched(true);
@@ -51,47 +52,36 @@ export default function LeadsPage() {
     setBulkAdded(false);
     setDetailLead(null);
     setStats(null);
-    setProgress(0);
+    setProgress(10);
 
-    const interval = setInterval(() => setProgress((p) => Math.min(p + 5, 85)), 200);
+    const interval = setInterval(() => setProgress((p) => Math.min(p + 3, 85)), 300);
 
     try {
-      // 1. Géocodage (< 2 s)
-      const geoRes = await fetch("/api/geocode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city }),
-      });
-      if (!geoRes.ok) { setLeads([]); return; }
-      const geo = await geoRes.json() as { lat: number; lon: number; dept?: string };
-      setProgress(20);
+      // 1. Géocodage via Nominatim (CORS OK)
+      const geo = await clientGeocode(city);
+      if (!geo) { setLeads([]); setSearched(true); return; }
+      setProgress(25);
 
-      // 2. OSM + SIRENE en parallèle (chacun < 9 s, deux fonctions distinctes)
-      const [osmRes, sireneRes] = await Promise.allSettled([
-        fetch("/api/scrape-osm", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lat: geo.lat, lon: geo.lon, radius, niche }),
-        }).then((r) => r.json()),
-        fetch("/api/scrape-sirene", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dept: geo.dept, lat: geo.lat, lon: geo.lon, radius, niche }),
-        }).then((r) => r.json()),
+      // 2. OSM + SIRENE en parallèle depuis le navigateur
+      const [osmLeads, sireneLeads] = await Promise.all([
+        clientSearchOsm(geo.lat, geo.lon, radius * 1000, niche, city),
+        clientSearchSirene(niche, geo.dept ?? "", geo.lat, geo.lon, radius),
       ]);
+      setProgress(95);
 
-      const osmLeads: Lead[]    = osmRes.status    === "fulfilled" ? (osmRes.value.leads    ?? []) : [];
-      const sireneLeads: Lead[] = sireneRes.status === "fulfilled" ? (sireneRes.value.leads ?? []) : [];
-
-      // Fusionner OSM (a les téléphones) + SIRENE en dédup par ID
+      // 3. Fusionner — OSM en priorité (a les téléphones)
       const seen = new Map<string, Lead>();
-      for (const l of osmLeads)    seen.set(l.id, { ...l, city });
+      for (const l of osmLeads)    seen.set(l.id, l);
       for (const l of sireneLeads) if (!seen.has(l.id)) seen.set(l.id, l);
 
-      const all = Array.from(seen.values());
+      const all      = Array.from(seen.values());
       const filtered = minRating > 0 ? all.filter((l) => l.rating >= minRating) : all;
 
-      // Persister dans le CRM en arrière-plan
+      setLeads(filtered);
+      setStats({ osm: osmLeads.length, sirene: sireneLeads.length });
+      setProgress(100);
+
+      // 4. Persister dans le CRM en arrière-plan (route Vercel rapide)
       if (filtered.length) {
         fetch("/api/leads", {
           method: "POST",
@@ -99,12 +89,8 @@ export default function LeadsPage() {
           body: JSON.stringify(filtered),
         }).catch(() => {});
       }
-
-      setLeads(filtered);
-      setStats({ osm: osmLeads.length, sirene: sireneLeads.length });
-      setProgress(100);
     } catch (e) {
-      console.error(e);
+      console.error("Erreur recherche :", e);
     } finally {
       clearInterval(interval);
       setLoading(false);
