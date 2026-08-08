@@ -11,9 +11,71 @@ import Navbar from "@/components/Navbar";
 import { NICHES, CITIES } from "@/lib/mock-data";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { clientGeocode, clientSearchOsm, clientSearchSirene } from "@/lib/search-client";
 
 type SortKey = "rating" | "reviews" | "name";
+
+// ── Types + helpers Overpass (appelé côté navigateur) ────────────────────────
+interface OsmElement {
+  type: "node" | "way" | "relation"; id: number;
+  lat?: number; lon?: number;
+  center?: { lat: number; lon: number };
+  tags?: Record<string, string>;
+}
+
+const OSM_TAGS: Record<string, string[]> = {
+  Plombier:["craft=plumber","craft=hvac_technician"],Électricien:["craft=electrician"],
+  Maçon:["craft=mason","craft=construction","craft=bricklayer"],
+  Serrurier:["craft=locksmith","shop=locksmith"],Peintre:["craft=painter"],
+  Couvreur:["craft=roofer"],Carreleur:["craft=tiler","craft=floor_layer"],
+  Menuisier:["craft=carpenter","craft=joiner"],Chauffagiste:["craft=hvac_technician","craft=heating_engineer"],
+  Paysagiste:["craft=gardener"],Nettoyage:["shop=cleaning_service"],
+  Restaurant:["amenity=restaurant","amenity=fast_food","amenity=cafe"],
+  Boulangerie:["shop=bakery","craft=bakery"],Coiffeur:["shop=hairdresser","shop=beauty"],
+  Comptable:["office=accountant","office=tax_advisor"],
+};
+const OSM_KW: Record<string, string> = {
+  Plombier:"plombier|plomberie",Électricien:"électricien|electricien",
+  Maçon:"maçon|maçonnerie",Serrurier:"serrurier|serrurerie",Peintre:"peintre|peinture",
+  Couvreur:"couvreur|toiture",Carreleur:"carreleur|carrelage",
+  Menuisier:"menuisier|menuiserie",Chauffagiste:"chauffagiste|chauffage",
+  Paysagiste:"paysagiste|jardinage",Nettoyage:"nettoyage|propreté",
+  Restaurant:"restaurant|brasserie",Boulangerie:"boulangerie|boulanger",
+  Coiffeur:"coiffeur|barbier",Comptable:"comptable|comptabilité",
+};
+
+function buildOverpassQuery(lat: number, lon: number, radiusM: number, niche: string): string {
+  const r   = Math.min(radiusM, 40000);
+  const kw  = OSM_KW[niche] ?? "";
+  const parts: string[] = [];
+  for (const tag of (OSM_TAGS[niche] ?? [])) {
+    const [k,v] = tag.split("=");
+    parts.push(`node["${k}"="${v}"](around:${r},${lat},${lon});`);
+    parts.push(`way["${k}"="${v}"](around:${r},${lat},${lon});`);
+  }
+  if (kw) {
+    parts.push(`node["name"~"${kw}",i](around:${r},${lat},${lon});`);
+    parts.push(`way["name"~"${kw}",i](around:${r},${lat},${lon});`);
+  }
+  if (!parts.length) return "";
+  return `data=${encodeURIComponent(`[out:json][timeout:25][maxsize:6000000];\n(\n${parts.join("\n")}\n);\nout center tags 200;`)}`;
+}
+
+function osmElementToLead(el: OsmElement, niche: string, city: string): Lead | null {
+  const t = el.tags ?? {};
+  const name = t.name ?? t["name:fr"] ?? t.operator ?? null;
+  if (!name) return null;
+  const phone = t.phone ?? t["contact:phone"] ?? t["contact:mobile"] ?? null;
+  const lat = el.lat ?? el.center?.lat;
+  const lon = el.lon ?? el.center?.lon;
+  const addr = [t["addr:housenumber"],t["addr:street"]].filter(Boolean).join(" ") || t["addr:full"] || `${lat?.toFixed(4)??""}, ${lon?.toFixed(4)??""}`;
+  const website = (t.website ?? t["contact:website"])?.replace(/^https?:\/\//,"");
+  return {
+    id:`osm-${el.type}-${el.id}`,name,category:niche,
+    phone: phone ? phone.replace(/^\+33\s?/,"0").replace(/\s+/g," ").trim() : "(pas de tél.)",
+    address:addr,city,rating:0,reviewCount:0,website,status:"new",notes:"",
+    detectedAt:new Date().toISOString(),source:"openstreetmap",callCount:0,
+  };
+}
 
 // ── Badge téléphone ───────────────────────────────────────────────────────────
 function PhoneBadge({ phone }: { phone: string }) {
@@ -43,8 +105,9 @@ export default function LeadsPage() {
 
   // ── Panneau de détail ─────────────────────────────────────────────────────
   const [detailLead, setDetailLead] = useState<Lead | null>(null);
+  const [error,      setError]      = useState<string | null>(null);
 
-  // ── Recherche 100 % côté navigateur (évite les timeouts Vercel) ─────────────
+  // ── Recherche hybride : Geocode+SIRENE server-side (rapide), OSM client-side ─
   const handleSearch = useCallback(async () => {
     setLoading(true);
     setSearched(true);
@@ -52,36 +115,70 @@ export default function LeadsPage() {
     setBulkAdded(false);
     setDetailLead(null);
     setStats(null);
+    setError(null);
     setProgress(10);
 
-    const interval = setInterval(() => setProgress((p) => Math.min(p + 3, 85)), 300);
+    const interval = setInterval(() => setProgress((p) => Math.min(p + 4, 80)), 250);
 
     try {
-      // 1. Géocodage via Nominatim (CORS OK)
-      const geo = await clientGeocode(city);
-      if (!geo) { setLeads([]); setSearched(true); return; }
-      setProgress(25);
+      // ── 1. Geocodage (route rapide, < 2 s) ────────────────────────────────
+      const geoRes = await fetch("/api/geocode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city }),
+      });
 
-      // 2. OSM + SIRENE en parallèle depuis le navigateur
-      const [osmLeads, sireneLeads] = await Promise.all([
-        clientSearchOsm(geo.lat, geo.lon, radius * 1000, niche, city),
-        clientSearchSirene(niche, geo.dept ?? "", geo.lat, geo.lon, radius),
-      ]);
-      setProgress(95);
+      if (!geoRes.ok) {
+        setError(`Ville introuvable : ${city}`);
+        setLeads([]);
+        return;
+      }
+      const geo = await geoRes.json() as { lat: number; lon: number; dept?: string };
+      setProgress(30);
 
-      // 3. Fusionner — OSM en priorité (a les téléphones)
-      const seen = new Map<string, Lead>();
-      for (const l of osmLeads)    seen.set(l.id, l);
-      for (const l of sireneLeads) if (!seen.has(l.id)) seen.set(l.id, l);
+      // ── 2. SIRENE via serveur (rapide, < 5 s) + OSM via navigateur ─────────
+      const osmPromise: Promise<Lead[]> = fetch("https://overpass-api.de/api/interpreter", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: buildOverpassQuery(geo.lat, geo.lon, radius * 1000, niche),
+      })
+        .then((r) => r.json())
+        .then((j: { elements: OsmElement[] }) =>
+          (j.elements ?? []).map((el) => osmElementToLead(el, niche, city)).filter(Boolean) as Lead[]
+        )
+        .catch(() => [] as Lead[]);
 
-      const all      = Array.from(seen.values());
+      const sireneRes = await fetch("/api/scrape-sirene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dept: geo.dept, lat: geo.lat, lon: geo.lon, radius, niche }),
+      });
+      const sireneData = sireneRes.ok ? await sireneRes.json() : { leads: [] };
+      const sireneLeads: Lead[] = sireneData.leads ?? [];
+      setProgress(70);
+
+      // Afficher d'abord les leads SIRENE (disponibles maintenant)
+      const seenMap = new Map<string, Lead>();
+      for (const l of sireneLeads) seenMap.set(l.id, l);
+
+      const sireneFinal = minRating > 0
+        ? sireneLeads.filter((l) => l.rating >= minRating)
+        : sireneLeads;
+      setLeads(sireneFinal);
+      setStats({ osm: 0, sirene: sireneLeads.length });
+      setProgress(80);
+
+      // ── 3. Attendre OSM et fusionner ─────────────────────────────────────
+      const osmLeads = await osmPromise;
+      for (const l of osmLeads) seenMap.set(l.id, l);
+      const all = Array.from(seenMap.values());
       const filtered = minRating > 0 ? all.filter((l) => l.rating >= minRating) : all;
 
       setLeads(filtered);
       setStats({ osm: osmLeads.length, sirene: sireneLeads.length });
       setProgress(100);
 
-      // 4. Persister dans le CRM en arrière-plan (route Vercel rapide)
+      // ── 4. Sauvegarder en DB ──────────────────────────────────────────────
       if (filtered.length) {
         fetch("/api/leads", {
           method: "POST",
@@ -90,7 +187,8 @@ export default function LeadsPage() {
         }).catch(() => {});
       }
     } catch (e) {
-      console.error("Erreur recherche :", e);
+      console.error("Erreur :", e);
+      setError("Erreur lors de la recherche. Vérifiez votre connexion.");
     } finally {
       clearInterval(interval);
       setLoading(false);
@@ -220,12 +318,24 @@ export default function LeadsPage() {
               </button>
             </div>
 
+            {/* Erreur */}
+            {!loading && error && (
+              <div className="glass rounded-2xl p-4 mb-5 flex items-center gap-3 border-red-500/20 bg-red-500/[0.05]">
+                <X className="w-4 h-4 text-red-400 shrink-0" />
+                <p className="text-red-300 text-sm">{error}</p>
+              </div>
+            )}
+
             {/* Barre de progression */}
             {loading && (
               <div className="glass rounded-2xl p-5 mb-5 text-center">
                 <Loader2 className="w-6 h-6 animate-spin text-brand-400 mx-auto mb-3" />
                 <p className="text-white font-semibold mb-1">Extraction en cours…</p>
-                <p className="text-xs text-white/40">OSM + Annuaire des Entreprises · {niche}s à {city}</p>
+                <p className="text-xs text-white/40">
+                  {progress < 30 ? "Géolocalisation de la ville…"
+                    : progress < 75 ? "Annuaire des Entreprises · en cours…"
+                    : "OpenStreetMap · finalisation…"}
+                </p>
                 <div className="mt-3 h-1.5 bg-white/[0.06] rounded-full overflow-hidden max-w-xs mx-auto">
                   <div className="h-full bg-brand-500 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
                 </div>
