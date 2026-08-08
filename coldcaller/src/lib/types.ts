@@ -1,4 +1,12 @@
 export type LeadStatus = "new" | "contacted" | "interested" | "rdv" | "client" | "lost";
+export type CallOutcome = "no_answer" | "interested" | "not_interested" | "rdv" | "callback";
+
+export interface CallRecord {
+  at:       string;       // ISO date
+  duration: number;       // seconds
+  outcome:  CallOutcome;
+  notes?:   string;
+}
 
 export interface Lead {
   id: string;
@@ -18,6 +26,7 @@ export interface Lead {
   source: "google_maps" | "manual" | "import" | "openstreetmap";
   detectedAt: string;
   callCount: number;
+  callHistory?: CallRecord[];
 }
 
 export interface PipelineColumn {
