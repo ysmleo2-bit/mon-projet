@@ -5,7 +5,7 @@ import {
   Search, MapPin, Phone, Globe, Download,
   Loader2, ChevronDown, Zap, Check, Database,
   X, Star, CheckSquare, Square, ChevronRight,
-  Filter, SortAsc,
+  Filter, ExternalLink,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { NICHES, CITIES } from "@/lib/mock-data";
@@ -13,14 +13,44 @@ import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { clientGeocode, clientSearchOsm, clientSearchSirene } from "@/lib/search-client";
 
-type SortKey = "rating" | "reviews" | "name";
+type SortKey = "phone" | "rating" | "reviews" | "name";
 
 // ── Badge téléphone ───────────────────────────────────────────────────────────
 function PhoneBadge({ phone }: { phone: string }) {
-  if (!phone || phone === "(pas de tél.)") {
-    return <span className="text-[10px] text-amber-400/60 italic">Tél. à compléter</span>;
+  if (!phone) {
+    return <span className="text-[10px] text-white/25 italic">Pas de tél.</span>;
   }
-  return <span className="font-mono text-brand-400 text-xs">{phone}</span>;
+  return <span className="font-mono text-brand-300 text-xs font-semibold">{phone}</span>;
+}
+
+// ── Bouton recherche téléphone ────────────────────────────────────────────────
+function PhoneLookupBtn({ name, city }: { name: string; city: string }) {
+  const pjUrl = `https://www.pagesjaunes.fr/annuaire/chercherlespros?quoiqui=${encodeURIComponent(name)}&ou=${encodeURIComponent(city)}`;
+  const gUrl  = `https://www.google.fr/search?q=${encodeURIComponent(`"${name}" ${city} téléphone`)}`;
+  return (
+    <div className="flex items-center gap-1">
+      <a
+        href={pjUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        title="Chercher sur Pages Jaunes"
+        className="flex items-center gap-1 text-[10px] text-amber-400/70 hover:text-amber-300 border border-amber-400/20 hover:border-amber-400/40 rounded px-1.5 py-0.5 transition-all"
+      >
+        <ExternalLink className="w-2.5 h-2.5" /> PJ
+      </a>
+      <a
+        href={gUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        title="Chercher sur Google"
+        className="flex items-center gap-1 text-[10px] text-blue-400/60 hover:text-blue-300 border border-blue-400/20 hover:border-blue-400/40 rounded px-1.5 py-0.5 transition-all"
+      >
+        <Search className="w-2.5 h-2.5" /> G
+      </a>
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,8 +63,9 @@ export default function LeadsPage() {
   const [loading,    setLoading]    = useState(false);
   const [searched,   setSearched]   = useState(false);
   const [progress,   setProgress]   = useState(0);
-  const [sortBy,     setSortBy]     = useState<SortKey>("name");
-  const [stats,      setStats]      = useState<{ osm: number; sirene: number } | null>(null);
+  const [sortBy,     setSortBy]     = useState<SortKey>("phone");
+  const [stats,      setStats]      = useState<{ osm: number; sirene: number; withPhone: number } | null>(null);
+  const [showOnlyPhone, setShowOnlyPhone] = useState(false);
 
   // ── Sélection multiple ────────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -81,9 +112,10 @@ export default function LeadsPage() {
 
       const all      = Array.from(seen.values());
       const filtered = minRating > 0 ? all.filter((l) => l.rating >= minRating) : all;
+      const withPhone = filtered.filter((l) => !!l.phone).length;
 
       setLeads(filtered);
-      setStats({ osm: osmLeads.length, sirene: sireneLeads.length });
+      setStats({ osm: osmLeads.length, sirene: sireneLeads.length, withPhone });
       setProgress(100);
 
       // 4. Sauvegarder en DB en arrière-plan
@@ -104,14 +136,23 @@ export default function LeadsPage() {
   }, [niche, city, radius, minRating]);
 
   // ── Tri ───────────────────────────────────────────────────────────────────
-  const sorted = [...leads].sort((a, b) => {
-    if (sortBy === "rating")  return b.rating - a.rating;
-    if (sortBy === "reviews") return b.reviewCount - a.reviewCount;
-    return a.name.localeCompare(b.name);
-  });
+  const sortedAndFiltered = [...leads]
+    .filter((l) => !showOnlyPhone || !!l.phone)
+    .sort((a, b) => {
+      if (sortBy === "phone") {
+        // Avec téléphone d'abord
+        const hasA = !!a.phone ? 1 : 0;
+        const hasB = !!b.phone ? 1 : 0;
+        if (hasA !== hasB) return hasB - hasA;
+        return a.name.localeCompare(b.name);
+      }
+      if (sortBy === "rating")  return b.rating - a.rating;
+      if (sortBy === "reviews") return b.reviewCount - a.reviewCount;
+      return a.name.localeCompare(b.name);
+    });
 
   // ── Sélection ────────────────────────────────────────────────────────────
-  const allSelected = sorted.length > 0 && selectedIds.size === sorted.length;
+  const allSelected = sortedAndFiltered.length > 0 && selectedIds.size === sortedAndFiltered.length;
 
   function toggleOne(id: string, e: React.MouseEvent) {
     e.stopPropagation();
@@ -124,12 +165,12 @@ export default function LeadsPage() {
 
   function toggleAll() {
     if (allSelected) setSelectedIds(new Set());
-    else setSelectedIds(new Set(sorted.map((l) => l.id)));
+    else setSelectedIds(new Set(sortedAndFiltered.map((l) => l.id)));
   }
 
   // ── Ajout bulk au CRM ────────────────────────────────────────────────────
   async function bulkAddToCrm() {
-    const toAdd = sorted.filter((l) => selectedIds.has(l.id));
+    const toAdd = sortedAndFiltered.filter((l) => selectedIds.has(l.id));
     if (!toAdd.length) return;
     setAddingBulk(true);
     await fetch("/api/leads", {
@@ -137,7 +178,6 @@ export default function LeadsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(toAdd),
     });
-    // Marquer visuellement comme ajoutés
     setLeads((prev) => prev.map((l) =>
       selectedIds.has(l.id) ? { ...l, _added: true } as Lead & { _added: boolean } : l
     ));
@@ -183,7 +223,9 @@ export default function LeadsPage() {
             {/* Formulaire de recherche */}
             <div className="glass rounded-2xl p-5 mb-5">
               <h2 className="text-sm font-bold text-white mb-1">Scraper des prospects</h2>
-              <p className="text-xs text-white/35 mb-4">Sources : OpenStreetMap + Annuaire des Entreprises · Les leads sont sauvegardés dans ton CRM.</p>
+              <p className="text-xs text-white/35 mb-4">
+                Sources : OpenStreetMap (avec tél.) + Annuaire des Entreprises · Leads sauvegardés dans ton CRM.
+              </p>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                 <div>
@@ -198,19 +240,14 @@ export default function LeadsPage() {
                 <div>
                   <label className="text-xs text-white/40 mb-1.5 block">Ville</label>
                   <div className="relative">
-                    <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 pointer-events-none" />
-                    <input
-                      list="cities-list"
-                      type="text"
+                    <select
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter" && !loading) handleSearch(); }}
-                      placeholder="Ex: Bordeaux, Metz…"
-                      className="select pl-8 w-full"
-                    />
-                    <datalist id="cities-list">
-                      {CITIES.map((c) => <option key={c} value={c} />)}
-                    </datalist>
+                      className="select pr-8 w-full"
+                    >
+                      {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 pointer-events-none" />
                   </div>
                 </div>
                 <div>
@@ -250,8 +287,8 @@ export default function LeadsPage() {
                 <p className="text-white font-semibold mb-1">Extraction en cours…</p>
                 <p className="text-xs text-white/40">
                   {progress < 30 ? "Géolocalisation de la ville…"
-                    : progress < 75 ? "Annuaire des Entreprises · en cours…"
-                    : "OpenStreetMap · finalisation…"}
+                    : progress < 75 ? "Annuaire des Entreprises + OpenStreetMap…"
+                    : "Finalisation et tri par téléphone…"}
                 </p>
                 <div className="mt-3 h-1.5 bg-white/[0.06] rounded-full overflow-hidden max-w-xs mx-auto">
                   <div className="h-full bg-brand-500 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
@@ -262,9 +299,9 @@ export default function LeadsPage() {
             {/* Résultats */}
             {!loading && leads.length > 0 && (
               <>
-                {/* Toolbar résultats */}
-                <div className="flex items-center justify-between mb-3 gap-3">
-                  <div className="flex items-center gap-3">
+                {/* Stats + toolbar */}
+                <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+                  <div className="flex items-center gap-3 flex-wrap">
                     {/* Tout sélectionner */}
                     <button onClick={toggleAll}
                       className="flex items-center gap-2 text-xs text-white/50 hover:text-white transition-colors">
@@ -273,18 +310,36 @@ export default function LeadsPage() {
                         : <Square className="w-4 h-4" />}
                       {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
                     </button>
-                    <span className="text-white font-bold text-sm">{leads.length} résultats</span>
+                    <span className="text-white font-bold text-sm">
+                      {sortedAndFiltered.length} résultat{sortedAndFiltered.length !== 1 ? "s" : ""}
+                    </span>
                     {stats && (
-                      <span className="text-xs text-white/30">
-                        {stats.osm > 0 && <span className="text-brand-400/70">{stats.osm} OSM </span>}
-                        {stats.sirene > 0 && <span className="text-amber-400/70">· {stats.sirene} Annuaire</span>}
+                      <span className="flex items-center gap-2 text-xs">
+                        <span className="flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5 text-emerald-400">
+                          <Phone className="w-3 h-3" /> {stats.withPhone} avec tél.
+                        </span>
+                        {stats.osm > 0 && <span className="text-brand-400/60">{stats.osm} OSM</span>}
+                        {stats.sirene > 0 && <span className="text-amber-400/60">{stats.sirene} Annuaire</span>}
                       </span>
                     )}
+                    {/* Filtre téléphone */}
+                    <button
+                      onClick={() => setShowOnlyPhone((v) => !v)}
+                      className={cn(
+                        "text-xs flex items-center gap-1.5 rounded-full px-3 py-1 border transition-all",
+                        showOnlyPhone
+                          ? "bg-brand-500/20 border-brand-500/40 text-brand-300"
+                          : "border-white/10 text-white/40 hover:text-white/70"
+                      )}>
+                      <Phone className="w-3 h-3" />
+                      {showOnlyPhone ? "Tous les leads" : "Avec tél. seulement"}
+                    </button>
                   </div>
                   <div className="flex items-center gap-2">
                     <Filter className="w-3.5 h-3.5 text-white/30" />
                     <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
                       className="select w-auto text-xs py-1.5 px-3">
+                      <option value="phone">Trier : tél. en premier</option>
                       <option value="name">Trier par nom</option>
                       <option value="rating">Trier par note</option>
                       <option value="reviews">Trier par avis</option>
@@ -294,9 +349,10 @@ export default function LeadsPage() {
 
                 {/* Grille leads */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5 pb-24">
-                  {sorted.map((lead: any) => {
+                  {sortedAndFiltered.map((lead: any) => {
                     const isSelected = selectedIds.has(lead.id);
                     const isAdded    = !!lead._added;
+                    const hasPhone   = !!lead.phone;
                     return (
                       <div
                         key={lead.id}
@@ -304,7 +360,8 @@ export default function LeadsPage() {
                         className={cn(
                           "glass rounded-xl p-4 cursor-pointer transition-all relative",
                           isSelected ? "border-brand-500/50 bg-brand-500/[0.07]" : "hover:border-white/15",
-                          isAdded    && "border-emerald-500/30 opacity-70"
+                          isAdded    && "border-emerald-500/30 opacity-70",
+                          hasPhone   && "border-l-2 border-l-emerald-500/40"
                         )}>
                         {/* Checkbox */}
                         <button
@@ -320,7 +377,7 @@ export default function LeadsPage() {
                           <div className="flex items-start gap-2 mb-2">
                             <div className="flex-1 min-w-0">
                               <h3 className="text-sm font-semibold text-white truncate">{lead.name}</h3>
-                              <p className="text-xs text-white/40">{lead.category}</p>
+                              <p className="text-xs text-white/40">{lead.category} · {lead.city}</p>
                             </div>
                             {lead.rating > 0 && (
                               <div className="shrink-0 text-right">
@@ -330,30 +387,46 @@ export default function LeadsPage() {
                             )}
                           </div>
 
-                          {/* Coordonnées */}
-                          <div className="space-y-1 mb-3">
-                            <div className="flex items-center gap-1.5">
-                              <Phone className="w-3 h-3 text-brand-400 shrink-0" />
+                          {/* Téléphone — point central */}
+                          <div className="flex items-center gap-2 mb-2 min-h-[22px]">
+                            <Phone className={cn("w-3 h-3 shrink-0", hasPhone ? "text-emerald-400" : "text-white/20")} />
+                            {hasPhone ? (
                               <PhoneBadge phone={lead.phone} />
-                            </div>
-                            <div className="flex items-center gap-1.5 text-white/40 text-xs">
-                              <MapPin className="w-3 h-3 shrink-0" />
-                              <span className="truncate">{lead.address ? `${lead.address}, ` : ""}{lead.city}</span>
-                            </div>
-                            {lead.website && (
-                              <div className="flex items-center gap-1.5 text-white/40 text-xs">
-                                <Globe className="w-3 h-3 shrink-0" />
-                                <span className="truncate text-brand-400/60">{lead.website}</span>
-                              </div>
+                            ) : (
+                              <PhoneLookupBtn name={lead.name} city={lead.city || city} />
                             )}
                           </div>
 
+                          {/* Adresse */}
+                          {lead.address && (
+                            <div className="flex items-center gap-1.5 text-white/35 text-xs mb-2">
+                              <MapPin className="w-3 h-3 shrink-0" />
+                              <span className="truncate">{lead.address}</span>
+                            </div>
+                          )}
+
+                          {lead.website && (
+                            <div className="flex items-center gap-1.5 text-white/35 text-xs mb-2">
+                              <Globe className="w-3 h-3 shrink-0" />
+                              <span className="truncate text-brand-400/60">{lead.website}</span>
+                            </div>
+                          )}
+
                           {/* Actions */}
-                          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                            {lead.phone && lead.phone !== "(pas de tél.)" && (
+                          <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
+                            {hasPhone ? (
                               <a href={`tel:${lead.phone.replace(/\s/g,"")}`}
                                 className="flex-1 flex items-center justify-center gap-1 text-[10px] btn-primary py-1.5 rounded-lg">
                                 <Phone className="w-3 h-3" /> Appeler
+                              </a>
+                            ) : (
+                              <a
+                                href={`https://www.pagesjaunes.fr/annuaire/chercherlespros?quoiqui=${encodeURIComponent(lead.name)}&ou=${encodeURIComponent(lead.city || city)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1.5 rounded-lg border border-amber-500/30 text-amber-400/80 hover:bg-amber-500/10 transition-all"
+                              >
+                                <ExternalLink className="w-3 h-3" /> Trouver tél.
                               </a>
                             )}
                             <button
@@ -419,14 +492,34 @@ export default function LeadsPage() {
 
                 {/* Téléphone */}
                 <div>
-                  <p className="text-[10px] text-white/30 mb-1">Téléphone</p>
-                  {detailLead.phone && detailLead.phone !== "(pas de tél.)" ? (
+                  <p className="text-[10px] text-white/30 mb-1.5">Téléphone</p>
+                  {detailLead.phone ? (
                     <a href={`tel:${detailLead.phone.replace(/\s/g,"")}`}
-                      className="font-mono text-brand-300 text-sm font-semibold hover:text-brand-200">
+                      className="font-mono text-emerald-300 text-base font-bold hover:text-emerald-200 block mb-1">
                       {detailLead.phone}
                     </a>
                   ) : (
-                    <span className="text-amber-400/70 text-xs italic">À compléter manuellement</span>
+                    <div className="space-y-2">
+                      <p className="text-white/30 text-xs">Numéro non disponible dans les sources libres.</p>
+                      <div className="flex gap-2">
+                        <a
+                          href={`https://www.pagesjaunes.fr/annuaire/chercherlespros?quoiqui=${encodeURIComponent(detailLead.name)}&ou=${encodeURIComponent(detailLead.city)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-xs border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 rounded-lg px-3 py-1.5 transition-all"
+                        >
+                          <ExternalLink className="w-3 h-3" /> Pages Jaunes
+                        </a>
+                        <a
+                          href={`https://www.google.fr/search?q=${encodeURIComponent(`"${detailLead.name}" ${detailLead.city} téléphone`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-xs border border-blue-400/30 text-blue-400 hover:bg-blue-400/10 rounded-lg px-3 py-1.5 transition-all"
+                        >
+                          <Search className="w-3 h-3" /> Google
+                        </a>
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -469,10 +562,19 @@ export default function LeadsPage() {
 
               {/* Actions */}
               <div className="space-y-2 pt-2">
-                {detailLead.phone && detailLead.phone !== "(pas de tél.)" && (
+                {detailLead.phone ? (
                   <a href={`tel:${detailLead.phone.replace(/\s/g,"")}`}
                     className="btn-primary flex items-center justify-center gap-2 text-sm w-full py-3 rounded-xl">
                     <Phone className="w-4 h-4" /> Appeler maintenant
+                  </a>
+                ) : (
+                  <a
+                    href={`https://www.pagesjaunes.fr/annuaire/chercherlespros?quoiqui=${encodeURIComponent(detailLead.name)}&ou=${encodeURIComponent(detailLead.city)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 text-sm w-full py-3 rounded-xl border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 transition-all"
+                  >
+                    <ExternalLink className="w-4 h-4" /> Trouver le tél. (Pages Jaunes)
                   </a>
                 )}
                 <button

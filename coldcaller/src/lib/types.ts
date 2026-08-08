@@ -23,7 +23,7 @@ export interface Lead {
   notes: string;
   lastContact?: string;   // ISO date
   rdvDate?: string;       // ISO date
-  source: "google_maps" | "manual" | "import" | "openstreetmap";
+  source: "google_maps" | "manual" | "import" | "openstreetmap" | "sirene";
   detectedAt: string;
   callCount: number;
   callHistory?: CallRecord[];

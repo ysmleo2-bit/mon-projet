@@ -75,7 +75,6 @@ function distKm(lat1: number, lon1: number, lat2: number, lon2: number): number 
 }
 
 // ── 1. Géocodage — api-adresse.data.gouv.fr ──────────────────────────────────
-// Avantages vs Nominatim : pas de User-Agent requis, CORS natif, API officielle FR
 export async function clientGeocode(
   city: string
 ): Promise<{ lat: number; lon: number; dept: string } | null> {
@@ -112,7 +111,13 @@ function osmToLead(el: OsmElement, niche: string, city: string): Lead | null {
   const t = el.tags ?? {};
   const name = t.name ?? t["name:fr"] ?? t.operator ?? null;
   if (!name) return null;
-  const phone = t.phone ?? t["contact:phone"] ?? t["contact:mobile"] ?? null;
+  const phone =
+    t.phone ??
+    t["contact:phone"] ??
+    t["contact:mobile"] ??
+    t["phone:mobile"] ??
+    t["mobile"] ??
+    null;
   const lat = el.lat ?? el.center?.lat;
   const lon = el.lon ?? el.center?.lon;
   const addr = [t["addr:housenumber"], t["addr:street"]].filter(Boolean).join(" ")
@@ -121,8 +126,8 @@ function osmToLead(el: OsmElement, niche: string, city: string): Lead | null {
   const website = (t.website ?? t["contact:website"])?.replace(/^https?:\/\//, "");
   return {
     id: `osm-${el.type}-${el.id}`, name, category: niche,
-    phone: phone ? phone.replace(/^\+33\s?/, "0").replace(/\s+/g, " ").trim() : "(pas de tél.)",
-    address: addr, city, rating: 0, reviewCount: 0, website,
+    phone: phone ? phone.replace(/^\+33\s?/, "0").replace(/\s+/g, " ").trim() : "",
+    address: addr, city: t["addr:city"] || city, rating: 0, reviewCount: 0, website,
     status: "new", notes: "", detectedAt: new Date().toISOString(),
     source: "openstreetmap", callCount: 0,
   };
@@ -136,19 +141,39 @@ export async function clientSearchOsm(
     const kw   = NICHE_KEYWORDS[niche] ?? "";
     if (!tags.length && !kw) return [];
 
-    const r = Math.min(radiusM, 40_000);
-    const parts: string[] = [];
+    const r = Math.min(radiusM, 50_000);
+
+    // Requête 1 : par tag métier (tous, avec ou sans tél.)
+    const tagParts: string[] = [];
     for (const tag of tags) {
       const [k, v] = tag.split("=");
-      parts.push(`node["${k}"="${v}"](around:${r},${lat},${lon});`);
-      parts.push(`way["${k}"="${v}"](around:${r},${lat},${lon});`);
-    }
-    if (kw) {
-      parts.push(`node["name"~"${kw}",i](around:${r},${lat},${lon});`);
-      parts.push(`way["name"~"${kw}",i](around:${r},${lat},${lon});`);
+      tagParts.push(`node["${k}"="${v}"](around:${r},${lat},${lon});`);
+      tagParts.push(`way["${k}"="${v}"](around:${r},${lat},${lon});`);
     }
 
-    const query = `[out:json][timeout:25][maxsize:6000000];\n(\n${parts.join("\n")}\n);\nout center tags 200;`;
+    // Requête 2 : par mot-clé dans le nom (attrape les non-taguées)
+    const kwParts: string[] = [];
+    if (kw) {
+      kwParts.push(`node["name"~"${kw}",i](around:${r},${lat},${lon});`);
+      kwParts.push(`way["name"~"${kw}",i](around:${r},${lat},${lon});`);
+    }
+
+    // Requête 3 : par tag métier ET ayant un numéro de téléphone (priorisé)
+    const phoneParts: string[] = [];
+    for (const tag of tags) {
+      const [k, v] = tag.split("=");
+      phoneParts.push(`node["${k}"="${v}"]["phone"](around:${r},${lat},${lon});`);
+      phoneParts.push(`node["${k}"="${v}"]["contact:phone"](around:${r},${lat},${lon});`);
+      phoneParts.push(`way["${k}"="${v}"]["phone"](around:${r},${lat},${lon});`);
+    }
+    if (kw) {
+      phoneParts.push(`node["name"~"${kw}",i]["phone"](around:${r},${lat},${lon});`);
+      phoneParts.push(`node["name"~"${kw}",i]["contact:phone"](around:${r},${lat},${lon});`);
+    }
+
+    const combined = [...phoneParts, ...tagParts, ...kwParts];
+    const allParts = combined.filter((v, i) => combined.indexOf(v) === i);
+    const query = `[out:json][timeout:30][maxsize:8000000];\n(\n${allParts.join("\n")}\n);\nout center tags 300;`;
 
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
@@ -230,7 +255,7 @@ export async function clientSearchSirene(
     reviewCount: 0,
     status:      "new",
     notes:       "",
-    source:      "openstreetmap",
+    source:      "sirene",
     detectedAt:  now,
     callCount:   0,
   }));
