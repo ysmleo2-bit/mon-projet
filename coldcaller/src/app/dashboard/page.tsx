@@ -63,6 +63,35 @@ export default function DashboardPage() {
   const [showAddForm,  setShowAddForm]  = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // ── Panneaux redimensionnables ───────────────────────────────────────────────
+  const [leftWidth,  setLeftWidth]  = useState(208); // px
+  const [rightWidth, setRightWidth] = useState(288); // px
+  const [isDragging, setIsDragging] = useState(false);
+  const dragState = useRef<{ panel: "left" | "right"; startX: number; startWidth: number } | null>(null);
+  const moveHandler = useRef<(e: MouseEvent) => void>(() => {});
+  const upHandler   = useRef<() => void>(() => {});
+
+  function startResize(panel: "left" | "right", e: React.MouseEvent) {
+    const startWidth = panel === "left" ? leftWidth : rightWidth;
+    dragState.current = { panel, startX: e.clientX, startWidth };
+    setIsDragging(true);
+
+    moveHandler.current = (ev: MouseEvent) => {
+      if (!dragState.current) return;
+      const delta = ev.clientX - dragState.current.startX;
+      if (panel === "left")  setLeftWidth (Math.max(160, Math.min(400, startWidth + delta)));
+      else                   setRightWidth(Math.max(220, Math.min(480, startWidth - delta)));
+    };
+    upHandler.current = () => {
+      dragState.current = null;
+      setIsDragging(false);
+      document.removeEventListener("mousemove", moveHandler.current);
+      document.removeEventListener("mouseup",   upHandler.current);
+    };
+    document.addEventListener("mousemove", moveHandler.current);
+    document.addEventListener("mouseup",   upHandler.current);
+  }
+
   // ── Chargement ──────────────────────────────────────────────────────────────
   const loadLeads = useCallback(async () => {
     try {
@@ -195,11 +224,11 @@ export default function DashboardPage() {
 
   // ────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-screen bg-ink-950 overflow-hidden">
+    <div className={cn("flex h-screen bg-ink-950 overflow-hidden", isDragging && "select-none cursor-col-resize")}>
       <Navbar />
 
       {/* ── Panneau gauche stats + filtres ── */}
-      <aside className="w-52 shrink-0 border-r border-white/[0.06] flex flex-col overflow-hidden bg-ink-900/40">
+      <aside style={{ width: leftWidth }} className="shrink-0 border-r border-white/[0.06] flex flex-col overflow-hidden bg-ink-900/40 relative">
 
         {/* Stats */}
         <div className="p-3 border-b border-white/[0.06]">
@@ -269,6 +298,14 @@ export default function DashboardPage() {
           </div>
         </div>
       </aside>
+
+      {/* ── Poignée gauche ── */}
+      <div
+        onMouseDown={(e) => startResize("left", e)}
+        className="w-1 shrink-0 bg-white/[0.04] hover:bg-brand-500/60 active:bg-brand-500 cursor-col-resize transition-colors relative group"
+        title="Redimensionner">
+        <div className="absolute inset-y-0 -left-1 -right-1" />
+      </div>
 
       {/* ── Liste principale ── */}
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -413,7 +450,15 @@ export default function DashboardPage() {
 
       {/* ── Panneau droit détail ── */}
       {selected && (
-        <aside className="w-72 shrink-0 border-l border-white/[0.06] bg-ink-900/60 flex flex-col h-full overflow-hidden">
+        <>
+        {/* Poignée droite */}
+        <div
+          onMouseDown={(e) => startResize("right", e)}
+          className="w-1 shrink-0 bg-white/[0.04] hover:bg-brand-500/60 active:bg-brand-500 cursor-col-resize transition-colors relative"
+          title="Redimensionner">
+          <div className="absolute inset-y-0 -left-1 -right-1" />
+        </div>
+        <aside style={{ width: rightWidth }} className="shrink-0 border-l border-white/[0.06] bg-ink-900/60 flex flex-col h-full overflow-hidden">
 
           {/* Header */}
           <div className="px-4 py-3.5 border-b border-white/[0.06] flex items-start justify-between gap-2 shrink-0">
@@ -582,6 +627,7 @@ export default function DashboardPage() {
             </div>
           </div>
         </aside>
+        </>
       )}
 
       {/* ── Modal ajout ── */}
