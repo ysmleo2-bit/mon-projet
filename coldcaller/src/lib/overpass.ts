@@ -41,12 +41,18 @@ const NICHE_KEYWORDS: Record<string, string> = {
 // ── Géocodage Nominatim ──────────────────────────────────────────────────────
 export async function geocodeCity(city: string): Promise<{ lat: number; lon: number; dept?: string } | null> {
   const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)},France&format=json&limit=1&addressdetails=1`;
-  const res  = await fetch(url, {
-    headers: {
-      "User-Agent": "ColdCaller/1.0 (contact@coldcaller.app)",
-      "Accept":     "application/json",
-    },
-  });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5_000);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: {
+        "User-Agent": "ColdCaller/1.0 (contact@coldcaller.app)",
+        "Accept":     "application/json",
+      },
+    });
+  } catch { return null; } finally { clearTimeout(timer); }
   if (!res.ok) return null;
   const data = await res.json() as Array<{ lat: string; lon: string; address?: { postcode?: string; county?: string } }>;
   if (!data.length) return null;
@@ -95,26 +101,32 @@ export async function searchOverpass(
   }
 
   const query = `
-[out:json][timeout:30][maxsize:8000000];
+[out:json][timeout:7][maxsize:4000000];
 (
 ${parts.join("\n")}
 );
 out center tags ${limit};
 `.trim();
 
-  const res = await fetch("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Accept":       "application/json",
-      "User-Agent":   "ColdCaller/1.0 (contact@coldcaller.app)",
-    },
-    body: `data=${encodeURIComponent(query)}`,
-  });
+  const osmCtrl = new AbortController();
+  const osmTimer = setTimeout(() => osmCtrl.abort(), 8_000);
+  let osmRes: Response;
+  try {
+    osmRes = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      signal: osmCtrl.signal,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept":       "application/json",
+        "User-Agent":   "ColdCaller/1.0 (contact@coldcaller.app)",
+      },
+      body: `data=${encodeURIComponent(query)}`,
+    });
+  } catch { return []; } finally { clearTimeout(osmTimer); }
 
-  if (!res.ok) return [];
+  if (!osmRes.ok) return [];
 
-  const json = await res.json() as { elements: OsmElement[] };
+  const json = await osmRes.json() as { elements: OsmElement[] };
   return json.elements ?? [];
 }
 

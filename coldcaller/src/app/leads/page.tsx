@@ -43,7 +43,7 @@ export default function LeadsPage() {
   // ── Panneau de détail ─────────────────────────────────────────────────────
   const [detailLead, setDetailLead] = useState<Lead | null>(null);
 
-  // ── Recherche ─────────────────────────────────────────────────────────────
+  // ── Recherche (3 appels séparés pour rester sous la limite Vercel Hobby 10 s) ──
   const handleSearch = useCallback(async () => {
     setLoading(true);
     setSearched(true);
@@ -53,17 +53,55 @@ export default function LeadsPage() {
     setStats(null);
     setProgress(0);
 
-    const interval = setInterval(() => setProgress((p) => Math.min(p + 6, 90)), 150);
+    const interval = setInterval(() => setProgress((p) => Math.min(p + 5, 85)), 200);
 
     try {
-      const res  = await fetch("/api/scrape", {
+      // 1. Géocodage (< 2 s)
+      const geoRes = await fetch("/api/geocode", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ niche, city, radius, minRating }),
+        body: JSON.stringify({ city }),
       });
-      const json = await res.json();
-      setLeads(json.leads ?? []);
-      setStats({ osm: json.osm ?? 0, sirene: json.sirene ?? 0 });
+      if (!geoRes.ok) { setLeads([]); return; }
+      const geo = await geoRes.json() as { lat: number; lon: number; dept?: string };
+      setProgress(20);
+
+      // 2. OSM + SIRENE en parallèle (chacun < 9 s, deux fonctions distinctes)
+      const [osmRes, sireneRes] = await Promise.allSettled([
+        fetch("/api/scrape-osm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat: geo.lat, lon: geo.lon, radius, niche }),
+        }).then((r) => r.json()),
+        fetch("/api/scrape-sirene", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dept: geo.dept, lat: geo.lat, lon: geo.lon, radius, niche }),
+        }).then((r) => r.json()),
+      ]);
+
+      const osmLeads: Lead[]    = osmRes.status    === "fulfilled" ? (osmRes.value.leads    ?? []) : [];
+      const sireneLeads: Lead[] = sireneRes.status === "fulfilled" ? (sireneRes.value.leads ?? []) : [];
+
+      // Fusionner OSM (a les téléphones) + SIRENE en dédup par ID
+      const seen = new Map<string, Lead>();
+      for (const l of osmLeads)    seen.set(l.id, { ...l, city });
+      for (const l of sireneLeads) if (!seen.has(l.id)) seen.set(l.id, l);
+
+      const all = Array.from(seen.values());
+      const filtered = minRating > 0 ? all.filter((l) => l.rating >= minRating) : all;
+
+      // Persister dans le CRM en arrière-plan
+      if (filtered.length) {
+        fetch("/api/leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(filtered),
+        }).catch(() => {});
+      }
+
+      setLeads(filtered);
+      setStats({ osm: osmLeads.length, sirene: sireneLeads.length });
       setProgress(100);
     } catch (e) {
       console.error(e);
