@@ -2,26 +2,45 @@ import type { Lead } from "@/lib/types";
 
 // ── Mapping niche → tags OSM ─────────────────────────────────────────────────
 const NICHE_TO_OSM: Record<string, string[]> = {
-  Plombier:     ['craft=plumber'],
+  Plombier:     ['craft=plumber','craft=hvac_technician'],
   Électricien:  ['craft=electrician'],
-  Maçon:        ['craft=mason','craft=construction'],
-  Serrurier:    ['craft=locksmith'],
+  Maçon:        ['craft=mason','craft=construction','craft=bricklayer'],
+  Serrurier:    ['craft=locksmith','shop=locksmith','emergency=locksmith'],
   Peintre:      ['craft=painter'],
   Couvreur:     ['craft=roofer'],
-  Carreleur:    ['craft=tiler'],
-  Menuisier:    ['craft=carpenter','craft=joiner'],
-  Chauffagiste: ['craft=hvac_technician','craft=heating_engineer'],
-  Paysagiste:   ['craft=gardener','landuse=garden_centre'],
+  Carreleur:    ['craft=tiler','craft=floor_layer'],
+  Menuisier:    ['craft=carpenter','craft=joiner','craft=cabinet_maker'],
+  Chauffagiste: ['craft=hvac_technician','craft=heating_engineer','craft=plumber'],
+  Paysagiste:   ['craft=gardener','shop=garden_centre','landuse=garden_centre'],
   Nettoyage:    ['shop=cleaning_service','craft=cleaning_service'],
-  Restaurant:   ['amenity=restaurant'],
-  Boulangerie:  ['shop=bakery'],
-  Coiffeur:     ['shop=hairdresser'],
-  Comptable:    ['office=accountant'],
+  Restaurant:   ['amenity=restaurant','amenity=fast_food','amenity=cafe'],
+  Boulangerie:  ['shop=bakery','craft=bakery'],
+  Coiffeur:     ['shop=hairdresser','shop=beauty'],
+  Comptable:    ['office=accountant','office=tax_advisor'],
+};
+
+// ── Mots-clés pour recherche par nom ──────────────────────────────────────
+const NICHE_KEYWORDS: Record<string, string> = {
+  Plombier:     "plombier|plomberie|sanitaire",
+  Électricien:  "électricien|electricien|électricité",
+  Maçon:        "maçon|maconnerie|maçonnerie|btp",
+  Serrurier:    "serrurier|serrurerie",
+  Peintre:      "peintre|peinture|décoration",
+  Couvreur:     "couvreur|couverture|toiture|ardoise",
+  Carreleur:    "carreleur|carrelage|mosaïque",
+  Menuisier:    "menuisier|menuiserie|ébéniste",
+  Chauffagiste: "chauffagiste|chauffage|climatisation|clim",
+  Paysagiste:   "paysagiste|jardinage|espaces verts",
+  Nettoyage:    "nettoyage|propreté|cleaning",
+  Restaurant:   "restaurant|brasserie|bistrot",
+  Boulangerie:  "boulangerie|boulanger|pain",
+  Coiffeur:     "coiffeur|coiffure|barbier",
+  Comptable:    "comptable|comptabilité|expert-comptable",
 };
 
 // ── Géocodage Nominatim ──────────────────────────────────────────────────────
-export async function geocodeCity(city: string): Promise<{ lat: number; lon: number } | null> {
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)},France&format=json&limit=1`;
+export async function geocodeCity(city: string): Promise<{ lat: number; lon: number; dept?: string } | null> {
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)},France&format=json&limit=1&addressdetails=1`;
   const res  = await fetch(url, {
     headers: {
       "User-Agent": "ColdCaller/1.0 (contact@coldcaller.app)",
@@ -29,9 +48,11 @@ export async function geocodeCity(city: string): Promise<{ lat: number; lon: num
     },
   });
   if (!res.ok) return null;
-  const data = await res.json() as Array<{ lat: string; lon: string }>;
+  const data = await res.json() as Array<{ lat: string; lon: string; address?: { postcode?: string; county?: string } }>;
   if (!data.length) return null;
-  return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+  const postcode = data[0].address?.postcode ?? "";
+  const dept = postcode.slice(0, 2) || undefined;
+  return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), dept };
 }
 
 // ── Requête Overpass ─────────────────────────────────────────────────────────
@@ -49,23 +70,32 @@ export async function searchOverpass(
   lon: number,
   radiusM: number,
   niche: string,
-  limit = 120,
+  limit = 150,
 ): Promise<OsmElement[]> {
-  const tags = NICHE_TO_OSM[niche] ?? [];
-  if (!tags.length) return [];
+  const tags    = NICHE_TO_OSM[niche] ?? [];
+  const keyword = NICHE_KEYWORDS[niche] ?? "";
+  if (!tags.length && !keyword) return [];
 
-  // Bâtir les clauses de filtre (union de toutes les combinaisons type×tag)
-  const radius = Math.min(radiusM, 50000); // cap 50 km pour limiter la taille
+  const radius = Math.min(radiusM, 50000);
   const parts: string[] = [];
+
+  // Par tag métier
   for (const tag of tags) {
     const [k, v] = tag.split("=");
-    for (const t of ["node","way","relation"]) {
+    for (const t of ["node", "way"]) {
       parts.push(`${t}["${k}"="${v}"](around:${radius},${lat},${lon});`);
     }
   }
 
+  // Par nom (catch les entreprises non taguées)
+  if (keyword) {
+    for (const t of ["node", "way"]) {
+      parts.push(`${t}["name"~"${keyword}",i](around:${radius},${lat},${lon});`);
+    }
+  }
+
   const query = `
-[out:json][timeout:25][maxsize:2000000];
+[out:json][timeout:30][maxsize:8000000];
 (
 ${parts.join("\n")}
 );
