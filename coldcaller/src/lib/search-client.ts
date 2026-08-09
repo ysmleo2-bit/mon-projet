@@ -399,7 +399,30 @@ export async function clientSearchFoursquare(
   }
 }
 
-// ── 4. Google Maps (via bot serveur — asynchrone, non bloquant) ──────────────
+// ── 4. Pages Jaunes (bot stealth Playwright — asynchrone, non bloquant) ────────
+// Scrape les vrais numéros de tél. depuis Pages Jaunes via navigateur stealth.
+// S'exécute en arrière-plan, ajoute les numéros aux leads existants par nom.
+export async function clientSearchPagesJaunes(
+  niche: string, city: string,
+): Promise<Array<{ name: string; phone: string; address: string; city: string }>> {
+  try {
+    const res = await fetch("/api/scrape-pagesjaunes", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ niche, city }),
+      signal:  AbortSignal.timeout(55_000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as {
+      results: Array<{ name: string; phone: string; address: string; city: string }>;
+    };
+    return data.results ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// ── 5. Google Maps (via bot serveur — asynchrone, non bloquant) ──────────────
 export async function clientSearchMaps(
   niche: string, city: string, radius: number, maxResults = 20
 ): Promise<Lead[]> {

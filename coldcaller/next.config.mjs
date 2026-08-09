@@ -7,6 +7,10 @@ const nextConfig = {
     serverComponentsExternalPackages: [
       "playwright-core",
       "puppeteer-core",
+      "puppeteer-extra",
+      "puppeteer-extra-plugin-stealth",
+      "puppeteer-extra-plugin-user-data-dir",
+      "puppeteer-extra-plugin-user-preferences",
       "@sparticuz/chromium-min",
     ],
   },

@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import {
   clientGeocode, clientSearchOsm, clientSearchSirene,
   clientSearchMaps, clientOsmBySiret, clientSearchFoursquare,
+  clientSearchPagesJaunes,
 } from "@/lib/search-client";
 
 type SortKey = "phone" | "rating" | "reviews" | "name";
@@ -92,7 +93,7 @@ export default function LeadsPage() {
   const [searched,   setSearched]   = useState(false);
   const [progress,   setProgress]   = useState(0);
   const [sortBy,     setSortBy]     = useState<SortKey>("phone");
-  const [stats,      setStats]      = useState<{ osm: number; sirene: number; maps: number; fsq: number; withPhone: number } | null>(null);
+  const [stats,      setStats]      = useState<{ osm: number; sirene: number; maps: number; fsq: number; pj: number; withPhone: number } | null>(null);
   const [showOnlyPhone,  setShowOnlyPhone]  = useState(false);
   const [enriching,      setEnriching]      = useState(false);
   const [enrichedCount,  setEnrichedCount]  = useState(0);
@@ -167,6 +168,7 @@ export default function LeadsPage() {
         sirene:    sireneLeads.length,
         maps:      0,
         fsq:       0,
+        pj:        0,
         withPhone: initialWithPhone,
       });
       setProgress(100);
@@ -213,9 +215,46 @@ export default function LeadsPage() {
         });
       };
 
+      // Pages Jaunes : matching par nom pour enrichir les leads existants
+      const mergePJPhones = (pjResults: { name: string; phone: string }[]) => {
+        if (!pjResults.length) return;
+        // Index par nom normalisé pour matching rapide
+        const pjMap = new Map<string, string>();
+        for (const r of pjResults) {
+          if (!r.phone) continue;
+          const key = r.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+          pjMap.set(key, r.phone);
+        }
+        let matched = 0;
+        setLeads((prev) => {
+          const updated = prev.map((l) => {
+            if (l.phone) return l;
+            const key = l.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+            // Cherche une correspondance exacte ou partielle
+            const exact = pjMap.get(key);
+            if (exact) { matched++; return { ...l, phone: exact }; }
+            // Correspondance partielle : check si le nom PJ contient le nom du lead
+            const pjEntries = Array.from(pjMap.entries());
+            for (const entry of pjEntries) {
+              const pjKey = entry[0]; const phone = entry[1];
+              if (pjKey.includes(key.slice(0, 6)) || key.includes(pjKey.slice(0, 6))) {
+                matched++; return { ...l, phone };
+              }
+            }
+            return l;
+          });
+          if (matched > 0) {
+            const withPhone = updated.filter((l) => !!l.phone).length;
+            setStats((s) => s ? { ...s, pj: pjResults.filter(r => r.phone).length, withPhone } : s);
+          }
+          return matched > 0 ? updated : prev;
+        });
+      };
+
       Promise.all([
         clientSearchMaps(niche, city, radius, 25).then((r) => mergeIncoming(r, "maps")).catch(() => {}),
         clientSearchFoursquare(geo.lat, geo.lon, radius * 1000, niche, city).then((r) => mergeIncoming(r, "fsq")).catch(() => {}),
+        clientSearchPagesJaunes(niche, city).then((r) => mergePJPhones(r)).catch(() => {}),
       ]).finally(() => setMapsSearching(false));
 
     } catch (e) {
@@ -365,28 +404,20 @@ export default function LeadsPage() {
                 </button>
 
                 {/* Bandeau activation téléphones */}
-                <div className="flex-1 min-w-[260px] rounded-xl border border-amber-500/20 bg-amber-500/[0.05] p-3 text-xs text-amber-300/80">
-                  <p className="font-semibold text-amber-300 mb-1">📞 Activer les numéros automatiques</p>
-                  <div className="space-y-1 text-amber-300/60">
-                    <p>
-                      <span className="text-white/50">Option 1 — </span>
-                      <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" rel="noopener noreferrer"
-                        className="underline hover:text-amber-200 transition-colors">
-                        Google Places API
-                      </a>
-                      {" "}(gratuit 200$/mois) → variable Vercel{" "}
-                      <code className="bg-white/10 px-1 rounded text-[10px]">GOOGLE_MAPS_API_KEY</code>
-                    </p>
-                    <p>
-                      <span className="text-white/50">Option 2 — </span>
-                      <a href="https://developer.foursquare.com/places" target="_blank" rel="noopener noreferrer"
-                        className="underline hover:text-amber-200 transition-colors">
-                        Foursquare Places
-                      </a>
-                      {" "}(100k appels/mois gratuits) → variable Vercel{" "}
-                      <code className="bg-white/10 px-1 rounded text-[10px]">NEXT_PUBLIC_FSQ_API_KEY</code>
-                    </p>
-                  </div>
+                <div className="flex-1 min-w-[240px] rounded-xl border border-amber-500/20 bg-amber-500/[0.05] p-3 text-xs text-amber-300/80">
+                  <p className="font-semibold text-amber-300 mb-1">📞 100% de numéros → clé Google Maps</p>
+                  <p className="text-amber-300/55 leading-relaxed">
+                    Pages Jaunes + OSM scrappés automatiquement.{" "}
+                    Pour couvrir tous les leads :{" "}
+                    <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com"
+                      target="_blank" rel="noopener noreferrer"
+                      className="underline text-amber-300 hover:text-white transition-colors">
+                      activer Google Places API
+                    </a>
+                    {" "}(200$/mois offerts ≈ 5 000 recherches) puis ajouter{" "}
+                    <code className="bg-white/10 px-1 rounded text-[10px]">GOOGLE_MAPS_API_KEY</code>
+                    {" "}dans les variables Vercel.
+                  </p>
                 </div>
               </div>
             </div>
@@ -457,6 +488,7 @@ export default function LeadsPage() {
                           </span>
                         )}
                         {stats.maps > 0   && <span className="text-white/20 text-[10px]">{stats.maps} Maps</span>}
+                        {stats.pj > 0     && <span className="text-white/20 text-[10px]">{stats.pj} PJ</span>}
                         {stats.fsq > 0    && <span className="text-white/20 text-[10px]">{stats.fsq} FSQ</span>}
                         {stats.osm > 0    && <span className="text-white/20 text-[10px]">{stats.osm} OSM</span>}
                         {stats.sirene > 0 && <span className="text-white/20 text-[10px]">{stats.sirene} Annuaire</span>}
