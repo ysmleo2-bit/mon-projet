@@ -196,11 +196,14 @@ interface SireneHit {
   nom_complet: string;
   nom_raison_sociale?: string;
   siege: {
+    siret?: string;
     libelle_commune: string;
     numero_voie?: string;
     libelle_voie?: string;
     latitude?: number;
     longitude?: number;
+    site_internet?: string;
+    telephone?: string;
   };
 }
 
@@ -239,21 +242,161 @@ export async function clientSearchSirene(
   });
 
   const now = new Date().toISOString();
-  return inRadius.slice(0, 80).map((r): Lead => ({
-    id:          `sirene-${r.siren}`,
-    name:        r.nom_raison_sociale ?? r.nom_complet,
-    category:    niche,
-    phone:       "",
-    address:     [r.siege.numero_voie, r.siege.libelle_voie].filter(Boolean).join(" "),
-    city:        r.siege.libelle_commune,
-    rating:      0,
-    reviewCount: 0,
-    status:      "new",
-    notes:       "",
-    source:      "sirene",
-    detectedAt:  now,
-    callCount:   0,
-  }));
+  return inRadius.slice(0, 80).map((r): Lead => {
+    const rawPhone = r.siege.telephone ?? "";
+    const phone = rawPhone
+      ? rawPhone.replace(/^\+33\s?/, "0").replace(/^0033\s?/, "0").replace(/[\s.\-]/g, " ").trim()
+      : "";
+    const website = r.siege.site_internet?.replace(/^https?:\/\//, "");
+    return {
+      id:          `sirene-${r.siren}`,
+      siret:       r.siege.siret,
+      name:        r.nom_raison_sociale ?? r.nom_complet,
+      category:    niche,
+      phone,
+      address:     [r.siege.numero_voie, r.siege.libelle_voie].filter(Boolean).join(" "),
+      city:        r.siege.libelle_commune,
+      rating:      0,
+      reviewCount: 0,
+      website,
+      status:      "new",
+      notes:       "",
+      source:      "sirene",
+      detectedAt:  now,
+      callCount:   0,
+    };
+  });
+}
+
+// ── 3b. Cross-référence SIRET→OSM (enrichissement téléphone gratuit) ──────────
+// Beaucoup de commerces français dans OSM ont un tag "ref:FR:SIRET".
+// On cherche tous les nodes OSM avec SIRET dans le rayon et on retourne
+// le mapping SIRET → {phone, website} pour enrichir les leads SIRENE.
+export async function clientOsmBySiret(
+  lat: number, lon: number, radiusM: number
+): Promise<Map<string, { phone: string; website?: string }>> {
+  try {
+    const r = Math.min(radiusM, 50_000);
+    const query =
+      `[out:json][timeout:20][maxsize:3000000];\n` +
+      `(\n` +
+      `  node["ref:FR:SIRET"](around:${r},${lat},${lon});\n` +
+      `  way["ref:FR:SIRET"](around:${r},${lat},${lon});\n` +
+      `);\n` +
+      `out center tags 500;`;
+
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept":       "application/json",
+      },
+      body: `data=${encodeURIComponent(query)}`,
+      signal: AbortSignal.timeout(25_000),
+    });
+
+    if (!res.ok) return new Map();
+    const json = await res.json() as { elements: OsmElement[] };
+
+    const result = new Map<string, { phone: string; website?: string }>();
+    for (const el of json.elements ?? []) {
+      const t   = el.tags ?? {};
+      const siret = t["ref:FR:SIRET"];
+      if (!siret) continue;
+      const rawPhone =
+        t.phone ?? t["contact:phone"] ?? t["contact:mobile"] ??
+        t["phone:mobile"] ?? t.mobile ?? "";
+      const phone = rawPhone
+        ? rawPhone.replace(/^\+33\s?/, "0").replace(/\s+/g, " ").trim()
+        : "";
+      const website = (t.website ?? t["contact:website"])?.replace(/^https?:\/\//, "");
+      if (phone || website) {
+        result.set(siret, { phone, website });
+      }
+    }
+    return result;
+  } catch {
+    return new Map();
+  }
+}
+
+// ── 3c. Foursquare Places (clé gratuite developer.foursquare.com) ─────────────
+// NEXT_PUBLIC_FSQ_API_KEY — 100 000 appels/mois gratuits, retourne les tél.
+interface FsqPlace {
+  fsq_id: string;
+  name: string;
+  tel?: string;
+  website?: string;
+  rating?: number;
+  location?: {
+    address?: string;
+    locality?: string;
+    formatted_address?: string;
+  };
+}
+
+export async function clientSearchFoursquare(
+  lat: number, lon: number, radiusM: number,
+  niche: string, city: string,
+): Promise<Lead[]> {
+  const key =
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_FSQ_API_KEY) ?? "";
+  if (!key) return [];
+
+  try {
+    const r = Math.min(radiusM, 50_000);
+    const url =
+      `https://api.foursquare.com/v3/places/search` +
+      `?query=${encodeURIComponent(niche)}` +
+      `&ll=${lat},${lon}` +
+      `&radius=${r}` +
+      `&limit=50` +
+      `&fields=fsq_id,name,tel,website,rating,location`;
+
+    const res = await fetch(url, {
+      headers: {
+        "Authorization": key,
+        "Accept": "application/json",
+      },
+      signal: AbortSignal.timeout(12_000),
+    });
+
+    if (!res.ok) return [];
+    const data = await res.json() as { results: FsqPlace[] };
+    const now  = new Date().toISOString();
+
+    return (data.results ?? [])
+      .filter((p) => !!p.name)
+      .map((p): Lead => {
+        const rawPhone = p.tel ?? "";
+        const phone    = rawPhone
+          ? rawPhone.replace(/^\+33\s?/, "0").replace(/^0033\s?/, "0")
+                    .replace(/[\s.\-]/g, " ").trim()
+          : "";
+        const addrParts = [
+          p.location?.address,
+          p.location?.locality ?? city,
+        ].filter(Boolean);
+        return {
+          id:          `fsq-${p.fsq_id}`,
+          name:        p.name,
+          category:    niche,
+          phone,
+          address:     addrParts.join(", "),
+          city:        p.location?.locality ?? city,
+          rating:      p.rating ?? 0,
+          reviewCount: 0,
+          website:     p.website?.replace(/^https?:\/\//, ""),
+          status:      "new",
+          notes:       "",
+          source:      "foursquare",
+          detectedAt:  now,
+          callCount:   0,
+        };
+      });
+  } catch {
+    return [];
+  }
 }
 
 // ── 4. Google Maps (via bot serveur — asynchrone, non bloquant) ──────────────

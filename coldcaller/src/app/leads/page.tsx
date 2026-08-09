@@ -11,7 +11,10 @@ import Navbar from "@/components/Navbar";
 import { NICHES, CITIES } from "@/lib/mock-data";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { clientGeocode, clientSearchOsm, clientSearchSirene, clientSearchMaps } from "@/lib/search-client";
+import {
+  clientGeocode, clientSearchOsm, clientSearchSirene,
+  clientSearchMaps, clientOsmBySiret, clientSearchFoursquare,
+} from "@/lib/search-client";
 
 type SortKey = "phone" | "rating" | "reviews" | "name";
 
@@ -89,7 +92,7 @@ export default function LeadsPage() {
   const [searched,   setSearched]   = useState(false);
   const [progress,   setProgress]   = useState(0);
   const [sortBy,     setSortBy]     = useState<SortKey>("phone");
-  const [stats,      setStats]      = useState<{ osm: number; sirene: number; maps: number; withPhone: number } | null>(null);
+  const [stats,      setStats]      = useState<{ osm: number; sirene: number; maps: number; fsq: number; withPhone: number } | null>(null);
   const [showOnlyPhone,  setShowOnlyPhone]  = useState(false);
   const [enriching,      setEnriching]      = useState(false);
   const [enrichedCount,  setEnrichedCount]  = useState(0);
@@ -130,18 +133,30 @@ export default function LeadsPage() {
       }
       setProgress(20);
 
-      // 2. OSM + SIRENE en parallèle (rapide, pas de bot)
-      //    Maps est lancé EN ARRIÈRE-PLAN pour ne pas bloquer l'affichage
-      const [osmLeads, sireneLeads] = await Promise.all([
+      // 2. OSM + SIRENE + cross-ref SIRET→OSM en parallèle
+      const [osmLeads, sireneLeads, siretMap] = await Promise.all([
         clientSearchOsm(geo.lat, geo.lon, radius * 1000, niche, city),
         clientSearchSirene(niche, geo.dept, geo.lat, geo.lon, radius),
+        clientOsmBySiret(geo.lat, geo.lon, radius * 1000),
       ]);
       setProgress(90);
 
-      // 3. Afficher OSM + SIRENE immédiatement
+      // 3. Enrichir les leads SIRENE avec les données OSM via SIRET
+      const enrichedSirene = sireneLeads.map((l) => {
+        if (l.phone || !l.siret) return l;
+        const osmData = siretMap.get(l.siret);
+        if (!osmData) return l;
+        return {
+          ...l,
+          phone:   osmData.phone   || l.phone,
+          website: osmData.website || l.website,
+        };
+      });
+
+      // 4. Afficher OSM + SIRENE enrichi immédiatement
       const initialSeen = new Map<string, Lead>();
-      for (const l of osmLeads)    initialSeen.set(l.id, l);
-      for (const l of sireneLeads) if (!initialSeen.has(l.id)) initialSeen.set(l.id, l);
+      for (const l of osmLeads)         initialSeen.set(l.id, l);
+      for (const l of enrichedSirene)   if (!initialSeen.has(l.id)) initialSeen.set(l.id, l);
       const initialAll      = Array.from(initialSeen.values());
       const initialFiltered = minRating > 0 ? initialAll.filter((l) => l.rating >= minRating) : initialAll;
       const initialWithPhone = initialFiltered.filter((l) => !!l.phone).length;
@@ -151,12 +166,13 @@ export default function LeadsPage() {
         osm:       osmLeads.length,
         sirene:    sireneLeads.length,
         maps:      0,
+        fsq:       0,
         withPhone: initialWithPhone,
       });
       setProgress(100);
       setEnrichedCount(0);
 
-      // 4. Sauvegarder OSM + SIRENE en DB
+      // 5. Sauvegarder OSM + SIRENE en DB
       if (initialFiltered.length) {
         fetch("/api/leads", {
           method: "POST",
@@ -165,7 +181,7 @@ export default function LeadsPage() {
         }).catch(() => {});
       }
 
-      // 5. Enrichissement tél. depuis sites web
+      // 6. Enrichissement tél. depuis sites web
       const toEnrich = initialFiltered.filter((l) => !l.phone && l.website);
       if (toEnrich.length > 0) {
         setEnriching(true);
@@ -179,26 +195,28 @@ export default function LeadsPage() {
         ).finally(() => setEnriching(false));
       }
 
-      // 6. Google Maps en ARRIÈRE-PLAN — ajoute les résultats dès qu'ils arrivent
-      //    (bot lent ou bloqué → ne bloque jamais l'affichage initial)
+      // 7. Sources supplémentaires EN ARRIÈRE-PLAN (Foursquare + Google Maps)
+      //    → s'ajoutent à la liste dès qu'elles répondent
       setMapsSearching(true);
-      clientSearchMaps(niche, city, radius, 25)
-        .then((mapsLeads) => {
-          if (!mapsLeads.length) return;
-          setLeads((prev) => {
-            // Maps prend la priorité : écrase les doublons éventuels
-            const merged = new Map<string, Lead>();
-            for (const l of mapsLeads) merged.set(l.id, l);
-            for (const l of prev)      if (!merged.has(l.id)) merged.set(l.id, l);
-            const all      = Array.from(merged.values());
-            const filtered = minRating > 0 ? all.filter((l) => l.rating >= minRating) : all;
-            const withPhone = filtered.filter((l) => !!l.phone).length;
-            setStats((s) => s ? { ...s, maps: mapsLeads.length, withPhone } : s);
-            return filtered;
-          });
-        })
-        .catch(() => {})
-        .finally(() => setMapsSearching(false));
+
+      const mergeIncoming = (incoming: Lead[], sourceKey: "maps" | "fsq") => {
+        if (!incoming.length) return;
+        setLeads((prev) => {
+          const merged = new Map<string, Lead>();
+          for (const l of incoming) merged.set(l.id, l);
+          for (const l of prev)     if (!merged.has(l.id)) merged.set(l.id, l);
+          const all      = Array.from(merged.values());
+          const filtered = minRating > 0 ? all.filter((l) => l.rating >= minRating) : all;
+          const withPhone = filtered.filter((l) => !!l.phone).length;
+          setStats((s) => s ? { ...s, [sourceKey]: incoming.length, withPhone } : s);
+          return filtered;
+        });
+      };
+
+      Promise.all([
+        clientSearchMaps(niche, city, radius, 25).then((r) => mergeIncoming(r, "maps")).catch(() => {}),
+        clientSearchFoursquare(geo.lat, geo.lon, radius * 1000, niche, city).then((r) => mergeIncoming(r, "fsq")).catch(() => {}),
+      ]).finally(() => setMapsSearching(false));
 
     } catch (e) {
       console.error("Erreur recherche :", e);
@@ -338,12 +356,39 @@ export default function LeadsPage() {
                 </div>
               </div>
 
-              <button onClick={handleSearch} disabled={loading}
-                className={cn("btn-primary flex items-center gap-2 text-sm px-8 py-3", loading && "opacity-70 cursor-not-allowed")}>
-                {loading
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Extraction en cours…</>
-                  : <><Zap className="w-4 h-4" /> Lancer la recherche</>}
-              </button>
+              <div className="flex items-start gap-4 flex-wrap">
+                <button onClick={handleSearch} disabled={loading}
+                  className={cn("btn-primary flex items-center gap-2 text-sm px-8 py-3", loading && "opacity-70 cursor-not-allowed")}>
+                  {loading
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Extraction en cours…</>
+                    : <><Zap className="w-4 h-4" /> Lancer la recherche</>}
+                </button>
+
+                {/* Bandeau activation téléphones */}
+                <div className="flex-1 min-w-[260px] rounded-xl border border-amber-500/20 bg-amber-500/[0.05] p-3 text-xs text-amber-300/80">
+                  <p className="font-semibold text-amber-300 mb-1">📞 Activer les numéros automatiques</p>
+                  <div className="space-y-1 text-amber-300/60">
+                    <p>
+                      <span className="text-white/50">Option 1 — </span>
+                      <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" rel="noopener noreferrer"
+                        className="underline hover:text-amber-200 transition-colors">
+                        Google Places API
+                      </a>
+                      {" "}(gratuit 200$/mois) → variable Vercel{" "}
+                      <code className="bg-white/10 px-1 rounded text-[10px]">GOOGLE_MAPS_API_KEY</code>
+                    </p>
+                    <p>
+                      <span className="text-white/50">Option 2 — </span>
+                      <a href="https://developer.foursquare.com/places" target="_blank" rel="noopener noreferrer"
+                        className="underline hover:text-amber-200 transition-colors">
+                        Foursquare Places
+                      </a>
+                      {" "}(100k appels/mois gratuits) → variable Vercel{" "}
+                      <code className="bg-white/10 px-1 rounded text-[10px]">NEXT_PUBLIC_FSQ_API_KEY</code>
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Erreur */}
@@ -411,8 +456,9 @@ export default function LeadsPage() {
                             +{enrichedCount} via sites
                           </span>
                         )}
-                        {stats.maps > 0 && <span className="text-white/20 text-[10px]">{stats.maps} Maps</span>}
-                        {stats.osm > 0 && <span className="text-white/20 text-[10px]">{stats.osm} OSM</span>}
+                        {stats.maps > 0   && <span className="text-white/20 text-[10px]">{stats.maps} Maps</span>}
+                        {stats.fsq > 0    && <span className="text-white/20 text-[10px]">{stats.fsq} FSQ</span>}
+                        {stats.osm > 0    && <span className="text-white/20 text-[10px]">{stats.osm} OSM</span>}
                         {stats.sirene > 0 && <span className="text-white/20 text-[10px]">{stats.sirene} Annuaire</span>}
                       </span>
                     )}

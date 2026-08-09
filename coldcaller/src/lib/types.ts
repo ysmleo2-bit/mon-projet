@@ -23,7 +23,8 @@ export interface Lead {
   notes: string;
   lastContact?: string;   // ISO date
   rdvDate?: string;       // ISO date
-  source: "google_maps" | "manual" | "import" | "openstreetmap" | "sirene";
+  siret?: string;            // for SIRENE leads (used to cross-ref with OSM)
+  source: "google_maps" | "manual" | "import" | "openstreetmap" | "sirene" | "foursquare";
   detectedAt: string;
   callCount: number;
   callHistory?: CallRecord[];
