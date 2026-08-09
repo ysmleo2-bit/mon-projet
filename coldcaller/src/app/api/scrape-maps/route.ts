@@ -2,21 +2,21 @@
  * /api/scrape-maps  — Google Maps scraper
  *
  * Mode 1 (recommandé) : si GOOGLE_MAPS_API_KEY est défini →
- *   utilise Places Text Search + Place Details (API officielle Google)
+ *   utilise la nouvelle Places API v1 (places:searchText) qui retourne les
+ *   numéros de téléphone en UNE SEULE requête (vs 20+ avant → plus de timeout)
  *
  * Mode 2 (bot headless) : si pas de clé API →
  *   utilise Playwright + Chromium pour scraper Google Maps directement
  *
  * Déploiement :
- *   - Vercel Pro (60 s) avec @sparticuz/chromium-min pour le mode bot
- *   - OU définir GOOGLE_MAPS_API_KEY dans les env vars Vercel (gratuit
- *     jusqu'à 200 $/mois de crédit ≈ 5 000 recherches/mois)
+ *   - Ajouter GOOGLE_MAPS_API_KEY dans les env vars Vercel
+ *   - L'API v1 répond en < 3s → compatible Vercel Hobby (10 s)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import type { Lead } from "@/lib/types";
 
-export const dynamic   = "force-dynamic";
+export const dynamic     = "force-dynamic";
 export const maxDuration = 55;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -28,39 +28,115 @@ function cleanPhone(raw: string): string {
     .trim();
 }
 
-function frPhoneFromText(text: string): string | null {
-  const m = text.match(/(?:\+33\s?|0033\s?|(?<!\d)0)[1-9](?:[\s.\-]?\d{2}){4}(?!\d)/);
-  return m ? cleanPhone(m[0]) : null;
-}
-
-// ── Mode 1 : Google Places API (officielle) ───────────────────────────────────
-async function scrapeViaPlacesApi(
-  niche: string, city: string, radiusM: number, maxResults: number,
+// ── Mode 1 : Google Places API v1 (une seule requête, retourne les tél.) ─────
+async function scrapeViaPlacesApiV1(
+  niche: string, city: string, maxResults: number,
 ): Promise<Lead[]> {
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   const now = new Date().toISOString();
 
-  // 1. Text Search
+  // Nouvelle Places API v1 — phone + website dans une seule requête
+  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: {
+      "Content-Type":   "application/json",
+      "X-Goog-Api-Key": key,
+      "X-Goog-FieldMask": [
+        "places.id",
+        "places.displayName",
+        "places.formattedAddress",
+        "places.nationalPhoneNumber",
+        "places.internationalPhoneNumber",
+        "places.rating",
+        "places.userRatingCount",
+        "places.websiteUri",
+        "places.addressComponents",
+      ].join(","),
+    },
+    body: JSON.stringify({
+      textQuery:       `${niche} ${city}`,
+      languageCode:    "fr",
+      maxResultCount:  Math.min(maxResults, 20),
+    }),
+    signal: AbortSignal.timeout(8_000),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    console.error("[scrape-maps] Places API v1 error:", res.status, errText.slice(0, 200));
+    // Fallback vers l'ancienne API
+    return scrapeViaPlacesApiLegacy(niche, city, maxResults);
+  }
+
+  const data = await res.json() as {
+    places?: Array<{
+      id: string;
+      displayName?: { text: string };
+      formattedAddress?: string;
+      nationalPhoneNumber?: string;
+      internationalPhoneNumber?: string;
+      rating?: number;
+      userRatingCount?: number;
+      websiteUri?: string;
+      addressComponents?: Array<{ longText: string; types: string[] }>;
+    }>;
+  };
+
+  const places = data.places ?? [];
+  console.log(`[scrape-maps] Places API v1: ${places.length} résultats pour "${niche} ${city}"`);
+
+  return places
+    .filter((p) => !!p.displayName?.text)
+    .map((p): Lead => {
+      const rawPhone = p.nationalPhoneNumber ?? p.internationalPhoneNumber ?? "";
+      const cityComp = p.addressComponents?.find((c) => c.types.includes("locality"));
+
+      return {
+        id:          `gmaps-${p.id}`,
+        name:        p.displayName!.text,
+        category:    niche,
+        phone:       rawPhone ? cleanPhone(rawPhone) : "",
+        address:     p.formattedAddress ?? "",
+        city:        cityComp?.longText ?? city,
+        rating:      p.rating ?? 0,
+        reviewCount: p.userRatingCount ?? 0,
+        website:     p.websiteUri?.replace(/^https?:\/\//, ""),
+        status:      "new",
+        notes:       "",
+        source:      "google_maps",
+        detectedAt:  now,
+        callCount:   0,
+      };
+    });
+}
+
+// ── Mode 1b : Ancienne API Places (Text Search + Details) — fallback ──────────
+async function scrapeViaPlacesApiLegacy(
+  niche: string, city: string, maxResults: number,
+): Promise<Lead[]> {
+  const key = process.env.GOOGLE_MAPS_API_KEY!;
+  const now = new Date().toISOString();
+
+  // 1. Text Search (limite à 5 résultats pour rester dans le timeout de 10 s)
   const searchUrl =
     `https://maps.googleapis.com/maps/api/place/textsearch/json` +
     `?query=${encodeURIComponent(`${niche} ${city}`)}` +
     `&language=fr&region=fr&key=${key}`;
 
-  const searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(10_000) });
+  const searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(6_000) });
   if (!searchRes.ok) return [];
   const searchData = await searchRes.json() as {
     results: Array<{
       place_id: string; name: string;
       formatted_address: string;
-      geometry: { location: { lat: number; lng: number } };
       rating?: number; user_ratings_total?: number;
-      website?: string;
     }>;
   };
 
-  const places = (searchData.results ?? []).slice(0, maxResults);
+  // Réduire à 5 max pour tenir dans le timeout Hobby
+  const places = (searchData.results ?? []).slice(0, Math.min(maxResults, 5));
 
-  // 2. Place Details pour chaque résultat (phone + website)
+  // 2. Place Details (téléphone) en parallèle
   const detailFetches = places.map(async (p) => {
     try {
       const detailUrl =
@@ -68,7 +144,7 @@ async function scrapeViaPlacesApi(
         `?place_id=${p.place_id}` +
         `&fields=name,formatted_phone_number,formatted_address,rating,user_ratings_total,website,address_component` +
         `&language=fr&key=${key}`;
-      const dr = await fetch(detailUrl, { signal: AbortSignal.timeout(8_000) });
+      const dr = await fetch(detailUrl, { signal: AbortSignal.timeout(4_000) });
       if (!dr.ok) return null;
       const dd = await dr.json() as {
         result?: {
@@ -85,13 +161,11 @@ async function scrapeViaPlacesApi(
       if (!r) return null;
 
       const cityComp = r.address_component?.find((c) => c.types.includes("locality"));
-      const phoneRaw = r.formatted_phone_number ?? "";
-
       return {
         id:          `gmaps-${p.place_id}`,
         name:        r.name,
         category:    niche,
-        phone:       phoneRaw ? cleanPhone(phoneRaw) : "",
+        phone:       r.formatted_phone_number ? cleanPhone(r.formatted_phone_number) : "",
         address:     r.formatted_address ?? p.formatted_address,
         city:        cityComp?.long_name ?? city,
         rating:      r.rating ?? 0,
@@ -171,6 +245,15 @@ async function scrapeViaPlaywrightCore(
 }
 
 // ── Logique d'extraction partagée ────────────────────────────────────────────
+interface BrowserPage {
+  goto: (url: string, opts?: any) => Promise<any>;
+  evaluate: <T>(fn: () => T) => Promise<T>;
+  waitForSelector: (sel: string, opts?: any) => Promise<any>;
+  waitForTimeout: (ms: number) => Promise<void>;
+  click?: (sel: string) => Promise<void>;
+  setExtraHTTPHeaders?: (h: Record<string, string>) => Promise<void>;
+}
+
 async function extractFromBrowser(
   browser: { newPage: () => Promise<BrowserPage> },
   niche: string, city: string, maxResults: number,
@@ -179,7 +262,6 @@ async function extractFromBrowser(
   const page = await browser.newPage();
   const now = new Date().toISOString();
 
-  // Set lang + UA
   if (mode === "playwright") {
     const pwPage = page as any;
     await pwPage.setExtraHTTPHeaders({ "Accept-Language": "fr-FR,fr;q=0.9" });
@@ -194,7 +276,6 @@ async function extractFromBrowser(
   const searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(`${niche} ${city}`)}`;
   await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 20_000 });
 
-  // Accepter les cookies si dialog présent
   try {
     const cookieBtn = await page.waitForSelector(
       'button[jsname="higCR"], button[aria-label*="Tout accepter"], button[aria-label*="Accept all"]',
@@ -204,11 +285,9 @@ async function extractFromBrowser(
     await page.waitForTimeout(1000);
   } catch { /* pas de dialog */ }
 
-  // Attendre le panneau de résultats
   await page.waitForSelector('[role="feed"], .Nv2PK, a.hfpxzc', { timeout: 15_000 });
   await page.waitForTimeout(2000);
 
-  // Récupérer tous les liens de résultats
   const placeLinks: string[] = await page.evaluate(() => {
     const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="/maps/place"]'));
     const seen = new Set<string>();
@@ -232,20 +311,17 @@ async function extractFromBrowser(
       await page.waitForTimeout(1500);
 
       const data = await page.evaluate(() => {
-        // Nom
         const name = (
           document.querySelector("h1.DUwDvf")
           ?? document.querySelector('[data-attrid="title"] span')
           ?? document.querySelector("h1")
         )?.textContent?.trim() ?? "";
 
-        // Téléphone — méthodes multiples
         let phone = "";
         const telEl = document.querySelector('a[href^="tel:"]');
         if (telEl) {
           phone = (telEl as HTMLAnchorElement).href.replace("tel:", "");
         } else {
-          // Chercher aria-label contenant un numéro
           const btns = Array.from(document.querySelectorAll("button, [aria-label]"));
           for (const btn of btns) {
             const lbl = (btn as HTMLElement).getAttribute("aria-label") ?? "";
@@ -254,34 +330,29 @@ async function extractFromBrowser(
               if (m) { phone = m[0]; break; }
             }
           }
-          // Dernier recours : data-value sur boutons
           if (!phone) {
             const dataVals = Array.from(document.querySelectorAll("[data-value]"));
             for (const el of dataVals) {
               const v = (el as HTMLElement).getAttribute("data-value") ?? "";
-              if (/^(\+33|0)[0-9]{9}/.test(v.replace(/\s/g,""))) { phone = v; break; }
+              if (/^(\+33|0)[0-9]{9}/.test(v.replace(/\s/g, ""))) { phone = v; break; }
             }
           }
         }
 
-        // Adresse
         const addrEl = document.querySelector('[data-item-id*="address"], button[aria-label*="Adresse"]');
         const address = addrEl?.getAttribute("aria-label")?.replace(/^Adresse\s*:\s*/i, "").trim()
           ?? addrEl?.textContent?.trim() ?? "";
 
-        // Note
         const ratingEl = document.querySelector(".ceNzKf, [aria-label*='étoile']");
         const ratingText = ratingEl?.getAttribute("aria-label") ?? "";
         const ratingM = ratingText.match(/([0-9][,.]?[0-9]?)/);
         const rating = ratingM ? parseFloat(ratingM[1].replace(",", ".")) : 0;
 
-        // Avis
         const reviewsEl = document.querySelector(".RDApEe, [aria-label*='avis']");
         const reviewsText = reviewsEl?.textContent ?? reviewsEl?.getAttribute("aria-label") ?? "";
         const reviewsM = reviewsText.match(/(\d[\d\s]*)/);
         const reviewCount = reviewsM ? parseInt(reviewsM[1].replace(/\s/g, "")) : 0;
 
-        // Site web
         const siteEl = document.querySelector('a[data-item-id*="authority"], a[href*="website"]');
         const website = (siteEl as HTMLAnchorElement)?.href?.replace(/^https?:\/\//, "") ?? "";
 
@@ -314,40 +385,31 @@ async function extractFromBrowser(
   return leads;
 }
 
-// Type minimal partagé
-interface BrowserPage {
-  goto: (url: string, opts?: any) => Promise<any>;
-  evaluate: <T>(fn: () => T) => Promise<T>;
-  waitForSelector: (sel: string, opts?: any) => Promise<any>;
-  waitForTimeout: (ms: number) => Promise<void>;
-  click?: (sel: string) => Promise<void>;
-  setExtraHTTPHeaders?: (h: Record<string, string>) => Promise<void>;
-}
-
 // ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
-    niche    = "Plombier",
-    city     = "Lyon",
-    radius   = 20,
+    niche      = "Plombier",
+    city       = "Lyon",
+    radius     = 20,
     maxResults = 20,
   } = body as { niche: string; city: string; radius: number; maxResults: number };
 
-  const radiusM = radius * 1_000;
-
   try {
     let leads: Lead[];
+    let source: string;
 
     if (process.env.GOOGLE_MAPS_API_KEY) {
-      // Mode 1 : API officielle
-      leads = await scrapeViaPlacesApi(niche, city, radiusM, maxResults);
+      // Mode 1 : API officielle v1 (une requête, retourne les tél. directement)
+      leads  = await scrapeViaPlacesApiV1(niche, city, maxResults);
+      source = "api-v1";
     } else {
       // Mode 2 : bot Playwright
-      leads = await scrapeViaPlaywright(niche, city, maxResults);
+      leads  = await scrapeViaPlaywright(niche, city, maxResults);
+      source = "bot";
     }
 
-    return NextResponse.json({ leads, total: leads.length, source: process.env.GOOGLE_MAPS_API_KEY ? "api" : "bot" });
+    return NextResponse.json({ leads, total: leads.length, source });
   } catch (err) {
     console.error("[scrape-maps]", err);
     return NextResponse.json(
