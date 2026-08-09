@@ -1,29 +1,10 @@
 /**
  * search-client.ts — scraping côté navigateur + appels aux routes API
- * • /api/scrape-maps          → Google Maps (Playwright bot ou Google Places API)
- * • api-adresse.data.gouv.fr  → géocodage officiel français
+ * • /api/scrape-maps          → Google Maps (Google Places API si clé définie)
+ * • api-adresse.data.gouv.fr  → géocodage officiel français (CORS natif)
  * • recherche-entreprises.api.gouv.fr → Annuaire des Entreprises (CORS)
- * • overpass-api.de           → OpenStreetMap (CORS *)
+ * • overpass-api.de           → OpenStreetMap (CORS: *)
  */
-
-// ── Google Maps (via notre bot serveur) ───────────────────────────────────────
-export async function clientSearchMaps(
-  niche: string, city: string, radius: number, maxResults = 20
-): Promise<Lead[]> {
-  try {
-    const res = await fetch("/api/scrape-maps", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ niche, city, radius, maxResults }),
-      signal: AbortSignal.timeout(55_000),
-    });
-    if (!res.ok) return [];
-    const data = await res.json() as { leads: Lead[] };
-    return data.leads ?? [];
-  } catch {
-    return [];
-  }
-}
 
 import type { Lead } from "@/lib/types";
 
@@ -32,7 +13,7 @@ const NICHE_TO_OSM: Record<string, string[]> = {
   Plombier:     ["craft=plumber", "craft=hvac_technician"],
   Électricien:  ["craft=electrician"],
   Maçon:        ["craft=mason", "craft=construction", "craft=bricklayer"],
-  Serrurier:    ["craft=locksmith", "shop=locksmith", "emergency=locksmith"],
+  Serrurier:    ["craft=locksmith", "shop=locksmith"],
   Peintre:      ["craft=painter"],
   Couvreur:     ["craft=roofer"],
   Carreleur:    ["craft=tiler", "craft=floor_layer"],
@@ -104,13 +85,13 @@ export async function clientGeocode(
     if (!res.ok) return null;
     const data = await res.json() as {
       features: Array<{
-        geometry: { coordinates: [number, number] };   // [lon, lat]
+        geometry: { coordinates: [number, number] };
         properties: { postcode?: string; citycode?: string };
       }>;
     };
     const f = data.features?.[0];
     if (!f) return null;
-    const [lon, lat] = f.geometry.coordinates;            // GeoJSON = [lon, lat]
+    const [lon, lat] = f.geometry.coordinates;
     const citycode   = f.properties.citycode ?? "";
     const dept       = citycode.slice(0, 2) || f.properties.postcode?.slice(0, 2) || "";
     return { lat, lon, dept };
@@ -119,7 +100,7 @@ export async function clientGeocode(
   }
 }
 
-// ── 2. OpenStreetMap via Overpass (navigateur → CORS *) ──────────────────────
+// ── 2. OpenStreetMap via Overpass ─────────────────────────────────────────────
 interface OsmElement {
   type: "node" | "way" | "relation"; id: number;
   lat?: number; lon?: number;
@@ -136,7 +117,7 @@ function osmToLead(el: OsmElement, niche: string, city: string): Lead | null {
     t["contact:phone"] ??
     t["contact:mobile"] ??
     t["phone:mobile"] ??
-    t["mobile"] ??
+    t.mobile ??
     null;
   const lat = el.lat ?? el.center?.lat;
   const lon = el.lon ?? el.center?.lon;
@@ -145,11 +126,20 @@ function osmToLead(el: OsmElement, niche: string, city: string): Lead | null {
     || `${lat?.toFixed(4) ?? ""}, ${lon?.toFixed(4) ?? ""}`;
   const website = (t.website ?? t["contact:website"])?.replace(/^https?:\/\//, "");
   return {
-    id: `osm-${el.type}-${el.id}`, name, category: niche,
-    phone: phone ? phone.replace(/^\+33\s?/, "0").replace(/\s+/g, " ").trim() : "",
-    address: addr, city: t["addr:city"] || city, rating: 0, reviewCount: 0, website,
-    status: "new", notes: "", detectedAt: new Date().toISOString(),
-    source: "openstreetmap", callCount: 0,
+    id:          `osm-${el.type}-${el.id}`,
+    name,
+    category:    niche,
+    phone:       phone ? phone.replace(/^\+33\s?/, "0").replace(/\s+/g, " ").trim() : "",
+    address:     addr,
+    city:        t["addr:city"] || city,
+    rating:      0,
+    reviewCount: 0,
+    website,
+    status:      "new",
+    notes:       "",
+    detectedAt:  new Date().toISOString(),
+    source:      "openstreetmap",
+    callCount:   0,
   };
 }
 
@@ -163,57 +153,44 @@ export async function clientSearchOsm(
 
     const r = Math.min(radiusM, 50_000);
 
-    // Requête 1 : par tag métier (tous, avec ou sans tél.)
-    const tagParts: string[] = [];
+    // Requête simple et fiable : tag métier + mot-clé dans nom
+    const parts: string[] = [];
     for (const tag of tags) {
       const [k, v] = tag.split("=");
-      tagParts.push(`node["${k}"="${v}"](around:${r},${lat},${lon});`);
-      tagParts.push(`way["${k}"="${v}"](around:${r},${lat},${lon});`);
-    }
-
-    // Requête 2 : par mot-clé dans le nom (attrape les non-taguées)
-    const kwParts: string[] = [];
-    if (kw) {
-      kwParts.push(`node["name"~"${kw}",i](around:${r},${lat},${lon});`);
-      kwParts.push(`way["name"~"${kw}",i](around:${r},${lat},${lon});`);
-    }
-
-    // Requête 3 : par tag métier ET ayant un numéro de téléphone (priorisé)
-    const phoneParts: string[] = [];
-    for (const tag of tags) {
-      const [k, v] = tag.split("=");
-      phoneParts.push(`node["${k}"="${v}"]["phone"](around:${r},${lat},${lon});`);
-      phoneParts.push(`node["${k}"="${v}"]["contact:phone"](around:${r},${lat},${lon});`);
-      phoneParts.push(`way["${k}"="${v}"]["phone"](around:${r},${lat},${lon});`);
+      parts.push(`node["${k}"="${v}"](around:${r},${lat},${lon});`);
+      parts.push(`way["${k}"="${v}"](around:${r},${lat},${lon});`);
     }
     if (kw) {
-      phoneParts.push(`node["name"~"${kw}",i]["phone"](around:${r},${lat},${lon});`);
-      phoneParts.push(`node["name"~"${kw}",i]["contact:phone"](around:${r},${lat},${lon});`);
+      parts.push(`node["name"~"${kw}",i](around:${r},${lat},${lon});`);
+      parts.push(`way["name"~"${kw}",i](around:${r},${lat},${lon});`);
     }
 
-    const combined = [...phoneParts, ...tagParts, ...kwParts];
-    const allParts = combined.filter((v, i) => combined.indexOf(v) === i);
-    const query = `[out:json][timeout:30][maxsize:8000000];\n(\n${allParts.join("\n")}\n);\nout center tags 300;`;
+    const query = `[out:json][timeout:25][maxsize:5000000];\n(\n${parts.join("\n")}\n);\nout center tags 200;`;
 
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/json",
+        "Accept":       "application/json",
       },
       body: `data=${encodeURIComponent(query)}`,
+      signal: AbortSignal.timeout(30_000),
     });
+
     if (!res.ok) return [];
     const json = await res.json() as { elements: OsmElement[] };
-    return (json.elements ?? [])
+    const leads = (json.elements ?? [])
       .map((el) => osmToLead(el, niche, city))
       .filter(Boolean) as Lead[];
+
+    // Trier : leads avec téléphone en premier
+    return leads.sort((a, b) => (b.phone ? 1 : 0) - (a.phone ? 1 : 0));
   } catch {
     return [];
   }
 }
 
-// ── 3. Annuaire des Entreprises SIRENE (navigateur → CORS *) ─────────────────
+// ── 3. Annuaire des Entreprises SIRENE ───────────────────────────────────────
 interface SireneHit {
   siren: string;
   nom_complet: string;
@@ -239,24 +216,22 @@ export async function clientSearchSirene(
     fetch(
       `https://recherche-entreprises.api.gouv.fr/search` +
       `?activite_principale=${encodeURIComponent(naf)}` +
-      `&departement=${dept}&page=1&per_page=25&statut_diffusion_etablissement=O`
+      `&departement=${dept}&page=1&per_page=25&statut_diffusion_etablissement=O`,
+      { signal: AbortSignal.timeout(8_000) }
     )
       .then((r) => r.ok ? r.json() as Promise<{ results: SireneHit[] }> : { results: [] })
       .then((j) => j.results ?? [])
       .catch(() => [] as SireneHit[])
   );
 
-  const pages    = await Promise.all(fetches);
-  const all      = pages.flat();
-
-  // Dédupliquer
-  const seen  = new Set<string>();
-  const unique = all.filter((r) => {
+  const pages   = await Promise.all(fetches);
+  const all     = pages.flat();
+  const seen    = new Set<string>();
+  const unique  = all.filter((r) => {
     if (!r?.siren || seen.has(r.siren)) return false;
     seen.add(r.siren); return true;
   });
 
-  // Filtrer par distance
   const inRadius = unique.filter((r) => {
     const la = r.siege?.latitude, lo = r.siege?.longitude;
     if (!la || !lo) return true;
@@ -279,4 +254,23 @@ export async function clientSearchSirene(
     detectedAt:  now,
     callCount:   0,
   }));
+}
+
+// ── 4. Google Maps (via bot serveur — asynchrone, non bloquant) ──────────────
+export async function clientSearchMaps(
+  niche: string, city: string, radius: number, maxResults = 20
+): Promise<Lead[]> {
+  try {
+    const res = await fetch("/api/scrape-maps", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ niche, city, radius, maxResults }),
+      signal:  AbortSignal.timeout(55_000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as { leads: Lead[] };
+    return data.leads ?? [];
+  } catch {
+    return [];
+  }
 }

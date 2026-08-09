@@ -93,6 +93,7 @@ export default function LeadsPage() {
   const [showOnlyPhone,  setShowOnlyPhone]  = useState(false);
   const [enriching,      setEnriching]      = useState(false);
   const [enrichedCount,  setEnrichedCount]  = useState(0);
+  const [mapsSearching,  setMapsSearching]  = useState(false);
 
   // ── Sélection multiple ────────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -115,78 +116,90 @@ export default function LeadsPage() {
     setProgress(5);
     setEnriching(false);
     setEnrichedCount(0);
+    setMapsSearching(false);
 
-    // Progress animé jusqu'à 85 % (les 3 sources en parallèle)
-    const interval = setInterval(() => setProgress((p) => Math.min(p + 2, 85)), 400);
+    // Progress animé jusqu'à 85 % (OSM + SIRENE rapides, Maps en parallèle)
+    const interval = setInterval(() => setProgress((p) => Math.min(p + 3, 85)), 300);
 
     try {
-      // 1. Géocodage (pour OSM + SIRENE)
+      // 1. Géocodage
       const geo = await clientGeocode(city);
       if (!geo) {
         setError(`Ville introuvable : "${city}". Essaie une autre ville.`);
         return;
       }
-      setProgress(15);
+      setProgress(20);
 
-      // 2. Les 3 sources en parallèle
-      //    • Google Maps bot → numéros réels, notes, sites web
-      //    • OpenStreetMap   → numéros réels, couverture locale
-      //    • Annuaire INSEE  → couverture maximale (sans tél.)
-      const [mapsLeads, osmLeads, sireneLeads] = await Promise.all([
-        clientSearchMaps(niche, city, radius, 25),
+      // 2. OSM + SIRENE en parallèle (rapide, pas de bot)
+      //    Maps est lancé EN ARRIÈRE-PLAN pour ne pas bloquer l'affichage
+      const [osmLeads, sireneLeads] = await Promise.all([
         clientSearchOsm(geo.lat, geo.lon, radius * 1000, niche, city),
         clientSearchSirene(niche, geo.dept, geo.lat, geo.lon, radius),
       ]);
       setProgress(90);
 
-      // 3. Fusionner, dédupliquer (Google Maps > OSM > SIRENE)
-      const seen = new Map<string, Lead>();
+      // 3. Afficher OSM + SIRENE immédiatement
+      const initialSeen = new Map<string, Lead>();
+      for (const l of osmLeads)    initialSeen.set(l.id, l);
+      for (const l of sireneLeads) if (!initialSeen.has(l.id)) initialSeen.set(l.id, l);
+      const initialAll      = Array.from(initialSeen.values());
+      const initialFiltered = minRating > 0 ? initialAll.filter((l) => l.rating >= minRating) : initialAll;
+      const initialWithPhone = initialFiltered.filter((l) => !!l.phone).length;
 
-      // Google Maps en priorité (a les vrais numéros + notes)
-      for (const l of mapsLeads)   seen.set(l.id, l);
-      // OSM complète (couvre ce que Maps manque)
-      for (const l of osmLeads)    if (!seen.has(l.id)) seen.set(l.id, l);
-      // SIRENE en dernier (aucun tél. mais noms officiels)
-      for (const l of sireneLeads) if (!seen.has(l.id)) seen.set(l.id, l);
-
-      const all      = Array.from(seen.values());
-      const filtered = minRating > 0 ? all.filter((l) => l.rating >= minRating) : all;
-      const withPhone = filtered.filter((l) => !!l.phone).length;
-
-      setLeads(filtered);
+      setLeads(initialFiltered);
       setStats({
         osm:       osmLeads.length,
         sirene:    sireneLeads.length,
-        maps:      mapsLeads.length,
-        withPhone,
+        maps:      0,
+        withPhone: initialWithPhone,
       });
       setProgress(100);
       setEnrichedCount(0);
 
-      // 4. Sauvegarder en DB en arrière-plan
-      if (filtered.length) {
+      // 4. Sauvegarder OSM + SIRENE en DB
+      if (initialFiltered.length) {
         fetch("/api/leads", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(filtered),
+          body: JSON.stringify(initialFiltered),
         }).catch(() => {});
       }
 
-      // 5. Enrichissement tél. depuis sites web (pour leads sans tél. mais avec site)
-      const toEnrich = filtered.filter((l) => !l.phone && l.website);
+      // 5. Enrichissement tél. depuis sites web
+      const toEnrich = initialFiltered.filter((l) => !l.phone && l.website);
       if (toEnrich.length > 0) {
         setEnriching(true);
         enrichPhones(
           toEnrich.map((l) => ({ id: l.id, website: l.website! })),
           (id, phone) => {
             setLeads((prev) => prev.map((l) => l.id === id ? { ...l, phone } : l));
-            setStats((prev) =>
-              prev ? { ...prev, withPhone: prev.withPhone + 1 } : prev
-            );
+            setStats((prev) => prev ? { ...prev, withPhone: prev.withPhone + 1 } : prev);
             setEnrichedCount((n) => n + 1);
           }
         ).finally(() => setEnriching(false));
       }
+
+      // 6. Google Maps en ARRIÈRE-PLAN — ajoute les résultats dès qu'ils arrivent
+      //    (bot lent ou bloqué → ne bloque jamais l'affichage initial)
+      setMapsSearching(true);
+      clientSearchMaps(niche, city, radius, 25)
+        .then((mapsLeads) => {
+          if (!mapsLeads.length) return;
+          setLeads((prev) => {
+            // Maps prend la priorité : écrase les doublons éventuels
+            const merged = new Map<string, Lead>();
+            for (const l of mapsLeads) merged.set(l.id, l);
+            for (const l of prev)      if (!merged.has(l.id)) merged.set(l.id, l);
+            const all      = Array.from(merged.values());
+            const filtered = minRating > 0 ? all.filter((l) => l.rating >= minRating) : all;
+            const withPhone = filtered.filter((l) => !!l.phone).length;
+            setStats((s) => s ? { ...s, maps: mapsLeads.length, withPhone } : s);
+            return filtered;
+          });
+        })
+        .catch(() => {})
+        .finally(() => setMapsSearching(false));
+
     } catch (e) {
       console.error("Erreur recherche :", e);
       setError("Erreur lors de la recherche. Vérifiez votre connexion internet.");
@@ -349,11 +362,9 @@ export default function LeadsPage() {
                 <p className="text-xs text-white/40">
                   {progress < 20
                     ? "Géolocalisation de la ville…"
-                    : progress < 60
-                    ? "🔍 Bot Google Maps en cours…"
                     : progress < 85
                     ? "OpenStreetMap + Annuaire des Entreprises…"
-                    : "Fusion et tri par téléphone…"}
+                    : "Tri et affichage des résultats…"}
                 </p>
                 <div className="mt-3 h-1.5 bg-white/[0.06] rounded-full overflow-hidden max-w-xs mx-auto">
                   <div className="h-full bg-brand-500 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
@@ -383,6 +394,12 @@ export default function LeadsPage() {
                         <span className="flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5 text-emerald-400">
                           <Phone className="w-3 h-3" /> {stats.withPhone} avec tél.
                         </span>
+                        {mapsSearching && (
+                          <span className="flex items-center gap-1 text-sky-400/70 animate-pulse">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Maps en cours…
+                          </span>
+                        )}
                         {enriching && (
                           <span className="flex items-center gap-1 text-brand-400/70 animate-pulse">
                             <Loader2 className="w-3 h-3 animate-spin" />
