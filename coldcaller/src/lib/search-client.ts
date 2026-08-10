@@ -10,57 +10,125 @@ import type { Lead } from "@/lib/types";
 
 // ── Mapping niche → tags OSM ─────────────────────────────────────────────────
 const NICHE_TO_OSM: Record<string, string[]> = {
-  Plombier:     ["craft=plumber", "craft=hvac_technician"],
-  Électricien:  ["craft=electrician"],
-  Maçon:        ["craft=mason", "craft=construction", "craft=bricklayer"],
-  Serrurier:    ["craft=locksmith", "shop=locksmith"],
-  Peintre:      ["craft=painter"],
-  Couvreur:     ["craft=roofer"],
-  Carreleur:    ["craft=tiler", "craft=floor_layer"],
-  Menuisier:    ["craft=carpenter", "craft=joiner", "craft=cabinet_maker"],
-  Chauffagiste: ["craft=hvac_technician", "craft=heating_engineer"],
-  Paysagiste:   ["craft=gardener", "shop=garden_centre"],
-  Nettoyage:    ["shop=cleaning_service", "craft=cleaning_service"],
-  Restaurant:   ["amenity=restaurant", "amenity=fast_food", "amenity=cafe"],
-  Boulangerie:  ["shop=bakery", "craft=bakery"],
-  Coiffeur:     ["shop=hairdresser", "shop=beauty"],
-  Comptable:    ["office=accountant", "office=tax_advisor"],
+  Plombier:            ["craft=plumber", "craft=hvac_technician"],
+  Électricien:         ["craft=electrician"],
+  Maçon:               ["craft=mason", "craft=construction", "craft=bricklayer"],
+  Serrurier:           ["craft=locksmith", "shop=locksmith"],
+  Peintre:             ["craft=painter"],
+  Couvreur:            ["craft=roofer"],
+  Carreleur:           ["craft=tiler", "craft=floor_layer"],
+  Menuisier:           ["craft=carpenter", "craft=joiner", "craft=cabinet_maker"],
+  Chauffagiste:        ["craft=hvac_technician", "craft=heating_engineer"],
+  Paysagiste:          ["craft=gardener", "shop=garden_centre"],
+  Nettoyage:           ["shop=cleaning_service", "craft=cleaning_service"],
+  Restaurant:          ["amenity=restaurant", "amenity=fast_food", "amenity=cafe"],
+  Boulangerie:         ["shop=bakery", "craft=bakery"],
+  Coiffeur:            ["shop=hairdresser", "shop=beauty"],
+  Comptable:           ["office=accountant", "office=tax_advisor"],
+  // Nouvelles niches
+  "Agent immobilier":  ["office=real_estate_agent", "shop=real_estate"],
+  Médecin:             ["amenity=doctors", "healthcare=doctor"],
+  Dentiste:            ["amenity=dentist", "healthcare=dentist"],
+  Pharmacie:           ["amenity=pharmacy", "shop=chemist"],
+  Avocat:              ["office=lawyer", "office=attorney"],
+  Architecte:          ["office=architect"],
+  Garage:              ["shop=car_repair", "amenity=car_repair"],
+  Auto:                ["shop=car_repair", "amenity=car_repair", "shop=car"],
+  Opticien:            ["shop=optician"],
+  Kiné:                ["healthcare=physiotherapist", "amenity=physiotherapist"],
+  Vétérinaire:         ["amenity=veterinary"],
+  Assurance:           ["office=insurance"],
+  Banque:              ["amenity=bank"],
+  Supermarché:         ["shop=supermarket", "shop=convenience"],
+  Fleuriste:           ["shop=florist"],
+  Bijouterie:          ["shop=jewelry", "shop=jewellery"],
+  Photographe:         ["shop=photo", "craft=photographer"],
+  Traiteur:            ["shop=deli", "craft=caterer"],
+  Pressing:            ["shop=laundry", "shop=dry_cleaning"],
+  Taxi:                ["amenity=taxi"],
+  Déménageur:          ["office=moving_company"],
+  Informatique:        ["shop=computer", "craft=computer_technician"],
 };
 
 const NICHE_KEYWORDS: Record<string, string> = {
-  Plombier:     "plombier|plomberie|sanitaire",
-  Électricien:  "électricien|electricien|électricité",
-  Maçon:        "maçon|maçonnerie|btp",
-  Serrurier:    "serrurier|serrurerie",
-  Peintre:      "peintre|peinture",
-  Couvreur:     "couvreur|toiture|couverture",
-  Carreleur:    "carreleur|carrelage",
-  Menuisier:    "menuisier|menuiserie",
-  Chauffagiste: "chauffagiste|chauffage|climatisation",
-  Paysagiste:   "paysagiste|jardinage",
-  Nettoyage:    "nettoyage|propreté",
-  Restaurant:   "restaurant|brasserie|bistrot",
-  Boulangerie:  "boulangerie|boulanger|pain",
-  Coiffeur:     "coiffeur|coiffure|barbier",
-  Comptable:    "comptable|comptabilité",
+  Plombier:            "plombier|plomberie|sanitaire",
+  Électricien:         "électricien|electricien|électricité",
+  Maçon:               "maçon|maçonnerie|btp",
+  Serrurier:           "serrurier|serrurerie",
+  Peintre:             "peintre|peinture",
+  Couvreur:            "couvreur|toiture|couverture",
+  Carreleur:           "carreleur|carrelage",
+  Menuisier:           "menuisier|menuiserie",
+  Chauffagiste:        "chauffagiste|chauffage|climatisation",
+  Paysagiste:          "paysagiste|jardinage",
+  Nettoyage:           "nettoyage|propreté",
+  Restaurant:          "restaurant|brasserie|bistrot",
+  Boulangerie:         "boulangerie|boulanger|pain",
+  Coiffeur:            "coiffeur|coiffure|barbier",
+  Comptable:           "comptable|comptabilité",
+  "Agent immobilier":  "immobilier|agence immobilière|agence immo",
+  Médecin:             "médecin|docteur|cabinet médical",
+  Dentiste:            "dentiste|cabinet dentaire",
+  Pharmacie:           "pharmacie|pharmacien",
+  Avocat:              "avocat|cabinet avocat",
+  Architecte:          "architecte|cabinet architecture",
+  Garage:              "garage|carrosserie|mécanique auto",
+  Auto:                "garage|carrosserie|mécanique|auto",
+  Opticien:            "opticien|optique|lunettes",
+  Kiné:                "kiné|kinésithérapeute|physiothérapeute",
+  Vétérinaire:         "vétérinaire|clinique vétérinaire",
+  Assurance:           "assurance|courtier assurance",
+  Banque:              "banque|crédit|caisse",
+  Supermarché:         "supermarché|épicerie|alimentation",
+  Fleuriste:           "fleuriste|fleurs",
+  Bijouterie:          "bijouterie|bijoux|horlogerie",
+  Photographe:         "photographe|photographie|photo",
+  Traiteur:            "traiteur|cuisine|buffet",
+  Pressing:            "pressing|laverie|nettoyage à sec",
+  Taxi:                "taxi|vtc|chauffeur",
+  Déménageur:          "déménagement|déménageur|transport déménagement",
+  Informatique:        "informatique|dépannage informatique|réparation ordinateur",
 };
 
 const NICHE_TO_NAF: Record<string, string[]> = {
-  Plombier:     ["43.21A", "43.22A"],
-  Électricien:  ["43.21A", "43.21B"],
-  Maçon:        ["43.99C", "41.20A", "43.12A"],
-  Serrurier:    ["43.22B", "43.32B"],
-  Peintre:      ["43.34Z"],
-  Couvreur:     ["43.91A", "43.91B"],
-  Carreleur:    ["43.33Z"],
-  Menuisier:    ["43.32A", "43.32B", "16.23Z"],
-  Chauffagiste: ["43.22A", "43.22C"],
-  Paysagiste:   ["81.30Z"],
-  Nettoyage:    ["81.21Z", "81.22Z"],
-  Restaurant:   ["56.10A", "56.10B", "56.21Z"],
-  Boulangerie:  ["10.71A", "10.71B", "47.24Z"],
-  Coiffeur:     ["96.02A", "96.02B"],
-  Comptable:    ["69.20Z"],
+  Plombier:            ["43.21A", "43.22A"],
+  Électricien:         ["43.21A", "43.21B"],
+  Maçon:               ["43.99C", "41.20A", "43.12A"],
+  Serrurier:           ["43.22B", "43.32B"],
+  Peintre:             ["43.34Z"],
+  Couvreur:            ["43.91A", "43.91B"],
+  Carreleur:           ["43.33Z"],
+  Menuisier:           ["43.32A", "43.32B", "16.23Z"],
+  Chauffagiste:        ["43.22A", "43.22C"],
+  Paysagiste:          ["81.30Z"],
+  Nettoyage:           ["81.21Z", "81.22Z"],
+  Restaurant:          ["56.10A", "56.10B", "56.21Z"],
+  Boulangerie:         ["10.71A", "10.71B", "47.24Z"],
+  Coiffeur:            ["96.02A", "96.02B"],
+  Comptable:           ["69.20Z"],
+  // Nouvelles niches
+  "Agent immobilier":  ["68.31Z", "68.10Z"],
+  Médecin:             ["86.21Z", "86.22A", "86.22B", "86.22C"],
+  Dentiste:            ["86.23Z"],
+  Pharmacie:           ["47.73Z"],
+  Avocat:              ["69.10Z"],
+  Architecte:          ["71.11Z"],
+  Garage:              ["45.20A", "45.20B"],
+  Auto:                ["45.20A", "45.20B", "45.11Z"],
+  Opticien:            ["47.78A"],
+  Kiné:                ["86.90A"],
+  Vétérinaire:         ["75.00Z"],
+  Assurance:           ["65.12Z", "65.20Z", "66.22Z"],
+  Banque:              ["64.19Z", "64.11Z"],
+  Supermarché:         ["47.11A", "47.11B", "47.11F"],
+  Fleuriste:           ["47.76Z"],
+  Bijouterie:          ["47.77Z"],
+  Photographe:         ["74.20Z"],
+  Traiteur:            ["56.21Z", "10.85Z"],
+  Pressing:            ["96.01Z"],
+  Taxi:                ["49.32Z"],
+  Déménageur:          ["49.42Z"],
+  Informatique:        ["62.09Z", "95.11Z"],
 };
 
 // ── Haversine ────────────────────────────────────────────────────────────────
@@ -148,7 +216,8 @@ export async function clientSearchOsm(
 ): Promise<Lead[]> {
   try {
     const tags = NICHE_TO_OSM[niche] ?? [];
-    const kw   = NICHE_KEYWORDS[niche] ?? "";
+    // Pour les niches inconnues, chercher par le nom de la niche dans le nom OSM
+    const kw   = NICHE_KEYWORDS[niche] ?? niche.toLowerCase().replace(/[^a-zàâäéèêëîïôùûü]/gi, "|");
     if (!tags.length && !kw) return [];
 
     const r = Math.min(radiusM, 50_000);
@@ -213,9 +282,19 @@ export async function clientSearchSirene(
 ): Promise<Lead[]> {
   if (!dept) return [];
   const nafCodes = NICHE_TO_NAF[niche] ?? [];
-  if (!nafCodes.length) return [];
 
-  const fetches = nafCodes.map((naf) =>
+  // ─ Requêtes : par code NAF si connu, + toujours une recherche texte libre
+  const textQuery = encodeURIComponent(niche);
+  const textSearch = fetch(
+    `https://recherche-entreprises.api.gouv.fr/search` +
+    `?q=${textQuery}&departement=${dept}&page=1&per_page=25&statut_diffusion_etablissement=O`,
+    { signal: AbortSignal.timeout(8_000) }
+  )
+    .then((r) => r.ok ? r.json() as Promise<{ results: SireneHit[] }> : { results: [] })
+    .then((j) => j.results ?? [])
+    .catch(() => [] as SireneHit[]);
+
+  const nafFetches = nafCodes.map((naf) =>
     fetch(
       `https://recherche-entreprises.api.gouv.fr/search` +
       `?activite_principale=${encodeURIComponent(naf)}` +
@@ -226,6 +305,8 @@ export async function clientSearchSirene(
       .then((j) => j.results ?? [])
       .catch(() => [] as SireneHit[])
   );
+
+  const fetches = [textSearch, ...nafFetches];
 
   const pages   = await Promise.all(fetches);
   const all     = pages.flat();

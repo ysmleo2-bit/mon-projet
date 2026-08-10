@@ -29,13 +29,28 @@ function cleanPhone(raw: string): string {
 }
 
 // ── Mode 1 : Google Places API v1 (une seule requête, retourne les tél.) ─────
-async function scrapeViaPlacesApiV1(
-  niche: string, city: string, maxResults: number,
-): Promise<Lead[]> {
-  const key = process.env.GOOGLE_MAPS_API_KEY!;
-  const now = new Date().toISOString();
+type PlaceV1 = {
+  id: string;
+  displayName?: { text: string };
+  formattedAddress?: string;
+  nationalPhoneNumber?: string;
+  internationalPhoneNumber?: string;
+  rating?: number;
+  userRatingCount?: number;
+  websiteUri?: string;
+  addressComponents?: Array<{ longText: string; types: string[] }>;
+};
 
-  // Nouvelle Places API v1 — phone + website dans une seule requête
+async function fetchPlacesV1Page(
+  key: string, textQuery: string, pageToken?: string,
+): Promise<{ places: PlaceV1[]; nextPageToken?: string }> {
+  const body: Record<string, unknown> = {
+    textQuery,
+    languageCode: "fr",
+    pageSize:     20,            // ← paramètre correct (maxResultCount est déprécié)
+  };
+  if (pageToken) body.pageToken = pageToken;
+
   const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
     method: "POST",
     headers: {
@@ -51,42 +66,54 @@ async function scrapeViaPlacesApiV1(
         "places.userRatingCount",
         "places.websiteUri",
         "places.addressComponents",
+        "nextPageToken",
       ].join(","),
     },
-    body: JSON.stringify({
-      textQuery:       `${niche} ${city}`,
-      languageCode:    "fr",
-      maxResultCount:  Math.min(maxResults, 20),
-    }),
-    signal: AbortSignal.timeout(8_000),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(7_000),
   });
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
     console.error("[scrape-maps] Places API v1 error:", res.status, errText.slice(0, 200));
-    // Fallback vers l'ancienne API
+    return { places: [] };
+  }
+
+  const data = await res.json() as { places?: PlaceV1[]; nextPageToken?: string };
+  return { places: data.places ?? [], nextPageToken: data.nextPageToken };
+}
+
+async function scrapeViaPlacesApiV1(
+  niche: string, city: string, maxResults: number,
+): Promise<Lead[]> {
+  const key = process.env.GOOGLE_MAPS_API_KEY!;
+  const now = new Date().toISOString();
+
+  const textQuery = `${niche} ${city}`;
+
+  // Page 1
+  const page1 = await fetchPlacesV1Page(key, textQuery);
+  let allPlaces: PlaceV1[] = [...page1.places];
+
+  // Page 2 (si disponible et qu'on veut plus de 20 résultats)
+  if (page1.nextPageToken && maxResults > 20) {
+    try {
+      const page2 = await fetchPlacesV1Page(key, textQuery, page1.nextPageToken);
+      allPlaces = [...allPlaces, ...page2.places];
+    } catch { /* page 2 optionnelle */ }
+  }
+
+  // Fallback si l'API v1 retourne 0 résultats
+  if (allPlaces.length === 0) {
+    console.warn("[scrape-maps] Places API v1: 0 résultats, fallback ancienne API");
     return scrapeViaPlacesApiLegacy(niche, city, maxResults);
   }
 
-  const data = await res.json() as {
-    places?: Array<{
-      id: string;
-      displayName?: { text: string };
-      formattedAddress?: string;
-      nationalPhoneNumber?: string;
-      internationalPhoneNumber?: string;
-      rating?: number;
-      userRatingCount?: number;
-      websiteUri?: string;
-      addressComponents?: Array<{ longText: string; types: string[] }>;
-    }>;
-  };
+  console.log(`[scrape-maps] Places API v1: ${allPlaces.length} résultats pour "${textQuery}"`);
 
-  const places = data.places ?? [];
-  console.log(`[scrape-maps] Places API v1: ${places.length} résultats pour "${niche} ${city}"`);
-
-  return places
+  return allPlaces
     .filter((p) => !!p.displayName?.text)
+    .slice(0, maxResults)
     .map((p): Lead => {
       const rawPhone = p.nationalPhoneNumber ?? p.internationalPhoneNumber ?? "";
       const cityComp = p.addressComponents?.find((c) => c.types.includes("locality"));
