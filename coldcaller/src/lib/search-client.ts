@@ -234,7 +234,7 @@ export async function clientSearchOsm(
       parts.push(`way["name"~"${kw}",i](around:${r},${lat},${lon});`);
     }
 
-    const query = `[out:json][timeout:25][maxsize:5000000];\n(\n${parts.join("\n")}\n);\nout center tags 200;`;
+    const query = `[out:json][timeout:30][maxsize:8000000];\n(\n${parts.join("\n")}\n);\nout center tags 500;`;
 
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
@@ -283,30 +283,30 @@ export async function clientSearchSirene(
   if (!dept) return [];
   const nafCodes = NICHE_TO_NAF[niche] ?? [];
 
-  // ─ Requêtes : par code NAF si connu, + toujours une recherche texte libre
-  const textQuery = encodeURIComponent(niche);
-  const textSearch = fetch(
-    `https://recherche-entreprises.api.gouv.fr/search` +
-    `?q=${textQuery}&departement=${dept}&page=1&per_page=25&statut_diffusion_etablissement=O`,
-    { signal: AbortSignal.timeout(8_000) }
-  )
-    .then((r) => r.ok ? r.json() as Promise<{ results: SireneHit[] }> : { results: [] })
-    .then((j) => j.results ?? [])
-    .catch(() => [] as SireneHit[]);
+  // Helper: fetch une page SIRENE
+  const sireneUrl = (params: string) =>
+    `https://recherche-entreprises.api.gouv.fr/search?${params}&statut_diffusion_etablissement=O`;
 
-  const nafFetches = nafCodes.map((naf) =>
-    fetch(
-      `https://recherche-entreprises.api.gouv.fr/search` +
-      `?activite_principale=${encodeURIComponent(naf)}` +
-      `&departement=${dept}&page=1&per_page=25&statut_diffusion_etablissement=O`,
-      { signal: AbortSignal.timeout(8_000) }
-    )
+  const fetchSirenePage = (params: string) =>
+    fetch(sireneUrl(params), { signal: AbortSignal.timeout(10_000) })
       .then((r) => r.ok ? r.json() as Promise<{ results: SireneHit[] }> : { results: [] })
       .then((j) => j.results ?? [])
-      .catch(() => [] as SireneHit[])
-  );
+      .catch(() => [] as SireneHit[]);
 
-  const fetches = [textSearch, ...nafFetches];
+  // ─ Pour chaque code NAF : pages 1 ET 2 en parallèle (50 résultats chacune)
+  const nafFetches = nafCodes.flatMap((naf) => {
+    const base = `activite_principale=${encodeURIComponent(naf)}&departement=${dept}&per_page=50`;
+    return [fetchSirenePage(`${base}&page=1`), fetchSirenePage(`${base}&page=2`)];
+  });
+
+  // ─ Recherche texte libre (pour niches inconnues ou résultats supplémentaires)
+  const textBase = `q=${encodeURIComponent(niche)}&departement=${dept}&per_page=50`;
+  const textFetches = [
+    fetchSirenePage(`${textBase}&page=1`),
+    fetchSirenePage(`${textBase}&page=2`),
+  ];
+
+  const fetches = [...nafFetches, ...textFetches];
 
   const pages   = await Promise.all(fetches);
   const all     = pages.flat();
@@ -323,7 +323,7 @@ export async function clientSearchSirene(
   });
 
   const now = new Date().toISOString();
-  return inRadius.slice(0, 80).map((r): Lead => {
+  return inRadius.slice(0, 200).map((r): Lead => {
     const rawPhone = r.siege.telephone ?? "";
     const phone = rawPhone
       ? rawPhone.replace(/^\+33\s?/, "0").replace(/^0033\s?/, "0").replace(/[\s.\-]/g, " ").trim()

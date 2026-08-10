@@ -93,39 +93,119 @@ async function fetchPlacesV1Page(
   return { places: data.places ?? [], nextPageToken: data.nextPageToken };
 }
 
+// Alias de requête pour diversifier les résultats Maps
+const NICHE_QUERY_ALIAS: Record<string, string> = {
+  Plombier:           "plomberie sanitaire",
+  Électricien:        "electricité installation électrique",
+  Maçon:              "maçonnerie construction",
+  Serrurier:          "serrurerie dépannage serrure",
+  Peintre:            "peinture décoration intérieure",
+  Couvreur:           "toiture couverture",
+  Carreleur:          "carrelage revêtement sol",
+  Menuisier:          "menuiserie ébénisterie",
+  Chauffagiste:       "chauffage climatisation",
+  Paysagiste:         "jardinage entretien espaces verts",
+  Nettoyage:          "société nettoyage propreté",
+  Restaurant:         "brasserie bistrot",
+  Boulangerie:        "boulanger artisan pâtisserie",
+  Coiffeur:           "salon coiffure barbier",
+  Comptable:          "expert comptable cabinet comptabilité",
+  "Agent immobilier": "agence immobilière transaction",
+  Médecin:            "cabinet médecin généraliste docteur",
+  Dentiste:           "cabinet dentaire chirurgien dentiste",
+  Pharmacie:          "pharmacien officine",
+  Avocat:             "cabinet avocat droit",
+  Architecte:         "cabinet architecture urbanisme",
+  Garage:             "carrosserie mécanique automobile",
+  Auto:               "réparation auto garage mécanique",
+  Opticien:           "optique lunettes vue",
+  Kiné:               "kinésithérapeute rééducation",
+  Vétérinaire:        "clinique vétérinaire animaux",
+};
+
+type OldSearchResult = {
+  place_id: string; name: string; formatted_address: string;
+  rating?: number; user_ratings_total?: number;
+};
+
+async function fetchOldTextSearch(key: string, query: string): Promise<OldSearchResult[]> {
+  try {
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/place/textsearch/json` +
+      `?query=${encodeURIComponent(query)}&language=fr&region=fr&key=${key}`,
+      { signal: AbortSignal.timeout(6_000) }
+    );
+    if (!res.ok) return [];
+    const data = await res.json() as { results: OldSearchResult[] };
+    return data.results ?? [];
+  } catch { return []; }
+}
+
+async function fetchPlaceDetails(
+  key: string, p: OldSearchResult, niche: string, city: string, now: string,
+): Promise<Lead | null> {
+  try {
+    const dr = await fetch(
+      `https://maps.googleapis.com/maps/api/place/details/json` +
+      `?place_id=${p.place_id}` +
+      `&fields=name,formatted_phone_number,formatted_address,rating,user_ratings_total,website,address_component` +
+      `&language=fr&key=${key}`,
+      { signal: AbortSignal.timeout(4_000) }
+    );
+    if (!dr.ok) return null;
+    const dd = await dr.json() as {
+      result?: {
+        name: string; formatted_phone_number?: string; formatted_address?: string;
+        rating?: number; user_ratings_total?: number; website?: string;
+        address_component?: Array<{ long_name: string; types: string[] }>;
+      };
+    };
+    const r = dd.result;
+    if (!r) return null;
+    const cityComp = r.address_component?.find((c) => c.types.includes("locality"));
+    return {
+      id:          `gmaps-${p.place_id}`,
+      name:        r.name,
+      category:    niche,
+      phone:       r.formatted_phone_number ? cleanPhone(r.formatted_phone_number) : "",
+      address:     r.formatted_address ?? p.formatted_address,
+      city:        cityComp?.long_name ?? city,
+      rating:      r.rating ?? p.rating ?? 0,
+      reviewCount: r.user_ratings_total ?? p.user_ratings_total ?? 0,
+      website:     r.website?.replace(/^https?:\/\//, ""),
+      status:      "new" as const,
+      notes:       "",
+      source:      "google_maps" as const,
+      detectedAt:  now,
+      callCount:   0,
+    } satisfies Lead;
+  } catch { return null; }
+}
+
 async function scrapeViaPlacesApiV1(
   niche: string, city: string, maxResults: number,
   lat?: number, lon?: number, radiusM?: number,
 ): Promise<Lead[]> {
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   const now = new Date().toISOString();
-  const textQuery = `${niche} ${city}`;
-  const geoOpts   = { lat, lon, radiusM };
+  const textQuery  = `${niche} ${city}`;
+  const aliasQuery = NICHE_QUERY_ALIAS[niche] ? `${NICHE_QUERY_ALIAS[niche]} ${city}` : null;
+  const geoOpts    = { lat, lon, radiusM };
 
-  // ── Stratégie hybride : v1 (phones directs) + old Text Search (volume) ────
-  // Lancés en parallèle pour minimiser la latence totale
-  const [page1, oldSearchData] = await Promise.all([
-    // v1 — retourne phones directement
+  // ── 3 requêtes en parallèle : v1 + Text Search principal + Text Search alias ─
+  const [page1, oldResults1, oldResults2] = await Promise.all([
     fetchPlacesV1Page(key, textQuery, geoOpts),
-    // Old Text Search — retourne 20 place_ids sans détails
-    fetch(
-      `https://maps.googleapis.com/maps/api/place/textsearch/json` +
-      `?query=${encodeURIComponent(textQuery)}&language=fr&region=fr&key=${key}`,
-      { signal: AbortSignal.timeout(6_000) }
-    )
-      .then((r) => r.ok ? r.json() as Promise<{
-        results: Array<{ place_id: string; name: string; formatted_address: string; rating?: number; user_ratings_total?: number }>;
-      }> : { results: [] })
-      .catch(() => ({ results: [] as { place_id: string; name: string; formatted_address: string; rating?: number; user_ratings_total?: number }[] })),
+    fetchOldTextSearch(key, textQuery),
+    aliasQuery ? fetchOldTextSearch(key, aliasQuery) : Promise.resolve([] as OldSearchResult[]),
   ]);
 
-  // Construire la map depuis v1 (place_id → Lead avec phone)
-  const v1LeadsMap = new Map<string, Lead>();
+  // Construire la map depuis v1
+  const leadsMap = new Map<string, Lead>();
   for (const p of (page1.places ?? [])) {
     if (!p.displayName?.text) continue;
     const rawPhone = p.nationalPhoneNumber ?? p.internationalPhoneNumber ?? "";
     const cityComp = p.addressComponents?.find((c) => c.types.includes("locality"));
-    v1LeadsMap.set(p.id, {
+    leadsMap.set(p.id, {
       id:          `gmaps-${p.id}`,
       name:        p.displayName.text,
       category:    niche,
@@ -143,61 +223,28 @@ async function scrapeViaPlacesApiV1(
     });
   }
 
-  // Place_ids depuis old Text Search NON couverts par v1 → fetch leurs Details
-  const oldResults = oldSearchData.results ?? [];
-  const missingIds = oldResults
-    .filter((p) => !v1LeadsMap.has(p.place_id))
-    .slice(0, 12); // max 12 Details en parallèle (~3s sur Hobby)
+  // Collecter tous les IDs uniques des 2 Text Searches non couverts par v1
+  const allOld = [...oldResults1, ...oldResults2];
+  const seenOld = new Set<string>();
+  const missingIds = allOld
+    .filter((p) => {
+      if (leadsMap.has(p.place_id) || seenOld.has(p.place_id)) return false;
+      seenOld.add(p.place_id);
+      return true;
+    })
+    .slice(0, 15); // max 15 Details en parallèle → ~3-4s
 
   if (missingIds.length > 0) {
-    const detailFetches = missingIds.map(async (p) => {
-      try {
-        const dr = await fetch(
-          `https://maps.googleapis.com/maps/api/place/details/json` +
-          `?place_id=${p.place_id}` +
-          `&fields=name,formatted_phone_number,formatted_address,rating,user_ratings_total,website,address_component` +
-          `&language=fr&key=${key}`,
-          { signal: AbortSignal.timeout(4_000) }
-        );
-        if (!dr.ok) return null;
-        const dd = await dr.json() as {
-          result?: {
-            name: string; formatted_phone_number?: string; formatted_address?: string;
-            rating?: number; user_ratings_total?: number; website?: string;
-            address_component?: Array<{ long_name: string; types: string[] }>;
-          };
-        };
-        const r = dd.result;
-        if (!r) return null;
-        const cityComp = r.address_component?.find((c) => c.types.includes("locality"));
-        return {
-          id:          `gmaps-${p.place_id}`,
-          name:        r.name,
-          category:    niche,
-          phone:       r.formatted_phone_number ? cleanPhone(r.formatted_phone_number) : "",
-          address:     r.formatted_address ?? p.formatted_address,
-          city:        cityComp?.long_name ?? city,
-          rating:      r.rating ?? p.rating ?? 0,
-          reviewCount: r.user_ratings_total ?? p.user_ratings_total ?? 0,
-          website:     r.website?.replace(/^https?:\/\//, ""),
-          status:      "new" as const,
-          notes:       "",
-          source:      "google_maps" as const,
-          detectedAt:  now,
-          callCount:   0,
-        } satisfies Lead;
-      } catch { return null; }
-    });
-    const extras = (await Promise.all(detailFetches)).filter(Boolean) as Lead[];
-    for (const l of extras) v1LeadsMap.set(l.id.replace("gmaps-", ""), l);
+    const extras = (
+      await Promise.all(missingIds.map((p) => fetchPlaceDetails(key, p, niche, city, now)))
+    ).filter(Boolean) as Lead[];
+    for (const l of extras) leadsMap.set(l.id.replace("gmaps-", ""), l);
   }
 
-  const all = Array.from(v1LeadsMap.values());
-  console.log(`[scrape-maps] Hybride v1+old: ${all.length} résultats (${v1LeadsMap.size - missingIds.length} v1, ${missingIds.length} details)`);
+  const all = Array.from(leadsMap.values());
+  console.log(`[scrape-maps] v1=${page1.places?.length ?? 0} old=${allOld.length} details=${missingIds.length} → total=${all.length}`);
 
-  if (all.length === 0) {
-    return scrapeViaPlacesApiLegacySimple(niche, city, maxResults);
-  }
+  if (all.length === 0) return scrapeViaPlacesApiLegacySimple(niche, city, maxResults);
   return all.slice(0, maxResults);
 }
 

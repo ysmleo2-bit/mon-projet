@@ -395,30 +395,13 @@ export default function LeadsPage() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-4 flex-wrap">
+              <div className="flex items-center gap-4 flex-wrap">
                 <button onClick={handleSearch} disabled={loading}
                   className={cn("btn-primary flex items-center gap-2 text-sm px-8 py-3", loading && "opacity-70 cursor-not-allowed")}>
                   {loading
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Extraction en cours…</>
                     : <><Zap className="w-4 h-4" /> Lancer la recherche</>}
                 </button>
-
-                {/* Bandeau activation téléphones */}
-                <div className="flex-1 min-w-[240px] rounded-xl border border-amber-500/20 bg-amber-500/[0.05] p-3 text-xs text-amber-300/80">
-                  <p className="font-semibold text-amber-300 mb-1">📞 100% de numéros → clé Google Maps</p>
-                  <p className="text-amber-300/55 leading-relaxed">
-                    Pages Jaunes + OSM scrappés automatiquement.{" "}
-                    Pour couvrir tous les leads :{" "}
-                    <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com"
-                      target="_blank" rel="noopener noreferrer"
-                      className="underline text-amber-300 hover:text-white transition-colors">
-                      activer Google Places API
-                    </a>
-                    {" "}(200$/mois offerts ≈ 5 000 recherches) puis ajouter{" "}
-                    <code className="bg-white/10 px-1 rounded text-[10px]">GOOGLE_MAPS_API_KEY</code>
-                    {" "}dans les variables Vercel.
-                  </p>
-                </div>
               </div>
             </div>
 
