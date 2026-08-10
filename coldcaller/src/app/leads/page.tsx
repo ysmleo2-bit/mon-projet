@@ -252,7 +252,7 @@ export default function LeadsPage() {
       };
 
       Promise.all([
-        clientSearchMaps(niche, city, radius, 25).then((r) => mergeIncoming(r, "maps")).catch(() => {}),
+        clientSearchMaps(niche, city, radius, 25, geo.lat, geo.lon).then((r) => mergeIncoming(r, "maps")).catch(() => {}),
         clientSearchFoursquare(geo.lat, geo.lon, radius * 1000, niche, city).then((r) => mergeIncoming(r, "fsq")).catch(() => {}),
         clientSearchPagesJaunes(niche, city).then((r) => mergePJPhones(r)).catch(() => {}),
       ]).finally(() => setMapsSearching(false));

@@ -42,14 +42,24 @@ type PlaceV1 = {
 };
 
 async function fetchPlacesV1Page(
-  key: string, textQuery: string, pageToken?: string,
+  key: string, textQuery: string,
+  opts?: { pageToken?: string; lat?: number; lon?: number; radiusM?: number },
 ): Promise<{ places: PlaceV1[]; nextPageToken?: string }> {
   const body: Record<string, unknown> = {
     textQuery,
     languageCode: "fr",
     pageSize:     20,            // ← paramètre correct (maxResultCount est déprécié)
   };
-  if (pageToken) body.pageToken = pageToken;
+  if (opts?.pageToken) body.pageToken = opts.pageToken;
+  // Biaiser la recherche vers la zone géographique → plus de résultats locaux
+  if (opts?.lat && opts?.lon) {
+    body.locationBias = {
+      circle: {
+        center: { latitude: opts.lat, longitude: opts.lon },
+        radius: Math.min(opts.radiusM ?? 20_000, 50_000),
+      },
+    };
+  }
 
   const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
     method: "POST",
@@ -85,20 +95,22 @@ async function fetchPlacesV1Page(
 
 async function scrapeViaPlacesApiV1(
   niche: string, city: string, maxResults: number,
+  lat?: number, lon?: number, radiusM?: number,
 ): Promise<Lead[]> {
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   const now = new Date().toISOString();
 
   const textQuery = `${niche} ${city}`;
+  const geoOpts   = { lat, lon, radiusM };
 
   // Page 1
-  const page1 = await fetchPlacesV1Page(key, textQuery);
+  const page1 = await fetchPlacesV1Page(key, textQuery, geoOpts);
   let allPlaces: PlaceV1[] = [...page1.places];
 
   // Page 2 (si disponible et qu'on veut plus de 20 résultats)
   if (page1.nextPageToken && maxResults > 20) {
     try {
-      const page2 = await fetchPlacesV1Page(key, textQuery, page1.nextPageToken);
+      const page2 = await fetchPlacesV1Page(key, textQuery, { pageToken: page1.nextPageToken, ...geoOpts });
       allPlaces = [...allPlaces, ...page2.places];
     } catch { /* page 2 optionnelle */ }
   }
@@ -420,7 +432,9 @@ export async function POST(req: NextRequest) {
     city       = "Lyon",
     radius     = 20,
     maxResults = 20,
-  } = body as { niche: string; city: string; radius: number; maxResults: number };
+    lat,
+    lon,
+  } = body as { niche: string; city: string; radius: number; maxResults: number; lat?: number; lon?: number };
 
   try {
     let leads: Lead[];
@@ -428,7 +442,7 @@ export async function POST(req: NextRequest) {
 
     if (process.env.GOOGLE_MAPS_API_KEY) {
       // Mode 1 : API officielle v1 (une requête, retourne les tél. directement)
-      leads  = await scrapeViaPlacesApiV1(niche, city, maxResults);
+      leads  = await scrapeViaPlacesApiV1(niche, city, maxResults, lat, lon, radius * 1_000);
       source = "api-v1";
     } else {
       // Mode 2 : bot Playwright

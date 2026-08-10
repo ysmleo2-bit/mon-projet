@@ -505,13 +505,14 @@ export async function clientSearchPagesJaunes(
 
 // ── 5. Google Maps (via bot serveur — asynchrone, non bloquant) ──────────────
 export async function clientSearchMaps(
-  niche: string, city: string, radius: number, maxResults = 20
+  niche: string, city: string, radius: number, maxResults = 20,
+  lat?: number, lon?: number,
 ): Promise<Lead[]> {
   try {
     const res = await fetch("/api/scrape-maps", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ niche, city, radius, maxResults }),
+      body:    JSON.stringify({ niche, city, radius, maxResults, lat, lon }),
       signal:  AbortSignal.timeout(55_000),
     });
     if (!res.ok) return [];
