@@ -99,130 +99,141 @@ async function scrapeViaPlacesApiV1(
 ): Promise<Lead[]> {
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   const now = new Date().toISOString();
-
   const textQuery = `${niche} ${city}`;
   const geoOpts   = { lat, lon, radiusM };
 
-  // Page 1
-  const page1 = await fetchPlacesV1Page(key, textQuery, geoOpts);
-  let allPlaces: PlaceV1[] = [...page1.places];
+  // ── Stratégie hybride : v1 (phones directs) + old Text Search (volume) ────
+  // Lancés en parallèle pour minimiser la latence totale
+  const [page1, oldSearchData] = await Promise.all([
+    // v1 — retourne phones directement
+    fetchPlacesV1Page(key, textQuery, geoOpts),
+    // Old Text Search — retourne 20 place_ids sans détails
+    fetch(
+      `https://maps.googleapis.com/maps/api/place/textsearch/json` +
+      `?query=${encodeURIComponent(textQuery)}&language=fr&region=fr&key=${key}`,
+      { signal: AbortSignal.timeout(6_000) }
+    )
+      .then((r) => r.ok ? r.json() as Promise<{
+        results: Array<{ place_id: string; name: string; formatted_address: string; rating?: number; user_ratings_total?: number }>;
+      }> : { results: [] })
+      .catch(() => ({ results: [] as { place_id: string; name: string; formatted_address: string; rating?: number; user_ratings_total?: number }[] })),
+  ]);
 
-  // Page 2 (si disponible et qu'on veut plus de 20 résultats)
-  if (page1.nextPageToken && maxResults > 20) {
-    try {
-      const page2 = await fetchPlacesV1Page(key, textQuery, { pageToken: page1.nextPageToken, ...geoOpts });
-      allPlaces = [...allPlaces, ...page2.places];
-    } catch { /* page 2 optionnelle */ }
-  }
-
-  // Fallback si l'API v1 retourne 0 résultats
-  if (allPlaces.length === 0) {
-    console.warn("[scrape-maps] Places API v1: 0 résultats, fallback ancienne API");
-    return scrapeViaPlacesApiLegacy(niche, city, maxResults);
-  }
-
-  console.log(`[scrape-maps] Places API v1: ${allPlaces.length} résultats pour "${textQuery}"`);
-
-  return allPlaces
-    .filter((p) => !!p.displayName?.text)
-    .slice(0, maxResults)
-    .map((p): Lead => {
-      const rawPhone = p.nationalPhoneNumber ?? p.internationalPhoneNumber ?? "";
-      const cityComp = p.addressComponents?.find((c) => c.types.includes("locality"));
-
-      return {
-        id:          `gmaps-${p.id}`,
-        name:        p.displayName!.text,
-        category:    niche,
-        phone:       rawPhone ? cleanPhone(rawPhone) : "",
-        address:     p.formattedAddress ?? "",
-        city:        cityComp?.longText ?? city,
-        rating:      p.rating ?? 0,
-        reviewCount: p.userRatingCount ?? 0,
-        website:     p.websiteUri?.replace(/^https?:\/\//, ""),
-        status:      "new",
-        notes:       "",
-        source:      "google_maps",
-        detectedAt:  now,
-        callCount:   0,
-      };
+  // Construire la map depuis v1 (place_id → Lead avec phone)
+  const v1LeadsMap = new Map<string, Lead>();
+  for (const p of (page1.places ?? [])) {
+    if (!p.displayName?.text) continue;
+    const rawPhone = p.nationalPhoneNumber ?? p.internationalPhoneNumber ?? "";
+    const cityComp = p.addressComponents?.find((c) => c.types.includes("locality"));
+    v1LeadsMap.set(p.id, {
+      id:          `gmaps-${p.id}`,
+      name:        p.displayName.text,
+      category:    niche,
+      phone:       rawPhone ? cleanPhone(rawPhone) : "",
+      address:     p.formattedAddress ?? "",
+      city:        cityComp?.longText ?? city,
+      rating:      p.rating ?? 0,
+      reviewCount: p.userRatingCount ?? 0,
+      website:     p.websiteUri?.replace(/^https?:\/\//, ""),
+      status:      "new",
+      notes:       "",
+      source:      "google_maps",
+      detectedAt:  now,
+      callCount:   0,
     });
+  }
+
+  // Place_ids depuis old Text Search NON couverts par v1 → fetch leurs Details
+  const oldResults = oldSearchData.results ?? [];
+  const missingIds = oldResults
+    .filter((p) => !v1LeadsMap.has(p.place_id))
+    .slice(0, 12); // max 12 Details en parallèle (~3s sur Hobby)
+
+  if (missingIds.length > 0) {
+    const detailFetches = missingIds.map(async (p) => {
+      try {
+        const dr = await fetch(
+          `https://maps.googleapis.com/maps/api/place/details/json` +
+          `?place_id=${p.place_id}` +
+          `&fields=name,formatted_phone_number,formatted_address,rating,user_ratings_total,website,address_component` +
+          `&language=fr&key=${key}`,
+          { signal: AbortSignal.timeout(4_000) }
+        );
+        if (!dr.ok) return null;
+        const dd = await dr.json() as {
+          result?: {
+            name: string; formatted_phone_number?: string; formatted_address?: string;
+            rating?: number; user_ratings_total?: number; website?: string;
+            address_component?: Array<{ long_name: string; types: string[] }>;
+          };
+        };
+        const r = dd.result;
+        if (!r) return null;
+        const cityComp = r.address_component?.find((c) => c.types.includes("locality"));
+        return {
+          id:          `gmaps-${p.place_id}`,
+          name:        r.name,
+          category:    niche,
+          phone:       r.formatted_phone_number ? cleanPhone(r.formatted_phone_number) : "",
+          address:     r.formatted_address ?? p.formatted_address,
+          city:        cityComp?.long_name ?? city,
+          rating:      r.rating ?? p.rating ?? 0,
+          reviewCount: r.user_ratings_total ?? p.user_ratings_total ?? 0,
+          website:     r.website?.replace(/^https?:\/\//, ""),
+          status:      "new" as const,
+          notes:       "",
+          source:      "google_maps" as const,
+          detectedAt:  now,
+          callCount:   0,
+        } satisfies Lead;
+      } catch { return null; }
+    });
+    const extras = (await Promise.all(detailFetches)).filter(Boolean) as Lead[];
+    for (const l of extras) v1LeadsMap.set(l.id.replace("gmaps-", ""), l);
+  }
+
+  const all = Array.from(v1LeadsMap.values());
+  console.log(`[scrape-maps] Hybride v1+old: ${all.length} résultats (${v1LeadsMap.size - missingIds.length} v1, ${missingIds.length} details)`);
+
+  if (all.length === 0) {
+    return scrapeViaPlacesApiLegacySimple(niche, city, maxResults);
+  }
+  return all.slice(0, maxResults);
 }
 
-// ── Mode 1b : Ancienne API Places (Text Search + Details) — fallback ──────────
-async function scrapeViaPlacesApiLegacy(
+// ── Fallback ultime : ancienne API seule, 5 résultats ─────────────────────────
+async function scrapeViaPlacesApiLegacySimple(
   niche: string, city: string, maxResults: number,
 ): Promise<Lead[]> {
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   const now = new Date().toISOString();
 
-  // 1. Text Search (limite à 5 résultats pour rester dans le timeout de 10 s)
-  const searchUrl =
+  const searchRes = await fetch(
     `https://maps.googleapis.com/maps/api/place/textsearch/json` +
-    `?query=${encodeURIComponent(`${niche} ${city}`)}` +
-    `&language=fr&region=fr&key=${key}`;
-
-  const searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(6_000) });
+    `?query=${encodeURIComponent(`${niche} ${city}`)}&language=fr&region=fr&key=${key}`,
+    { signal: AbortSignal.timeout(6_000) }
+  );
   if (!searchRes.ok) return [];
   const searchData = await searchRes.json() as {
-    results: Array<{
-      place_id: string; name: string;
-      formatted_address: string;
-      rating?: number; user_ratings_total?: number;
-    }>;
+    results: Array<{ place_id: string; name: string; formatted_address: string; rating?: number; user_ratings_total?: number }>;
   };
-
-  // Réduire à 5 max pour tenir dans le timeout Hobby
   const places = (searchData.results ?? []).slice(0, Math.min(maxResults, 5));
-
-  // 2. Place Details (téléphone) en parallèle
   const detailFetches = places.map(async (p) => {
     try {
-      const detailUrl =
-        `https://maps.googleapis.com/maps/api/place/details/json` +
-        `?place_id=${p.place_id}` +
+      const dr = await fetch(
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${p.place_id}` +
         `&fields=name,formatted_phone_number,formatted_address,rating,user_ratings_total,website,address_component` +
-        `&language=fr&key=${key}`;
-      const dr = await fetch(detailUrl, { signal: AbortSignal.timeout(4_000) });
+        `&language=fr&key=${key}`,
+        { signal: AbortSignal.timeout(4_000) }
+      );
       if (!dr.ok) return null;
-      const dd = await dr.json() as {
-        result?: {
-          name: string;
-          formatted_phone_number?: string;
-          formatted_address?: string;
-          rating?: number;
-          user_ratings_total?: number;
-          website?: string;
-          address_component?: Array<{ long_name: string; types: string[] }>;
-        };
-      };
-      const r = dd.result;
-      if (!r) return null;
-
+      const dd = await dr.json() as { result?: { name: string; formatted_phone_number?: string; formatted_address?: string; rating?: number; user_ratings_total?: number; website?: string; address_component?: Array<{ long_name: string; types: string[] }> } };
+      const r = dd.result; if (!r) return null;
       const cityComp = r.address_component?.find((c) => c.types.includes("locality"));
-      return {
-        id:          `gmaps-${p.place_id}`,
-        name:        r.name,
-        category:    niche,
-        phone:       r.formatted_phone_number ? cleanPhone(r.formatted_phone_number) : "",
-        address:     r.formatted_address ?? p.formatted_address,
-        city:        cityComp?.long_name ?? city,
-        rating:      r.rating ?? 0,
-        reviewCount: r.user_ratings_total ?? 0,
-        website:     r.website?.replace(/^https?:\/\//, ""),
-        status:      "new" as const,
-        notes:       "",
-        source:      "google_maps" as const,
-        detectedAt:  now,
-        callCount:   0,
-      } satisfies Lead;
-    } catch {
-      return null;
-    }
+      return { id: `gmaps-${p.place_id}`, name: r.name, category: niche, phone: r.formatted_phone_number ? cleanPhone(r.formatted_phone_number) : "", address: r.formatted_address ?? "", city: cityComp?.long_name ?? city, rating: r.rating ?? 0, reviewCount: r.user_ratings_total ?? 0, website: r.website?.replace(/^https?:\/\//, ""), status: "new" as const, notes: "", source: "google_maps" as const, detectedAt: now, callCount: 0 } satisfies Lead;
+    } catch { return null; }
   });
-
-  const results = await Promise.all(detailFetches);
-  return results.filter(Boolean) as Lead[];
+  return (await Promise.all(detailFetches)).filter(Boolean) as Lead[];
 }
 
 // ── Mode 2 : Playwright headless bot ─────────────────────────────────────────
