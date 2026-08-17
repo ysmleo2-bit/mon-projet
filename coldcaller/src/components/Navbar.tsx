@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Phone, BarChart2, Users, Search, ChevronRight } from "lucide-react";
+import { Phone, BarChart2, Users, Search, ChevronRight, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/dashboard", label: "CRM",        icon: BarChart2 },
-  { href: "/leads",     label: "Recherche",  icon: Search },
-  { href: "/app",       label: "Appeler",    icon: Phone },
+  { href: "/dashboard",   label: "CRM",              icon: BarChart2 },
+  { href: "/leads",       label: "Recherche",        icon: Search },
+  { href: "/app",         label: "Appeler",          icon: Phone },
+  { href: "/prospection", label: "Prospection B2B",  icon: Target },
 ];
 
 export default function Navbar({ variant = "app" }: { variant?: "landing" | "app" }) {
