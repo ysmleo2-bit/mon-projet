@@ -2,14 +2,68 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbUpsertLeads } from "@/lib/db";
 import { geocodeCity, searchOverpass, osmToLead } from "@/lib/overpass";
 import { searchSirene } from "@/lib/sirene";
+import { normalizePhone } from "@/lib/compliance";
+import { isBlacklisted } from "@/lib/blacklist";
 import type { Lead } from "@/lib/types";
+
+// ── Source Google Maps (Playwright) ──────────────────────────────────────────
+function idFromUrl(url: string): string {
+  let hash = 0;
+  for (let i = 0; i < url.length; i++) hash = (hash * 31 + url.charCodeAt(i)) | 0;
+  return `gmaps-${Math.abs(hash)}`;
+}
+
+async function scrapeGoogleMapsSource(niche: string, city: string, limit: number, minRating: number): Promise<Lead[]> {
+  const { scrapeGoogleMaps } = await import("@/lib/google-maps-scraper");
+  const records = await scrapeGoogleMaps({ query: niche, location: city, limit });
+
+  const leads: Lead[] = records
+    .filter((r) => r.name)
+    .map((r) => {
+      const phoneNormalized = normalizePhone(r.phone);
+      return {
+        id:          idFromUrl(r.source_url),
+        name:        r.name as string,
+        category:    niche,
+        phone:       r.phone || "(pas de tél.)",
+        address:     r.address || "",
+        city,
+        rating:      r.rating ?? 0,
+        reviewCount: r.review_count ?? 0,
+        website:     r.website ?? undefined,
+        status:      "new",
+        notes:       "",
+        detectedAt:  new Date().toISOString(),
+        source:      "google_maps" as const,
+        callCount:   0,
+        doNotCall:   isBlacklisted(phoneNormalized),
+        doNotCallAt: isBlacklisted(phoneNormalized) ? new Date().toISOString() : undefined,
+      } as Lead;
+    });
+
+  return minRating > 0 ? leads.filter((l) => l.rating >= minRating) : leads;
+}
 
 export const dynamic = "force-dynamic";
 // Vercel Pro : 60 s max — on fixe 55 s pour laisser de la marge
 export const maxDuration = 55;
 
 export async function POST(req: NextRequest) {
-  const { niche, city, radius = 20, minRating = 0 } = await req.json();
+  const { niche, city, radius = 20, minRating = 0, source = "openstreetmap", limit = 30 } = await req.json();
+
+  // ── Source Google Maps ───────────────────────────────────────────────────────
+  if (source === "google_maps") {
+    try {
+      const filtered = await scrapeGoogleMapsSource(niche, city, limit, minRating);
+      if (filtered.length) await dbUpsertLeads(filtered);
+      return NextResponse.json({ leads: filtered, total: filtered.length, source: "google_maps" });
+    } catch (err) {
+      return NextResponse.json(
+        { error: `Échec du scraping Google Maps : ${(err as Error).message}` },
+        { status: 502 }
+      );
+    }
+  }
   if (!niche || !city) {
     return NextResponse.json({ error: "niche and city are required" }, { status: 400 });
   }

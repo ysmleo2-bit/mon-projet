@@ -17,6 +17,14 @@ export async function POST(req: NextRequest) {
   const existing = await dbGetLead(leadId);
   if (!existing) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
 
+  // Garde-fou RGPD : un lead qui s'est opposé ne doit plus jamais être appelé.
+  if (existing.doNotCall) {
+    return NextResponse.json(
+      { error: "Ce numéro est sur liste \"ne plus appeler\". Appel bloqué." },
+      { status: 403 }
+    );
+  }
+
   const STATUS_MAP: Record<CallOutcome, LeadStatus> = {
     no_answer:      "contacted",
     interested:     "interested",

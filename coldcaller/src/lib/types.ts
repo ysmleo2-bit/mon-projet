@@ -28,6 +28,10 @@ export interface Lead {
   detectedAt: string;
   callCount: number;
   callHistory?: CallRecord[];
+  // Conformité RGPD / droit d'opposition : si true, ce lead ne doit plus
+  // jamais être appelé (voir src/lib/blacklist.ts + /api/leads/:id/optout).
+  doNotCall?: boolean;
+  doNotCallAt?: string;   // ISO date
 }
 
 export interface PipelineColumn {

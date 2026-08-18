@@ -1,6 +1,6 @@
 "use client";
 
-import { Phone, Globe, Star, MapPin, ChevronRight, Clock } from "lucide-react";
+import { Phone, Globe, Star, MapPin, ChevronRight, Clock, PhoneOff } from "lucide-react";
 import type { Lead } from "@/lib/types";
 import { cn, statusLabel } from "@/lib/utils";
 
@@ -27,13 +27,19 @@ export default function LeadCard({ lead, onClick, compact }: Props) {
       onClick={onClick}
       className={cn(
         "glass rounded-xl p-4 cursor-pointer hover:border-white/15 transition-all group",
-        compact && "p-3"
+        compact && "p-3",
+        lead.doNotCall && "opacity-60"
       )}
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
             <span className={cn("badge border", STATUS_STYLE[lead.status])}>{statusLabel(lead.status)}</span>
+            {lead.doNotCall && (
+              <span className="badge border bg-red-500/10 text-red-300 border-red-500/25" title="Le prospect s'est opposé — ne plus jamais appeler">
+                <PhoneOff className="w-3 h-3 inline mr-0.5" />Ne plus appeler
+              </span>
+            )}
             {lead.callCount > 0 && (
               <span className="text-[10px] text-white/30">
                 <Phone className="w-3 h-3 inline mr-0.5" />{lead.callCount}

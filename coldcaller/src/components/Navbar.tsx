@@ -1,15 +1,55 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Phone, BarChart2, Users, Search, ChevronRight, Target } from "lucide-react";
+import { Phone, BarChart2, ChevronRight, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/prospection", label: "Prospection B2B",  icon: Target },
-  { href: "/dashboard",   label: "CRM",              icon: BarChart2 },
+  { href: "/prospection", label: "Prospection B2B", icon: Target },
+  { href: "/dashboard",   label: "CRM",             icon: BarChart2 },
   { href: "/app",         label: "Appeler",          icon: Phone },
 ];
+
+// Bandeau de conformité : indique si on est dans le créneau légal d'appel
+// B2B en France (lun-ven 10h-13h / 14h-20h, heure de Paris).
+// Voir src/lib/compliance.ts et /api/compliance/call-window.
+function CallWindowBadge() {
+  const [status, setStatus] = useState<{ open: boolean; reason: string | null } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function refresh() {
+      try {
+        const res  = await fetch("/api/compliance/call-window");
+        const data = await res.json();
+        if (!cancelled) setStatus(data);
+      } catch { /* ignore */ }
+    }
+    refresh();
+    const id = setInterval(refresh, 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  if (!status) return null;
+
+  return (
+    <div
+      className={cn(
+        "glass rounded-xl p-3 text-xs font-medium border",
+        status.open
+          ? "text-emerald-300 border-emerald-500/25 bg-emerald-500/10"
+          : "text-red-300 border-red-500/25 bg-red-500/10"
+      )}
+      title={status.reason ?? undefined}
+    >
+      {status.open
+        ? "🟢 Créneau d'appel ouvert"
+        : `🔴 Appels non recommandés${status.reason ? ` (${status.reason})` : ""}`}
+    </div>
+  );
+}
 
 export default function Navbar({ variant = "app" }: { variant?: "landing" | "app" }) {
   const path = usePathname();
@@ -59,6 +99,11 @@ export default function Navbar({ variant = "app" }: { variant?: "landing" | "app
           </div>
           <span className="font-black text-white text-base">ColdCaller</span>
         </Link>
+      </div>
+
+      {/* Créneau d'appel légal */}
+      <div className="px-3 pt-4">
+        <CallWindowBadge />
       </div>
 
       {/* Nav */}
