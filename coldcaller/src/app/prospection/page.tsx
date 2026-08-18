@@ -413,6 +413,7 @@ export default function ProspectionPage() {
           siteWeb:             p.siteWeb,
           telephonePro:        p.telephonePro,
           dirigeantPrincipal:  p.dirigeantPrincipal,
+          libelleNaf:          p.libelleNaf,
         }),
       });
       const data = await res.json() as { prospect?: Prospect };
