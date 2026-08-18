@@ -94,8 +94,48 @@ export default function ProspectionPage() {
   const [searched,    setSearched]    = useState(false);
   const [enriching,   setEnriching]   = useState<Set<string>>(new Set());
   const [generating,  setGenerating]  = useState<Set<string>>(new Set());
-  const [selected,    setSelected]    = useState<Prospect | null>(null);
-  const [copied,      setCopied]      = useState(false);
+  const [selected,        setSelected]        = useState<Prospect | null>(null);
+  const [copied,          setCopied]          = useState(false);
+  const [enrichProgress,  setEnrichProgress]  = useState<{ done: number; total: number } | null>(null);
+
+  // ── Enrichir un seul prospect (appelé aussi par enrichAll) ───────────────
+  const enrich = useCallback(async (p: Prospect) => {
+    setEnriching((prev) => new Set([...Array.from(prev), p.id]));
+    try {
+      const res = await fetch("/api/prospection/enrich", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          prospectId:         p.id,
+          siren:              p.siren,
+          nom:                p.nom,
+          ville:              p.ville,
+          siteWeb:            p.siteWeb,
+          dirigeantPrincipal: p.dirigeantPrincipal,
+        }),
+      });
+      const data = await res.json() as { prospect?: Prospect };
+      if (data.prospect) {
+        setProspects((prev) => prev.map((x) => x.id === p.id ? data.prospect! : x));
+        // Mise à jour du panneau latéral si c'est le prospect sélectionné
+        setSelected((prev) => prev?.id === p.id ? data.prospect! : prev);
+      }
+    } catch { /* silencieux */ } finally {
+      setEnriching((prev) => { const n = new Set(prev); n.delete(p.id); return n; });
+    }
+  }, []); // pas de dépendance sur `selected` — on utilise la mise à jour fonctionnelle
+
+  // ── Enrichissement en masse (auto après recherche) ───────────────────────
+  const enrichAll = useCallback(async (list: Prospect[]) => {
+    const BATCH = 6; // 6 requêtes en parallèle max
+    setEnrichProgress({ done: 0, total: list.length });
+    for (let i = 0; i < list.length; i += BATCH) {
+      const batch = list.slice(i, i + BATCH);
+      await Promise.all(batch.map((p) => enrich(p)));
+      setEnrichProgress({ done: Math.min(i + BATCH, list.length), total: list.length });
+    }
+    setEnrichProgress(null);
+  }, [enrich]);
 
   // ── Recherche ────────────────────────────────────────────────────────────
   const handleSearch = useCallback(async () => {
@@ -103,6 +143,7 @@ export default function ProspectionPage() {
     setSearched(true);
     setError(null);
     setSelected(null);
+    setEnrichProgress(null);
 
     const secteur   = SECTEURS[secteurIdx];
     const nafCodes  = nafCustom
@@ -125,12 +166,16 @@ export default function ProspectionPage() {
       const data = await res.json() as { prospects: Prospect[]; total: number; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
       setProspects(data.prospects);
+      // Enrichissement automatique de tous les prospects en background
+      if (data.prospects.length > 0) {
+        enrichAll(data.prospects).catch(() => setEnrichProgress(null));
+      }
     } catch (e) {
       setError(String(e));
     } finally {
       setLoading(false);
     }
-  }, [secteurIdx, nafCustom, departement, tranche, perPage]);
+  }, [secteurIdx, nafCustom, departement, tranche, perPage, enrichAll]);
 
   // ── Charger les prospects sauvegardés ────────────────────────────────────
   const loadSaved = useCallback(async () => {
@@ -144,32 +189,6 @@ export default function ProspectionPage() {
       setLoading(false);
     }
   }, []);
-
-  // ── Enrichir un prospect ─────────────────────────────────────────────────
-  const enrich = useCallback(async (p: Prospect) => {
-    setEnriching((prev) => new Set([...Array.from(prev), p.id]));
-    try {
-      const res = await fetch("/api/prospection/enrich", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          prospectId:         p.id,
-          siren:              p.siren,
-          nom:                p.nom,
-          ville:              p.ville,
-          siteWeb:            p.siteWeb,
-          dirigeantPrincipal: p.dirigeantPrincipal,
-        }),
-      });
-      const data = await res.json() as { prospect?: Prospect };
-      if (data.prospect) {
-        setProspects((prev) => prev.map((x) => x.id === p.id ? data.prospect! : x));
-        if (selected?.id === p.id) setSelected(data.prospect);
-      }
-    } catch { /* silencieux */ } finally {
-      setEnriching((prev) => { const n = new Set(prev); n.delete(p.id); return n; });
-    }
-  }, [selected]);
 
   // ── Générer l'email ──────────────────────────────────────────────────────
   const generateEmail = useCallback(async (p: Prospect) => {
@@ -355,22 +374,49 @@ export default function ProspectionPage() {
 
             {/* ── Stats ── */}
             {searched && !loading && prospects.length > 0 && (
-              <div className="grid grid-cols-4 gap-3 mb-5">
-                {[
-                  { label: "Prospects",   value: prospects.length,  icon: Users,     color: "text-white" },
-                  { label: "Avec email",  value: withEmail,         icon: Mail,      color: "text-violet-400" },
-                  { label: "Prêts",       value: prets,             icon: CheckCircle, color: "text-green-400" },
-                  { label: "Avec site",   value: prospects.filter((p) => p.siteWeb).length, icon: Globe, color: "text-sky-400" },
-                ].map(({ label, value, icon: Icon, color }) => (
-                  <div key={label} className="glass rounded-xl p-3 flex items-center gap-3">
-                    <Icon className={cn("w-5 h-5 shrink-0", color)} />
-                    <div>
-                      <div className="text-lg font-bold text-white">{value}</div>
-                      <div className="text-[10px] text-white/40">{label}</div>
+              <>
+                <div className="grid grid-cols-4 gap-3 mb-3">
+                  {[
+                    { label: "Prospects",  value: prospects.length,                                 icon: Users,       color: "text-white" },
+                    { label: "Avec site",  value: prospects.filter((p) => p.siteWeb).length,        icon: Globe,       color: "text-sky-400" },
+                    { label: "Avec email", value: withEmail,                                        icon: Mail,        color: "text-violet-400" },
+                    { label: "Avec tél.",  value: prospects.filter((p) => p.telephonePro).length,   icon: Phone,       color: "text-brand-400" },
+                  ].map(({ label, value, icon: Icon, color }) => (
+                    <div key={label} className="glass rounded-xl p-3 flex items-center gap-3">
+                      <Icon className={cn("w-5 h-5 shrink-0", color)} />
+                      <div>
+                        <div className="text-lg font-bold text-white">{value}</div>
+                        <div className="text-[10px] text-white/40">{label}</div>
+                      </div>
                     </div>
+                  ))}
+                </div>
+                {/* Barre de progression enrichissement */}
+                {enrichProgress && (
+                  <div className="glass rounded-xl p-3 mb-3 flex items-center gap-3">
+                    <Loader2 className="w-4 h-4 text-sky-400 animate-spin shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex justify-between text-[10px] text-white/50 mb-1">
+                        <span>Enrichissement automatique en cours…</span>
+                        <span className="font-bold text-white">{enrichProgress.done} / {enrichProgress.total}</span>
+                      </div>
+                      <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-sky-400 rounded-full transition-all duration-300"
+                          style={{ width: `${Math.round((enrichProgress.done / enrichProgress.total) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setEnrichProgress(null)}
+                      className="text-white/20 hover:text-white/50 text-[10px]"
+                      title="Annuler"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
 
             {/* ── Table des prospects ── */}
@@ -382,6 +428,7 @@ export default function ProspectionPage() {
                       <tr className="border-b border-white/[0.06]">
                         <th className="text-left text-white/30 font-medium px-4 py-3 whitespace-nowrap">Entreprise</th>
                         <th className="text-left text-white/30 font-medium px-4 py-3 whitespace-nowrap">Dirigeant</th>
+                        <th className="text-left text-white/30 font-medium px-4 py-3 whitespace-nowrap">Site</th>
                         <th className="text-left text-white/30 font-medium px-4 py-3 whitespace-nowrap">Email</th>
                         <th className="text-left text-white/30 font-medium px-4 py-3 whitespace-nowrap">Tél.</th>
                         <th className="text-left text-white/30 font-medium px-4 py-3 whitespace-nowrap">Statut</th>
@@ -415,6 +462,26 @@ export default function ProspectionPage() {
                                 : <span className="text-white/20 italic">—</span>}
                             </td>
 
+                            {/* Site */}
+                            <td className="px-4 py-3 whitespace-nowrap max-w-[160px]">
+                              {enriching.has(p.id) && !p.siteWeb ? (
+                                <Loader2 className="w-3 h-3 text-sky-400/50 animate-spin" />
+                              ) : p.siteWeb ? (
+                                <a
+                                  href={`https://${p.siteWeb}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="flex items-center gap-1 text-sky-400 hover:text-sky-300 text-[10px] font-mono truncate max-w-[140px] transition-colors"
+                                >
+                                  <Globe className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">{p.siteWeb.replace(/^www\./, "")}</span>
+                                </a>
+                              ) : (
+                                <span className="text-white/20">—</span>
+                              )}
+                            </td>
+
                             {/* Email */}
                             <td className="px-4 py-3 whitespace-nowrap max-w-[180px]">
                               {p.emailDirigeant ? (
@@ -422,16 +489,28 @@ export default function ProspectionPage() {
                                   <EmailSourceIcon source={p.emailSource} />
                                   <span className="font-mono text-violet-300 text-[10px] truncate">{p.emailDirigeant}</span>
                                 </div>
+                              ) : enriching.has(p.id) ? (
+                                <span className="text-white/20 italic text-[10px] animate-pulse">Recherche…</span>
                               ) : (
-                                <span className="text-white/20 italic text-[10px]">Non trouvé</span>
+                                <span className="text-white/20 italic text-[10px]">—</span>
                               )}
                             </td>
 
                             {/* Tél */}
                             <td className="px-4 py-3 whitespace-nowrap">
-                              {p.telephonePro
-                                ? <span className="font-mono text-brand-300 text-[10px]">{p.telephonePro}</span>
-                                : <span className="text-white/20">—</span>}
+                              {p.telephonePro ? (
+                                <a
+                                  href={`tel:${p.telephonePro.replace(/\s/g, "")}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="font-mono text-brand-300 text-[10px] hover:text-brand-200 transition-colors"
+                                >
+                                  {p.telephonePro}
+                                </a>
+                              ) : enriching.has(p.id) ? (
+                                <span className="text-white/20 text-[10px] animate-pulse">…</span>
+                              ) : (
+                                <span className="text-white/20">—</span>
+                              )}
                             </td>
 
                             {/* Statut */}
