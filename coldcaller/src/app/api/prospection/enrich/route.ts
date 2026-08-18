@@ -317,7 +317,15 @@ export async function POST(req: NextRequest) {
     if (actions.length > 0) patch.actions = actions;
 
     const { dbUpdateProspect } = await import("@/lib/db-prospection");
-    const updated = await dbUpdateProspect(prospectId, patch);
+    const updated = await dbUpdateProspect(prospectId, {
+      ...patch,
+      // Pass raw fields so the upsert can create a minimal record if needed
+      siren:      siren  || undefined,
+      nom:        nom    || undefined,
+      ville:      ville  || undefined,
+      adresse:    adresse || undefined,
+      codePostal: codePostal || undefined,
+    });
 
     return NextResponse.json({
       ok:           true,
@@ -336,6 +344,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("[prospection/enrich]", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    const msg = err instanceof Error
+      ? `${err.message}\n${err.stack ?? ""}`
+      : String(err);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

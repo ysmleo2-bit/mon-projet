@@ -10,8 +10,18 @@ interface PgResult { rows: Record<string, unknown>[]; rowCount: number }
 async function pgQuery(sql: string, params: unknown[] = []): Promise<PgResult> {
   const { neon } = await import("@neondatabase/serverless");
   const db  = neon(process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "");
-  const res = await db.query(sql, params);
-  return res as unknown as PgResult;
+  // neon tagged template (sql`...`) returns rows[] directly.
+  // neon.query(text, params) returns a QueryResult { rows, rowCount }.
+  // We normalise both shapes so callers always get { rows, rowCount }.
+  const res = await db.query(sql, params) as unknown;
+  if (Array.isArray(res)) {
+    return { rows: res as Record<string, unknown>[], rowCount: (res as unknown[]).length };
+  }
+  const qr = res as { rows?: Record<string, unknown>[]; rowCount?: number };
+  return {
+    rows:     qr.rows     ?? [],
+    rowCount: qr.rowCount ?? 0,
+  };
 }
 
 async function ensureTable() {
@@ -110,21 +120,58 @@ export async function dbUpsertProspects(incoming: Prospect[]): Promise<void> {
   }
 }
 
-export async function dbUpdateProspect(id: string, patch: Partial<Prospect>): Promise<Prospect | null> {
+export async function dbUpdateProspect(id: string, patch: Partial<Prospect>): Promise<Prospect> {
   if (USE_PG) {
     await ensureTable();
     const existing = await dbGetProspect(id);
-    if (!existing) return null;
-    const updated = { ...existing, ...patch, updatedAt: new Date().toISOString() };
+    // Upsert: if the prospect doesn't exist yet (e.g. DB save was fire-and-forget
+    // and failed), create a minimal record so the enrichment data is not lost.
+    const base: Prospect = existing ?? ({
+      id,
+      siren:      patch.siren      ?? "",
+      nom:        patch.nom        ?? id,
+      codeNaf:    patch.codeNaf    ?? "",
+      libelleNaf: patch.libelleNaf ?? "",
+      secteur:    patch.secteur    ?? "",
+      adresse:    patch.adresse    ?? "",
+      dirigeants: [],
+      statut:     "nouveau",
+      sources:    ["sirene"],
+      actions:    [],
+      createdAt:  new Date().toISOString(),
+      updatedAt:  new Date().toISOString(),
+    } as unknown as Prospect);
+    const updated = { ...base, ...patch, updatedAt: new Date().toISOString() };
     await pgQuery(
-      `UPDATE prospects SET data = $2, updated_at = NOW() WHERE id = $1`,
+      `INSERT INTO prospects (id, data) VALUES ($1, $2)
+       ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
       [id, JSON.stringify(updated)]
     );
     return updated;
   } else {
     const items = readJson();
     const idx   = items.findIndex((p) => p.id === id);
-    if (idx === -1) return null;
+    if (idx === -1) {
+      // Upsert: create if not found
+      const newProspect: Prospect = {
+        id,
+        siren:      patch.siren      ?? "",
+        nom:        patch.nom        ?? id,
+        codeNaf:    patch.codeNaf    ?? "",
+        libelleNaf: patch.libelleNaf ?? "",
+        secteur:    patch.secteur    ?? "",
+        adresse:    patch.adresse    ?? "",
+        statut:     "nouveau",
+        sources:    ["sirene"],
+        actions:    [],
+        createdAt:  new Date().toISOString(),
+        updatedAt:  new Date().toISOString(),
+        ...patch,
+      } as Prospect;
+      items.push(newProspect);
+      writeJson(items);
+      return newProspect;
+    }
     items[idx] = { ...items[idx], ...patch, updatedAt: new Date().toISOString() };
     writeJson(items);
     return items[idx];
