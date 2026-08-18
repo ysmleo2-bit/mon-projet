@@ -114,6 +114,7 @@ export interface Prospect {
   libelleNaf:      string;
   secteur:         string;
   adresse?:        string;
+  adresseVerifiee?: string;
   ville?:          string;
   codePostal?:     string;
   departement?:    string;
