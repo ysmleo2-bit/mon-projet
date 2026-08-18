@@ -1,7 +1,12 @@
 /**
  * POST /api/prospection/enrich
- * Enrichit un prospect : site web (Google Places v1), emails (scraping), téléphone,
- * données SIRENE complémentaires, vérification adresse BAN
+ * Enrichit un prospect : site web, emails, téléphone via plusieurs sources :
+ *  1. Google Places v1 (site + tél)
+ *  2. Pages Jaunes HTTP (tél — meilleure source pour artisans FR)
+ *  3. Société.com (tél via SIREN)
+ *  4. SIRENE complémentaire (dirigeants, date, effectifs)
+ *  5. Scraping site web (emails, tél)
+ *  6. BAN — vérification adresse
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -12,13 +17,19 @@ export const maxDuration = 30;
 
 // ── Normalisation numéro FR ───────────────────────────────────────────────────
 function normalizePhone(raw: string): string {
-  let p = raw.replace(/\s|\.|–|-/g, "");
+  let p = raw.replace(/[\s.–-]/g, "");
   if (p.startsWith("+33")) p = "0" + p.slice(3);
   if (p.startsWith("0033")) p = "0" + p.slice(4);
   if (p.length === 10 && p.startsWith("0")) {
     return p.replace(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, "$1 $2 $3 $4 $5");
   }
-  return raw;
+  return raw.trim();
+}
+
+// Teste si une chaîne ressemble à un numéro FR valide
+function isValidFrPhone(p: string): boolean {
+  const digits = p.replace(/\s/g, "");
+  return /^0[1-9]\d{8}$/.test(digits);
 }
 
 // ── Scraping site web ─────────────────────────────────────────────────────────
@@ -29,7 +40,6 @@ async function scrapeWebsiteContacts(rawUrl: string): Promise<{
 }> {
   const cleanUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
   const EMAIL_RE = /\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b/g;
-  // Regex téléphone France plus complète : gère formats "Tél :", "☎", "Tel:", "+33", espaces points tirets
   const PHONE_RE = /(?:(?:\+33|0033|0)[1-9])(?:[\s.\-]?\d{2}){4}/g;
 
   const pages = [
@@ -57,7 +67,7 @@ async function scrapeWebsiteContacts(rawUrl: string): Promise<{
   for (const url of pages) {
     try {
       const res = await fetch(url, {
-        signal:   AbortSignal.timeout(5_000),
+        signal:   AbortSignal.timeout(4_000),
         headers:  { "User-Agent": "Mozilla/5.0 (compatible; ColdCaller/1.0; +https://coldcaller.app)" },
         redirect: "follow",
       });
@@ -65,8 +75,7 @@ async function scrapeWebsiteContacts(rawUrl: string): Promise<{
       const html = await res.text();
       scrapedOk  = true;
 
-      // ── Emails ──
-      // Aussi chercher les mailto: links obfusqués
+      // Emails (déobfusqués)
       const deobfuscated = html
         .replace(/\[at\]|\(at\)/gi, "@")
         .replace(/\[dot\]|\(dot\)/gi, ".");
@@ -79,14 +88,22 @@ async function scrapeWebsiteContacts(rawUrl: string): Promise<{
         emails.add(lower);
       }
 
-      // ── Téléphones ──
+      // Téléphones
       const telMatches = html.match(PHONE_RE) ?? [];
       for (const t of telMatches) {
         const normalized = normalizePhone(t);
-        if (normalized) phones.add(normalized);
+        if (isValidFrPhone(normalized)) phones.add(normalized);
       }
 
-      if (emails.size > 0) break; // stop dès qu'on a un email
+      // Aussi tel: links
+      const telLinks = html.match(/href="tel:([^"]+)"/gi) ?? [];
+      for (const link of telLinks) {
+        const raw = link.replace(/href="tel:/i, "").replace(/"$/, "");
+        const n = normalizePhone(raw);
+        if (isValidFrPhone(n)) phones.add(n);
+      }
+
+      if (emails.size > 0) break;
     } catch { continue; }
   }
 
@@ -109,14 +126,20 @@ async function findViaGooglePlaces(nom: string, ville?: string): Promise<{
         headers: {
           "Content-Type":     "application/json",
           "X-Goog-Api-Key":   key,
-          "X-Goog-FieldMask": "places.websiteUri,places.nationalPhoneNumber",
+          "X-Goog-FieldMask": "places.websiteUri,places.nationalPhoneNumber,places.displayName",
         },
         body:   JSON.stringify({ textQuery: query, languageCode: "fr", pageSize: 1 }),
-        signal: AbortSignal.timeout(6_000),
+        signal: AbortSignal.timeout(5_000),
       }
     );
     if (!res.ok) return null;
-    const data = await res.json() as { places?: Array<{ websiteUri?: string; nationalPhoneNumber?: string }> };
+    const data = await res.json() as {
+      places?: Array<{
+        websiteUri?: string;
+        nationalPhoneNumber?: string;
+        displayName?: { text?: string };
+      }>
+    };
     const place = data.places?.[0];
     if (!place) return null;
     return {
@@ -126,12 +149,91 @@ async function findViaGooglePlaces(nom: string, ville?: string): Promise<{
   } catch { return null; }
 }
 
+// ── Pages Jaunes HTTP (sans navigateur) ──────────────────────────────────────
+// Source principale pour les artisans/PME françaises
+async function searchPagesJaunesPhone(nom: string, ville?: string): Promise<string | null> {
+  try {
+    const quoi = encodeURIComponent(nom.toLowerCase());
+    const ou   = encodeURIComponent((ville ?? "").toLowerCase());
+    const url  = `https://www.pagesjaunes.fr/annuaire/chercherlespros?quoiqui=${quoi}&ou=${ou}`;
+
+    const res = await fetch(url, {
+      signal:  AbortSignal.timeout(4_000),
+      headers: {
+        "User-Agent":       "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+        "Accept":           "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language":  "fr-FR,fr;q=0.9",
+        "Cache-Control":    "no-cache",
+        "Referer":          "https://www.pagesjaunes.fr/",
+      },
+      redirect: "follow",
+    });
+
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    // Cloudflare challenge → abandon
+    if (html.includes("_cf_chl_opt") || html.length < 3000) return null;
+
+    // Extraire les liens tel: (format PJ: href="tel:0x xx xx xx xx")
+    const TEL_LINK_RE = /href="tel:([^"]+)"/gi;
+    let m: RegExpExecArray | null;
+    const candidates: string[] = [];
+    const re = new RegExp(TEL_LINK_RE.source, TEL_LINK_RE.flags);
+    while ((m = re.exec(html)) !== null) {
+      const n = normalizePhone(m[1]);
+      if (isValidFrPhone(n)) candidates.push(n);
+    }
+
+    // Préférer un 04/05 (Sud/Ouest) ou 01-09 mobile —  retourner le premier
+    return candidates[0] ?? null;
+  } catch { return null; }
+}
+
+// ── Société.com par SIREN ────────────────────────────────────────────────────
+// Accès direct par SIREN → récupère le téléphone si disponible
+async function searchSocieteComPhone(siren: string): Promise<string | null> {
+  try {
+    // Chercher via leur moteur de recherche par SIREN
+    const res = await fetch(
+      `https://www.societe.com/cgi-bin/search?champs=${siren}`,
+      {
+        signal:  AbortSignal.timeout(4_000),
+        headers: {
+          "User-Agent":      "Mozilla/5.0 (compatible; ColdCaller/1.0)",
+          "Accept":          "text/html",
+          "Accept-Language": "fr-FR,fr;q=0.9",
+        },
+        redirect: "follow",
+      }
+    );
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    // Extraire tel: ou patterns téléphone
+    const TEL_LINK = /href="tel:([^"]+)"/i.exec(html);
+    if (TEL_LINK) {
+      const n = normalizePhone(TEL_LINK[1]);
+      if (isValidFrPhone(n)) return n;
+    }
+
+    // Pattern texte "01 23 45 67 89" ou "01.23.45.67.89"
+    const TEL_TEXT = /\b(0[1-9](?:[\s.]{1}\d{2}){4})\b/.exec(html);
+    if (TEL_TEXT) {
+      const n = normalizePhone(TEL_TEXT[1]);
+      if (isValidFrPhone(n)) return n;
+    }
+
+    return null;
+  } catch { return null; }
+}
+
 // ── Données SIRENE supplémentaires (dirigeants, date, effectifs) ──────────────
 async function fetchSireneExtra(siren: string): Promise<Record<string, unknown> | null> {
   try {
     const res = await fetch(
       `https://recherche-entreprises.api.gouv.fr/search?q=${siren}&per_page=1`,
-      { signal: AbortSignal.timeout(5_000) }
+      { signal: AbortSignal.timeout(4_000) }
     );
     if (!res.ok) return null;
     const data = await res.json() as { results?: Array<Record<string, unknown>> };
@@ -145,7 +247,7 @@ async function verifyAddress(adresse: string, codePostal?: string): Promise<stri
     const q = encodeURIComponent(adresse + (codePostal ? " " + codePostal : ""));
     const res = await fetch(
       `https://api-adresse.data.gouv.fr/search/?q=${q}&limit=1`,
-      { signal: AbortSignal.timeout(4_000) }
+      { signal: AbortSignal.timeout(3_000) }
     );
     if (!res.ok) return null;
     const data = await res.json() as { features?: Array<{ properties?: { label?: string } }> };
@@ -199,15 +301,26 @@ export async function POST(req: NextRequest) {
   const patch: Partial<Prospect>  = { updatedAt: now };
 
   try {
-    // ── 1. Lancer en parallèle : Google Places + SIRENE extra ─────────────────
-    const [placesResult, sireneExtra] = await Promise.all([
-      (!siteWeb || !telephonePro) && process.env.GOOGLE_MAPS_API_KEY
+    // ── 1. Lancer 4 sources en parallèle ─────────────────────────────────────
+    const needPhone = !telephonePro;
+    const needSite  = !siteWeb;
+
+    const [placesResult, sireneExtra, pjPhone, societePhone] = await Promise.all([
+      (needSite || needPhone) && process.env.GOOGLE_MAPS_API_KEY
         ? findViaGooglePlaces(nom, ville)
         : Promise.resolve(null),
-      siren ? fetchSireneExtra(siren) : Promise.resolve(null),
+      siren
+        ? fetchSireneExtra(siren)
+        : Promise.resolve(null),
+      needPhone
+        ? searchPagesJaunesPhone(nom, ville)
+        : Promise.resolve(null),
+      needPhone && siren
+        ? searchSocieteComPhone(siren)
+        : Promise.resolve(null),
     ]);
 
-    // Appliquer résultats Google Places
+    // ── Appliquer résultats Google Places ─────────────────────────────────────
     if (placesResult) {
       if (placesResult.siteWeb && !siteWeb) {
         siteWeb = placesResult.siteWeb;
@@ -218,18 +331,38 @@ export async function POST(req: NextRequest) {
       if (placesResult.phone && !telephonePro) {
         telephonePro = placesResult.phone;
         patch.telephonePro = telephonePro;
+        sources.push("google_places");
         actions.push({ date: now, type: "enrichissement", detail: `Tél trouvé via Google : ${telephonePro}` });
       }
     }
 
-    // Appliquer données SIRENE complémentaires
+    // ── Appliquer Pages Jaunes ────────────────────────────────────────────────
+    if (pjPhone && !telephonePro) {
+      telephonePro = pjPhone;
+      patch.telephonePro = telephonePro;
+      sources.push("pages_jaunes" as DataSource);
+      actions.push({ date: now, type: "enrichissement", detail: `Tél trouvé Pages Jaunes : ${telephonePro}` });
+    }
+
+    // ── Appliquer Société.com ─────────────────────────────────────────────────
+    if (societePhone && !telephonePro) {
+      telephonePro = societePhone;
+      patch.telephonePro = telephonePro;
+      actions.push({ date: now, type: "enrichissement", detail: `Tél trouvé société.com : ${telephonePro}` });
+    }
+
+    // ── Appliquer données SIRENE complémentaires ──────────────────────────────
     if (sireneExtra) {
       const siege = sireneExtra.siege as Record<string, unknown> | undefined;
       if (!telephonePro && siege?.telephone) {
         const rawPhone = String(siege.telephone);
         telephonePro = normalizePhone(rawPhone.replace(/^\+33\s?/, "0"));
-        patch.telephonePro = telephonePro;
-        actions.push({ date: now, type: "enrichissement", detail: `Tél trouvé SIRENE : ${telephonePro}` });
+        if (isValidFrPhone(telephonePro)) {
+          patch.telephonePro = telephonePro;
+          actions.push({ date: now, type: "enrichissement", detail: `Tél trouvé SIRENE : ${telephonePro}` });
+        } else {
+          telephonePro = body.telephonePro; // reset
+        }
       }
       if (!siteWeb && siege?.site_internet) {
         const rawSite = String(siege.site_internet);
@@ -272,7 +405,6 @@ export async function POST(req: NextRequest) {
       }
 
       if (emails.length > 0) {
-        // Préférer email contenant le nom du dirigeant
         const dirLower = (dirigeantPrincipal ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
         const dirParts = dirLower.split(/\s+/).filter((p) => p.length > 2);
         emailTrouve = emails.find((e) => dirParts.some((p) => e.includes(p))) ?? emails[0];
@@ -291,16 +423,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── 3. Vérification adresse BAN (en parallèle si possible) ───────────────
+    // ── 3. Vérification adresse BAN ──────────────────────────────────────────
     if (adresse && !patch.adresseVerifiee) {
       const verified = await verifyAddress(adresse, codePostal);
       if (verified) {
-        (patch as any).adresseVerifiee = verified;
+        patch.adresseVerifiee = verified;
         actions.push({ date: now, type: "enrichissement", detail: `Adresse vérifiée : ${verified}` });
       }
     }
 
-    // ── 4. Patch final ─────────────────────────────────────────────────────────
+    // ── 4. Patch final ────────────────────────────────────────────────────────
     if (emailTrouve) {
       patch.emailDirigeant = emailTrouve;
       patch.emailSource    = emailSource;
@@ -329,6 +461,10 @@ export async function POST(req: NextRequest) {
       emailPatterns,
       siteFound:    !!siteWeb,
       phoneFound:   !!(patch.telephonePro),
+      phoneSource:  pjPhone && patch.telephonePro === pjPhone ? "pages_jaunes"
+                  : placesResult?.phone && patch.telephonePro === placesResult.phone ? "google_places"
+                  : societePhone && patch.telephonePro === societePhone ? "societe_com"
+                  : "sirene",
     });
   } catch (err) {
     console.error("[prospection/enrich]", err);

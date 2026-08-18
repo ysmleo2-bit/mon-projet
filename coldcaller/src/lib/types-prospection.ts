@@ -95,6 +95,8 @@ export interface Dirigeant {
 export type DataSource =
   | "sirene"
   | "google_places"
+  | "pages_jaunes"
+  | "societe_com"
   | "website_scraping"
   | "pattern_email"
   | "pappers"
