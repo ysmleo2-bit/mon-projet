@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { font-family: "Inter", system-ui, sans-serif; background: #020617; color: #f1f5f9; }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(8px);
+  }
+  .glass-blue {
+    background: rgba(14,165,233,0.08);
+    border: 1px solid rgba(14,165,233,0.2);
+  }
+  .btn-primary {
+    @apply bg-brand-500 hover:bg-brand-400 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-glow-sm hover:shadow-glow;
+  }
+  .btn-outline {
+    @apply border border-white/20 hover:border-brand-400/50 text-white/70 hover:text-white font-medium px-6 py-3 rounded-xl transition-all duration-200;
+  }
+  .btn-ghost {
+    @apply text-white/50 hover:text-white hover:bg-white/[0.06] px-3 py-2 rounded-lg transition-all duration-150;
+  }
+  .card {
+    @apply glass rounded-2xl p-5;
+  }
+  .badge {
+    @apply text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full;
+  }
+  .live-dot {
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  .stat-value {
+    @apply text-2xl font-black text-white tabular-nums;
+  }
+  .stat-label {
+    @apply text-xs text-white/40 mt-0.5;
+  }
+  .input {
+    @apply w-full bg-ink-800 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/30 transition-all;
+  }
+  .select {
+    @apply w-full bg-ink-800 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500/60 cursor-pointer appearance-none;
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.75); }
+}
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fade-up 0.5s ease forwards; }

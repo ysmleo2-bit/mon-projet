@@ -1,0 +1,38 @@
+{
+  "name": "coldcaller",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "NODE_USE_ENV_PROXY=1 next dev",
+    "build": "next build",
+    "start": "NODE_USE_ENV_PROXY=1 next start",
+    "lint": "next lint",
+    "purge": "node scripts/purge-stale-leads.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
+    "@neondatabase/serverless": "^1.1.0",
+    "@sparticuz/chromium-min": "^149.0.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.30.0",
+    "next": "14.2.35",
+    "playwright": "^1.47.0",
+    "playwright-core": "^1.62.1",
+    "puppeteer-core": "^25.5.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "react": "^18",
+    "react-dom": "^18",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.35",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
+}
