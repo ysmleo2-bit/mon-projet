@@ -316,16 +316,50 @@ export async function POST(req: NextRequest) {
     patch.enrichiAt = now;
     if (actions.length > 0) patch.actions = actions;
 
-    const { dbUpdateProspect } = await import("@/lib/db-prospection");
-    const updated = await dbUpdateProspect(prospectId, {
+    // Build the full patch including raw identification fields for the upsert fallback
+    const fullPatch = {
       ...patch,
-      // Pass raw fields so the upsert can create a minimal record if needed
-      siren:      siren  || undefined,
-      nom:        nom    || undefined,
-      ville:      ville  || undefined,
-      adresse:    adresse || undefined,
+      siren:      siren      || undefined,
+      nom:        nom        || undefined,
+      ville:      ville      || undefined,
+      adresse:    adresse    || undefined,
       codePostal: codePostal || undefined,
-    });
+    };
+
+    // Try to persist — but even if the DB crashes, return the enrichment data
+    // so the UI can display the phone/site immediately.
+    let updated: import("@/lib/types-prospection").Prospect | null = null;
+    let dbError: string | undefined;
+    try {
+      const { dbUpdateProspect } = await import("@/lib/db-prospection");
+      updated = await dbUpdateProspect(prospectId, fullPatch);
+    } catch (dbErr) {
+      console.error("[prospection/enrich] DB error:", dbErr);
+      dbError = dbErr instanceof Error
+        ? `${dbErr.message}\n${dbErr.stack ?? ""}`
+        : String(dbErr);
+      // Build a synthetic in-memory prospect so the caller still gets data
+      updated = {
+        id:            prospectId,
+        siren:         siren         ?? "",
+        nom:           nom           ?? "",
+        codeNaf:       "",
+        libelleNaf:    libelleNaf    ?? "",
+        secteur:       "",
+        adresse:       adresse       ?? "",
+        ville,
+        codePostal,
+        dirigeants:    [],
+        statut:        (patch.statut ?? "enrichi") as import("@/lib/types-prospection").ProspectStatut,
+        sources:       patch.sources ?? ["sirene"],
+        actions:       patch.actions ?? [],
+        createdAt:     now,
+        updatedAt:     now,
+        telephonePro,
+        siteWeb,
+        ...patch,
+      } as import("@/lib/types-prospection").Prospect;
+    }
 
     return NextResponse.json({
       ok:           true,
@@ -333,7 +367,8 @@ export async function POST(req: NextRequest) {
       emailFound:   !!emailTrouve,
       emailPatterns,
       siteFound:    !!siteWeb,
-      phoneFound:   !!(patch.telephonePro),
+      phoneFound:   !!(telephonePro ?? patch.telephonePro),
+      ...(dbError ? { dbError } : {}),
       debug: {
         placesFound:  !!placesResult,
         placesPhone:  placesResult?.phone,
