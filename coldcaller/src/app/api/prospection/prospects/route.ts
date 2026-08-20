@@ -47,7 +47,7 @@ export async function PATCH(req: NextRequest) {
   if (triggerCrm && updated) {
     try {
       const { dbUpsertLeads } = await import("@/lib/db");
-      const { prospectToLead } = await import("@/app/api/prospection/crm-sync/route");
+      const { prospectToLead } = await import("@/lib/crm-utils");
       const lead = prospectToLead(updated);
       await dbUpsertLeads([lead]);
       // Marquer comme étant dans le CRM
