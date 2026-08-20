@@ -271,12 +271,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── LinkedIn dirigeant (URL de recherche publique) ────────────────────────
+    const dirName = patch.dirigeantPrincipal ?? dirigeantPrincipal;
+    if (dirName) {
+      const linkedinQuery = encodeURIComponent(`${dirName} ${nom}`);
+      patch.linkedinDirigeant = `https://www.linkedin.com/search/results/people/?keywords=${linkedinQuery}`;
+      actions.push({ date: now, type: "enrichissement", detail: `LinkedIn: ${dirName}` });
+    }
+
     // ── Phase 2 : Scraping site → email + tél (seulement si site trouvé) ──────
     let emailTrouve: string | undefined;
     let emailPatterns: string[] = [];
 
     if (siteWeb) {
-      const domaine = siteWeb.split("/")[0];
+      // Nettoyer le domaine : retirer "www." pour éviter "contact@www.example.com"
+      const domaine = siteWeb.split("/")[0].replace(/^www\./, "");
       const { emails, phones } = await scrapeWebsiteContacts(siteWeb);
 
       if (emails.length > 0) {
