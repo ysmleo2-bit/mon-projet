@@ -22,22 +22,22 @@ function avatarColor(name: string) {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
 }
 
-// ── Config statuts ────────────────────────────────────────────────────────────
+// ── Config statuts — light theme ──────────────────────────────────────────────
 const STATUS_CFG: Record<LeadStatus, { label: string; color: string; bg: string; border: string }> = {
-  new:        { label: "À appeler",  color: "text-white/50",    bg: "bg-white/[0.04]",     border: "border-white/[0.08]"  },
-  contacted:  { label: "Rappeler",   color: "text-amber-400",   bg: "bg-amber-500/10",     border: "border-amber-500/25"  },
-  interested: { label: "Intéressé",  color: "text-emerald-400", bg: "bg-emerald-500/10",   border: "border-emerald-500/25"},
-  rdv:        { label: "RDV Pris",   color: "text-violet-400",  bg: "bg-violet-500/10",    border: "border-violet-500/25" },
-  client:     { label: "Client",     color: "text-brand-400",   bg: "bg-brand-500/10",     border: "border-brand-500/25"  },
-  lost:       { label: "Perdu",      color: "text-red-400",     bg: "bg-red-500/10",       border: "border-red-500/25"    },
+  new:        { label: "À appeler",  color: "text-gray-500",    bg: "bg-gray-100",     border: "border-gray-200"   },
+  contacted:  { label: "Rappeler",   color: "text-amber-700",   bg: "bg-amber-50",     border: "border-amber-200"  },
+  interested: { label: "Intéressé",  color: "text-emerald-700", bg: "bg-emerald-50",   border: "border-emerald-200"},
+  rdv:        { label: "RDV Pris",   color: "text-violet-700",  bg: "bg-violet-50",    border: "border-violet-200" },
+  client:     { label: "Client",     color: "text-brand-700",   bg: "bg-brand-50",     border: "border-brand-200"  },
+  lost:       { label: "Perdu",      color: "text-red-600",     bg: "bg-red-50",       border: "border-red-200"    },
 };
 
 const OUTCOME_LABELS: Record<string, { label: string; color: string }> = {
-  no_answer:      { label: "Pas répondu",  color: "text-white/40"    },
-  interested:     { label: "Intéressé",    color: "text-emerald-400" },
-  not_interested: { label: "Pas intéressé",color: "text-red-400"     },
-  rdv:            { label: "RDV pris",     color: "text-violet-400"  },
-  callback:       { label: "À rappeler",   color: "text-amber-400"   },
+  no_answer:      { label: "Pas répondu",   color: "text-gray-500"    },
+  interested:     { label: "Intéressé",     color: "text-emerald-700" },
+  not_interested: { label: "Pas intéressé", color: "text-red-600"     },
+  rdv:            { label: "RDV pris",      color: "text-violet-700"  },
+  callback:       { label: "À rappeler",    color: "text-amber-700"   },
 };
 
 const FILTER_TABS: Array<{ id: LeadStatus | "all"; label: string }> = [
@@ -64,8 +64,8 @@ export default function DashboardPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Panneaux redimensionnables ───────────────────────────────────────────────
-  const [leftWidth,  setLeftWidth]  = useState(208); // px
-  const [rightWidth, setRightWidth] = useState(288); // px
+  const [leftWidth,  setLeftWidth]  = useState(208);
+  const [rightWidth, setRightWidth] = useState(288);
   const [isDragging, setIsDragging] = useState(false);
   const dragState = useRef<{ panel: "left" | "right"; startX: number; startWidth: number } | null>(null);
   const moveHandler = useRef<(e: MouseEvent) => void>(() => {});
@@ -123,8 +123,8 @@ export default function DashboardPage() {
   useEffect(() => { setPage(1); }, [search, filterStatus]);
 
   // ── Stats ────────────────────────────────────────────────────────────────────
-  const today    = new Date().toDateString();
-  const stats    = {
+  const today = new Date().toDateString();
+  const stats = {
     total:      leads.length,
     interested: leads.filter((l) => l.status === "interested").length,
     rappels:    leads.filter((l) => l.status === "contacted").length,
@@ -224,33 +224,33 @@ export default function DashboardPage() {
 
   // ────────────────────────────────────────────────────────────────────────────
   return (
-    <div className={cn("flex h-screen bg-ink-950 overflow-hidden", isDragging && "select-none cursor-col-resize")}>
+    <div className={cn("flex h-screen bg-slate-50 overflow-hidden", isDragging && "select-none cursor-col-resize")}>
       <Navbar />
 
       {/* ── Panneau gauche stats + filtres ── */}
-      <aside style={{ width: leftWidth }} className="shrink-0 border-r border-white/[0.06] flex flex-col overflow-hidden bg-ink-900/40 relative">
+      <aside style={{ width: leftWidth }} className="shrink-0 border-r border-gray-200 flex flex-col overflow-hidden bg-white relative">
 
         {/* Stats */}
-        <div className="p-3 border-b border-white/[0.06]">
+        <div className="p-3 border-b border-gray-100">
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: "Prospects",   v: stats.total,      color: "text-white"        },
-              { label: "Intéressés",  v: stats.interested, color: "text-emerald-400"  },
-              { label: "Rappels",     v: stats.rappels,    color: "text-amber-400"    },
-              { label: "Aujourd'hui", v: stats.today,      color: "text-brand-400"    },
+              { label: "Prospects",   v: stats.total,      color: "text-gray-900"     },
+              { label: "Intéressés",  v: stats.interested, color: "text-emerald-600"  },
+              { label: "Rappels",     v: stats.rappels,    color: "text-amber-600"    },
+              { label: "Aujourd'hui", v: stats.today,      color: "text-brand-600"    },
             ].map(({ label, v, color }) => (
-              <div key={label} className="glass rounded-xl p-3">
+              <div key={label} className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
                 <div className={cn("text-xl font-black", color)}>{v}</div>
-                <div className="text-[9px] text-white/35 mt-0.5 leading-tight">{label}</div>
+                <div className="text-[9px] text-gray-400 mt-0.5 leading-tight">{label}</div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Recherche */}
-        <div className="px-3 py-2.5 border-b border-white/[0.06]">
+        <div className="px-3 py-2.5 border-b border-gray-100">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -262,7 +262,7 @@ export default function DashboardPage() {
 
         {/* Filtres statut */}
         <div className="flex-1 overflow-auto p-2 space-y-0.5">
-          <p className="text-[9px] text-white/20 uppercase tracking-wider mb-2 px-2 pt-1">Statut</p>
+          <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wider mb-2 px-2 pt-1">Statut</p>
           {FILTER_TABS.map((tab) => {
             const count  = tab.id === "all" ? leads.length : leads.filter((l) => l.status === tab.id).length;
             const active = filterStatus === tab.id;
@@ -273,28 +273,28 @@ export default function DashboardPage() {
                 className={cn(
                   "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all",
                   active
-                    ? "bg-white/[0.08] text-white font-semibold"
-                    : "text-white/35 hover:text-white hover:bg-white/[0.04]"
+                    ? "bg-brand-50 text-brand-700 font-semibold border border-brand-200"
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
                 )}>
                 <span>{tab.label}</span>
-                <span className={cn("text-[10px] font-mono", active ? "text-white/50" : "text-white/15")}>{count}</span>
+                <span className={cn("text-[10px] font-mono", active ? "text-brand-500" : "text-gray-300")}>{count}</span>
               </button>
             );
           })}
         </div>
 
         {/* Plan / CRM */}
-        <div className="p-3 border-t border-white/[0.06]">
-          <div className="glass rounded-xl p-3">
+        <div className="p-3 border-t border-gray-100">
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-bold text-brand-400">Plan Free</span>
-              <span className="text-[9px] text-white/25">{leads.length} leads</span>
+              <span className="text-[10px] font-bold text-brand-600">Plan Free</span>
+              <span className="text-[9px] text-gray-400">{leads.length} leads</span>
             </div>
-            <div className="h-1 bg-white/[0.05] rounded-full overflow-hidden">
+            <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
               <div className="h-full bg-brand-500 rounded-full transition-all"
                 style={{ width: `${Math.min(100, (leads.length / 500) * 100)}%` }} />
             </div>
-            <p className="text-[9px] text-white/25 mt-1.5">● CRM actif</p>
+            <p className="text-[9px] text-gray-400 mt-1.5 font-medium">● CRM actif</p>
           </div>
         </div>
       </aside>
@@ -302,7 +302,7 @@ export default function DashboardPage() {
       {/* ── Poignée gauche ── */}
       <div
         onMouseDown={(e) => startResize("left", e)}
-        className="w-1 shrink-0 bg-white/[0.04] hover:bg-brand-500/60 active:bg-brand-500 cursor-col-resize transition-colors relative group"
+        className="w-1 shrink-0 bg-gray-200 hover:bg-brand-400 active:bg-brand-500 cursor-col-resize transition-colors relative group"
         title="Redimensionner">
         <div className="absolute inset-y-0 -left-1 -right-1" />
       </div>
@@ -311,11 +311,11 @@ export default function DashboardPage() {
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* Top bar */}
-        <div className="border-b border-white/[0.06] bg-ink-950/90 backdrop-blur-xl px-5 h-14 flex items-center justify-between shrink-0">
-          <h1 className="text-sm font-bold text-white flex items-center gap-2">
+        <div className="border-b border-gray-200 bg-white px-5 h-14 flex items-center justify-between shrink-0">
+          <h1 className="text-sm font-bold text-gray-900 flex items-center gap-2">
             Prospects
             {!loading && (
-              <span className="text-[10px] font-mono text-white/30 bg-white/[0.06] px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
                 {filtered.length}
               </span>
             )}
@@ -338,15 +338,15 @@ export default function DashboardPage() {
         </div>
 
         {/* Liste */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto bg-slate-50">
           {loading ? (
-            <div className="flex items-center justify-center h-full text-white/30">
+            <div className="flex items-center justify-center h-full text-gray-400">
               <Loader2 className="w-5 h-5 animate-spin mr-2" /> Chargement…
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-white/20 gap-2">
-              <Search className="w-8 h-8 opacity-30" />
-              <p className="text-sm">Aucun lead trouvé</p>
+            <div className="flex flex-col items-center justify-center h-full text-gray-300 gap-2">
+              <Search className="w-8 h-8 opacity-50" />
+              <p className="text-sm text-gray-400">Aucun lead trouvé</p>
             </div>
           ) : (
             paginated.map((lead) => {
@@ -357,8 +357,8 @@ export default function DashboardPage() {
                   key={lead.id}
                   onClick={() => { setSelected(lead); setNoteInput(""); }}
                   className={cn(
-                    "flex items-center gap-4 px-5 py-3.5 border-b border-white/[0.04] cursor-pointer transition-colors",
-                    isSelected ? "bg-white/[0.06] border-l-2 border-l-brand-500" : "hover:bg-white/[0.025]"
+                    "flex items-center gap-4 px-5 py-3.5 border-b border-gray-100 cursor-pointer transition-colors bg-white",
+                    isSelected ? "bg-brand-50 border-l-2 border-l-brand-500" : "hover:bg-blue-50/40"
                   )}>
                   {/* Avatar */}
                   <div className={cn(
@@ -371,20 +371,20 @@ export default function DashboardPage() {
                   {/* Infos */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-sm font-semibold text-white truncate">{lead.name}</span>
+                      <span className="text-sm font-semibold text-gray-900 truncate">{lead.name}</span>
                       {lead.rating > 0 && (
-                        <span className="text-[10px] text-amber-400 shrink-0">★ {lead.rating}</span>
+                        <span className="text-[10px] text-amber-500 shrink-0">★ {lead.rating}</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-white/35">
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
                       <span>{lead.city}</span>
-                      <span className="font-mono text-brand-400/60">{lead.phone}</span>
+                      <span className="font-mono text-brand-500">{lead.phone}</span>
                     </div>
                   </div>
 
                   {/* Badge statut */}
                   <span className={cn(
-                    "text-[10px] font-bold px-2.5 py-1 rounded-full border shrink-0",
+                    "text-[10px] font-semibold px-2.5 py-1 rounded-full border shrink-0",
                     cfg.bg, cfg.border, cfg.color
                   )}>
                     {cfg.label}
@@ -398,7 +398,7 @@ export default function DashboardPage() {
                       "w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all",
                       lead.status === "rdv"
                         ? "bg-emerald-500 text-white"
-                        : "bg-white/[0.05] text-white/30 hover:bg-brand-500 hover:text-white"
+                        : "bg-gray-100 text-gray-400 hover:bg-brand-500 hover:text-white"
                     )}>
                     <Phone className="w-3.5 h-3.5" />
                   </a>
@@ -410,25 +410,25 @@ export default function DashboardPage() {
 
         {/* Pagination */}
         {!loading && totalPages > 1 && (
-          <div className="border-t border-white/[0.06] px-5 py-3 flex items-center justify-between shrink-0 bg-ink-950/80">
-            <span className="text-xs text-white/25">
+          <div className="border-t border-gray-200 px-5 py-3 flex items-center justify-between shrink-0 bg-white">
+            <span className="text-xs text-gray-400">
               {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}
             </span>
             <div className="flex items-center gap-1">
               <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                className="btn-ghost p-1.5 disabled:opacity-20"><ChevronLeft className="w-4 h-4" /></button>
+                className="btn-ghost p-1.5 disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
 
               {page > 3 && (
                 <>
-                  <button onClick={() => setPage(1)} className="w-7 h-7 rounded-lg text-xs text-white/40 hover:text-white hover:bg-white/[0.06]">1</button>
-                  <span className="text-white/20 text-xs px-0.5">…</span>
+                  <button onClick={() => setPage(1)} className="w-7 h-7 rounded-lg text-xs text-gray-400 hover:text-gray-900 hover:bg-gray-100">1</button>
+                  <span className="text-gray-300 text-xs px-0.5">…</span>
                 </>
               )}
 
               {pageNumbers().map((p) => (
                 <button key={p} onClick={() => setPage(p)}
                   className={cn("w-7 h-7 rounded-lg text-xs font-mono transition-all",
-                    p === page ? "bg-brand-500 text-white" : "text-white/40 hover:text-white hover:bg-white/[0.06]"
+                    p === page ? "bg-brand-500 text-white" : "text-gray-400 hover:text-gray-900 hover:bg-gray-100"
                   )}>
                   {p}
                 </button>
@@ -436,13 +436,13 @@ export default function DashboardPage() {
 
               {page < totalPages - 2 && (
                 <>
-                  <span className="text-white/20 text-xs px-0.5">…</span>
-                  <button onClick={() => setPage(totalPages)} className="w-7 h-7 rounded-lg text-xs text-white/40 hover:text-white hover:bg-white/[0.06]">{totalPages}</button>
+                  <span className="text-gray-300 text-xs px-0.5">…</span>
+                  <button onClick={() => setPage(totalPages)} className="w-7 h-7 rounded-lg text-xs text-gray-400 hover:text-gray-900 hover:bg-gray-100">{totalPages}</button>
                 </>
               )}
 
               <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="btn-ghost p-1.5 disabled:opacity-20"><ChevronRight className="w-4 h-4" /></button>
+                className="btn-ghost p-1.5 disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
             </div>
           </div>
         )}
@@ -454,29 +454,29 @@ export default function DashboardPage() {
         {/* Poignée droite */}
         <div
           onMouseDown={(e) => startResize("right", e)}
-          className="w-1 shrink-0 bg-white/[0.04] hover:bg-brand-500/60 active:bg-brand-500 cursor-col-resize transition-colors relative"
+          className="w-1 shrink-0 bg-gray-200 hover:bg-brand-400 active:bg-brand-500 cursor-col-resize transition-colors relative"
           title="Redimensionner">
           <div className="absolute inset-y-0 -left-1 -right-1" />
         </div>
-        <aside style={{ width: rightWidth }} className="shrink-0 border-l border-white/[0.06] bg-ink-900/60 flex flex-col h-full overflow-hidden">
+        <aside style={{ width: rightWidth }} className="shrink-0 border-l border-gray-200 bg-white flex flex-col h-full overflow-hidden">
 
           {/* Header */}
-          <div className="px-4 py-3.5 border-b border-white/[0.06] flex items-start justify-between gap-2 shrink-0">
+          <div className="px-4 py-3.5 border-b border-gray-100 flex items-start justify-between gap-2 shrink-0">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <h2 className="text-sm font-bold text-white truncate">{selected.name}</h2>
+                <h2 className="text-sm font-bold text-gray-900 truncate">{selected.name}</h2>
               </div>
               <span className={cn(
-                "text-[9px] font-bold px-2 py-0.5 rounded-full border",
+                "text-[9px] font-semibold px-2 py-0.5 rounded-full border",
                 STATUS_CFG[selected.status].bg, STATUS_CFG[selected.status].border, STATUS_CFG[selected.status].color
               )}>
                 {STATUS_CFG[selected.status].label}
               </span>
               {selected.rating > 0 && (
-                <span className="text-xs text-amber-400 ml-2">★ {selected.rating}</span>
+                <span className="text-xs text-amber-500 ml-2">★ {selected.rating}</span>
               )}
             </div>
-            <button onClick={() => setSelected(null)} className="text-white/25 hover:text-white shrink-0 mt-0.5">
+            <button onClick={() => setSelected(null)} className="text-gray-300 hover:text-gray-700 shrink-0 mt-0.5">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -489,7 +489,7 @@ export default function DashboardPage() {
               iconBg="bg-brand-500"
               label="Téléphone">
               <a href={`tel:${selected.phone.replace(/\s/g, "")}`}
-                className="text-base font-semibold text-white hover:text-brand-200 break-all">
+                className="text-base font-semibold text-gray-900 hover:text-brand-600 break-all">
                 {selected.phone}
               </a>
             </BigContactCard>
@@ -500,7 +500,7 @@ export default function DashboardPage() {
                 iconBg="bg-sky-500"
                 label="Email">
                 <a href={`mailto:${selected.email}`}
-                  className="text-base font-semibold text-white hover:text-sky-200 break-all">
+                  className="text-base font-semibold text-gray-900 hover:text-sky-600 break-all">
                   {selected.email}
                 </a>
               </BigContactCard>
@@ -510,7 +510,7 @@ export default function DashboardPage() {
               icon={<MapPin className="w-5 h-5 text-white" />}
               iconBg="bg-violet-500"
               label="Ville">
-              <span className="text-base font-semibold text-white">{selected.city}</span>
+              <span className="text-base font-semibold text-gray-900">{selected.city}</span>
             </BigContactCard>
 
             {selected.website && (
@@ -519,7 +519,7 @@ export default function DashboardPage() {
                 iconBg="bg-slate-500"
                 label="Site web">
                 <a href={`https://${selected.website}`} target="_blank" rel="noopener noreferrer"
-                  className="text-sm font-semibold text-white hover:text-brand-200 break-all">
+                  className="text-sm font-semibold text-gray-900 hover:text-brand-600 break-all">
                   {selected.website}
                 </a>
               </BigContactCard>
@@ -527,9 +527,9 @@ export default function DashboardPage() {
 
             {/* ── Notes ── */}
             <div>
-              <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2">Notes</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Notes</p>
               {selected.notes ? (
-                <div className="rounded-2xl bg-white/[0.06] border border-white/[0.08] p-4 text-sm text-white/75 leading-relaxed mb-2">
+                <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 text-sm text-gray-700 leading-relaxed mb-2">
                   {selected.notes}
                 </div>
               ) : null}
@@ -538,7 +538,7 @@ export default function DashboardPage() {
                 onChange={(e) => setNoteInput(e.target.value)}
                 placeholder="Ajouter une note…"
                 rows={3}
-                className="input text-sm resize-none rounded-2xl"
+                className="input text-sm resize-none rounded-xl"
               />
               <button onClick={() => saveNote(selected.id)} disabled={saving}
                 className="mt-2 w-full text-sm btn-primary py-2.5 flex items-center justify-center gap-1.5 rounded-xl">
@@ -550,32 +550,31 @@ export default function DashboardPage() {
             {/* ── Historique d'appels ── */}
             {(selected.callHistory?.length ?? 0) > 0 && (
               <div>
-                <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
                   Historique d&apos;appels
                 </p>
                 <div className="space-y-2">
                   {[...(selected.callHistory ?? [])].reverse().map((rec, i) => {
-                    const oc = OUTCOME_LABELS[rec.outcome] ?? { label: rec.outcome, color: "text-white/40" };
+                    const oc = OUTCOME_LABELS[rec.outcome] ?? { label: rec.outcome, color: "text-gray-500" };
                     return (
-                      <div key={i} className="rounded-2xl bg-white/[0.06] border border-white/[0.08] px-4 py-3">
+                      <div key={i} className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-white/50">
+                          <span className="text-sm text-gray-500">
                             {new Date(rec.at).toLocaleDateString("fr-FR", { year:"numeric", month:"2-digit", day:"2-digit" })}
                             {" "}{formatTime(rec.at)}
                           </span>
-                          <span className="text-sm font-mono text-white/50 font-semibold">
+                          <span className="text-sm font-mono text-gray-500 font-semibold">
                             {formatDuration(rec.duration)}
                           </span>
                         </div>
                         <span className={cn(
                           "text-xs font-semibold px-3 py-1 rounded-full border",
                           oc.color,
-                          // border couleur assortie
-                          rec.outcome === "interested"     ? "border-emerald-500/40 bg-emerald-500/10" :
-                          rec.outcome === "rdv"            ? "border-violet-500/40 bg-violet-500/10"   :
-                          rec.outcome === "callback"       ? "border-amber-500/40 bg-amber-500/10"     :
-                          rec.outcome === "not_interested" ? "border-red-500/40 bg-red-500/10"         :
-                                                             "border-white/[0.12] bg-white/[0.04]"
+                          rec.outcome === "interested"     ? "border-emerald-200 bg-emerald-50" :
+                          rec.outcome === "rdv"            ? "border-violet-200 bg-violet-50"   :
+                          rec.outcome === "callback"       ? "border-amber-200 bg-amber-50"     :
+                          rec.outcome === "not_interested" ? "border-red-200 bg-red-50"         :
+                                                             "border-gray-200 bg-gray-100"
                         )}>
                           {oc.label}
                         </span>
@@ -588,15 +587,15 @@ export default function DashboardPage() {
 
             {/* ── Changer statut ── */}
             <div>
-              <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2">Déplacer vers</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Déplacer vers</p>
               <div className="grid grid-cols-3 gap-1.5">
                 {(Object.entries(STATUS_CFG) as [LeadStatus, (typeof STATUS_CFG)[LeadStatus]][]).map(([id, cfg]) => (
                   <button key={id} onClick={() => moveLead(selected.id, id)}
                     className={cn(
-                      "text-[10px] font-bold py-2 px-1 rounded-xl border transition-all truncate",
+                      "text-[10px] font-semibold py-2 px-1 rounded-xl border transition-all truncate",
                       selected.status === id
                         ? cn(cfg.bg, cfg.border, cfg.color)
-                        : "border-white/[0.06] text-white/25 hover:text-white hover:border-white/20"
+                        : "border-gray-200 text-gray-400 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50"
                     )}>
                     {cfg.label}
                   </button>
@@ -607,7 +606,7 @@ export default function DashboardPage() {
             {/* ── Actions ── */}
             <div className="space-y-2 pb-4">
               <a href={`tel:${selected.phone.replace(/\s/g, "")}`}
-                className="flex items-center justify-center gap-2 text-sm w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold transition-colors">
+                className="flex items-center justify-center gap-2 text-sm w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">
                 <Phone className="w-4 h-4" /> Appeler maintenant
               </a>
               {selected.email && (
@@ -621,7 +620,7 @@ export default function DashboardPage() {
                 Interface d&apos;appel complète
               </a>
               <button onClick={() => deleteLead(selected.id)}
-                className="w-full flex items-center justify-center gap-2 text-xs text-red-400/50 hover:text-red-400 py-2 transition-colors">
+                className="w-full flex items-center justify-center gap-2 text-xs text-red-400 hover:text-red-600 py-2 transition-colors">
                 <Trash2 className="w-3.5 h-3.5" /> Supprimer ce lead
               </button>
             </div>
@@ -646,12 +645,12 @@ function BigContactCard({ icon, iconBg, label, children }: {
   icon: React.ReactNode; iconBg: string; label: string; children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-4 rounded-2xl bg-white/[0.06] border border-white/[0.08] px-4 py-3.5">
+    <div className="flex items-center gap-4 rounded-xl bg-gray-50 border border-gray-200 px-4 py-3.5">
       <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shrink-0", iconBg)}>
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-xs text-white/40 mb-0.5">{label}</p>
+        <p className="text-xs text-gray-400 font-medium mb-0.5">{label}</p>
         {children}
       </div>
     </div>
@@ -696,16 +695,16 @@ function AddLeadModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="glass rounded-2xl p-6 w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-xl p-6 w-full max-w-md">
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-bold text-white">Ajouter un lead</h3>
-          <button onClick={onClose}><X className="w-4 h-4 text-white/40 hover:text-white" /></button>
+          <h3 className="text-base font-bold text-gray-900">Ajouter un lead</h3>
+          <button onClick={onClose}><X className="w-4 h-4 text-gray-400 hover:text-gray-700" /></button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
           {fields.map(({ key, label, placeholder }) => (
             <div key={key}>
-              <label className="text-xs text-white/40 mb-1 block">{label}</label>
+              <label className="text-xs text-gray-500 font-medium mb-1 block">{label}</label>
               <input
                 value={(form as Record<string, string>)[key]}
                 onChange={(e) => setForm({ ...form, [key]: e.target.value })}
