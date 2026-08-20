@@ -198,15 +198,16 @@ function isEmailBlacklisted(email: string): boolean {
 function diceSimilarity(a: string, b: string): number {
   const normalize = (s: string) =>
     s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, " ").trim();
-  const bigrams = (s: string) => {
+  const bigrams = (s: string): string[] => {
     const words = normalize(s).split(/\s+/).join("");
-    const set = new Set<string>();
-    for (let i = 0; i < words.length - 1; i++) set.add(words.slice(i, i + 2));
-    return set;
+    const arr: string[] = [];
+    for (let i = 0; i < words.length - 1; i++) arr.push(words.slice(i, i + 2));
+    return arr;
   };
   const sa = bigrams(a), sb = bigrams(b);
-  const intersection = [...sa].filter((g) => sb.has(g)).length;
-  return (2 * intersection) / (sa.size + sb.size) || 0;
+  const sbSet = new Set<string>(sb);
+  const intersection = sa.filter((g) => sbSet.has(g)).length;
+  return (2 * intersection) / (sa.length + sb.length) || 0;
 }
 
 // ── Scraping site web (rapide, 1 page principale + contact) ──────────────────
