@@ -2,66 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+/* Plus Jakarta Sans — geometric humanist, variable weight */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @layer base {
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
-  body { font-family: "Inter", system-ui, sans-serif; background: #020617; color: #f1f5f9; }
+  body {
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    background: #0A0A0F;
+    color: #f0ede8;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Tighter, more intentional type scale */
+  h1 { font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; text-wrap: balance; }
+  h2 { font-weight: 700; letter-spacing: -0.025em; line-height: 1.2; text-wrap: balance; }
+  h3 { font-weight: 600; letter-spacing: -0.015em; line-height: 1.25; }
+  h4 { font-weight: 600; letter-spacing: -0.01em; }
+
+  /* Mono for numbers and codes */
+  .font-mono, [class*="tabular"] {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-feature-settings: "tnum";
+  }
 }
 
 @layer utilities {
+  /* Glass surface — warm amber bias in the tint */
   .glass {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 220, 150, 0.07);
+    backdrop-filter: blur(10px);
   }
-  .glass-blue {
-    background: rgba(14,165,233,0.08);
-    border: 1px solid rgba(14,165,233,0.2);
+  .glass-amber {
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.22);
   }
+
+  /* Primary button — amber gold */
   .btn-primary {
-    @apply bg-brand-500 hover:bg-brand-400 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-glow-sm hover:shadow-glow;
+    @apply bg-brand-400 hover:bg-brand-300 text-ink-950 font-bold px-6 py-3 rounded-xl transition-all duration-200 shadow-glow-sm hover:shadow-glow;
+    letter-spacing: -0.01em;
   }
   .btn-outline {
-    @apply border border-white/20 hover:border-brand-400/50 text-white/70 hover:text-white font-medium px-6 py-3 rounded-xl transition-all duration-200;
+    @apply border border-white/15 hover:border-brand-400/40 text-white/60 hover:text-white font-medium px-6 py-3 rounded-xl transition-all duration-200;
   }
   .btn-ghost {
-    @apply text-white/50 hover:text-white hover:bg-white/[0.06] px-3 py-2 rounded-lg transition-all duration-150;
+    @apply text-white/40 hover:text-white hover:bg-white/[0.05] px-3 py-2 rounded-lg transition-all duration-150;
   }
   .card {
     @apply glass rounded-2xl p-5;
   }
   .badge {
-    @apply text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full;
+    @apply text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full;
   }
   .live-dot {
     animation: pulse-dot 2s ease-in-out infinite;
   }
   .stat-value {
-    @apply text-2xl font-black text-white tabular-nums;
+    @apply text-2xl font-extrabold text-white tabular-nums;
+    letter-spacing: -0.03em;
   }
   .stat-label {
-    @apply text-xs text-white/40 mt-0.5;
+    @apply text-xs text-white/35 mt-0.5 font-medium uppercase tracking-wider;
   }
   .input {
-    @apply w-full bg-ink-800 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/30 transition-all;
+    @apply w-full bg-ink-900 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400/50 focus:ring-1 focus:ring-brand-400/20 transition-all;
   }
   .select {
-    @apply w-full bg-ink-800 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500/60 cursor-pointer appearance-none;
+    @apply w-full bg-ink-900 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-400/50 cursor-pointer appearance-none;
+  }
+
+  /* Subtle separator */
+  .divider {
+    @apply border-t border-white/[0.06];
   }
 }
 
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.5; transform: scale(0.75); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
 }
 @keyframes ticker {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
 }
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.fade-up { animation: fade-up 0.5s ease forwards; }
+.fade-up { animation: fade-up 0.4s cubic-bezier(0.16,1,0.3,1) forwards; }

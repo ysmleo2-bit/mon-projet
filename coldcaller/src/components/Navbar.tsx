@@ -59,11 +59,11 @@ export default function Navbar({ variant = "app" }: { variant?: "landing" | "app
       <header className="fixed top-0 inset-x-0 z-50 border-b border-white/[0.06] bg-ink-950/90 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
-              <Phone className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 bg-brand-400 rounded-lg flex items-center justify-center shadow-glow-sm">
+              <Phone className="w-4 h-4 text-ink-950" />
             </div>
-            <span className="font-black text-white text-lg">ColdCaller</span>
-            <span className="badge bg-brand-500/20 text-brand-300 border border-brand-500/30 ml-1">PRO</span>
+            <span className="font-extrabold text-white text-lg tracking-tight">ColdCaller</span>
+            <span className="badge bg-brand-400/20 text-brand-300 border border-brand-400/30 ml-1">PRO</span>
           </Link>
           <nav className="hidden md:flex items-center gap-1">
             {[
@@ -94,10 +94,10 @@ export default function Navbar({ variant = "app" }: { variant?: "landing" | "app
       {/* Logo */}
       <div className="px-5 py-5 border-b border-white/[0.06]">
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
-            <Phone className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 bg-brand-400 rounded-lg flex items-center justify-center shadow-glow-sm">
+            <Phone className="w-4 h-4 text-ink-950" />
           </div>
-          <span className="font-black text-white text-base">ColdCaller</span>
+          <span className="font-extrabold text-white text-base tracking-tight">ColdCaller</span>
         </Link>
       </div>
 
@@ -133,7 +133,7 @@ export default function Navbar({ variant = "app" }: { variant?: "landing" | "app
             <span className="text-xs font-bold text-brand-400">143 / 300</span>
           </div>
           <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-            <div className="h-full bg-brand-500 rounded-full" style={{ width: "48%" }} />
+            <div className="h-full bg-brand-400 rounded-full shadow-glow-sm" style={{ width: "48%" }} />
           </div>
           <Link href="/pricing" className="mt-3 text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors">
             Passer au Pro <ChevronRight className="w-3 h-3" />
