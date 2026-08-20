@@ -35,7 +35,10 @@ function isValidFrPhone(p: string): boolean {
 // L'API Places v1 ("New") nécessite une activation séparée.
 // L'ancienne API Maps est universellement activée sur la même clé.
 //
-// Flux : Text Search (place_id) → Place Details (tél + site)
+// Flux : Text Search (place_id + name) → validation similarité → Place Details (tél + site)
+// Seuil de similarité : 0.25 (Dice sur bigrammes) — suffisant pour les abréviations courantes.
+const PLACES_MIN_SIMILARITY = 0.20;
+
 async function findViaGooglePlaces(nom: string, ville?: string): Promise<{
   siteWeb?: string;
   phone?:   string;
@@ -57,7 +60,7 @@ async function findViaGooglePlaces(nom: string, ville?: string): Promise<{
 
   for (const query of queries) {
     try {
-      // 1. Text Search → place_id
+      // 1. Text Search → place_id + name (pour validation)
       const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?`
         + `query=${encodeURIComponent(query)}&language=fr&key=${key}`;
 
@@ -66,17 +69,28 @@ async function findViaGooglePlaces(nom: string, ville?: string): Promise<{
 
       const searchData = await searchRes.json() as {
         status:   string;
-        results?: Array<{ place_id?: string }>;
+        results?: Array<{ place_id?: string; name?: string }>;
       };
 
       if (searchData.status !== "OK" || !searchData.results?.length) continue;
 
-      const placeId = searchData.results[0].place_id;
-      if (!placeId) continue;
+      const hit = searchData.results[0];
+      if (!hit.place_id) continue;
+
+      // ── Validation : le nom retourné par Places doit ressembler au nom cherché ──
+      // Évite les faux positifs (banque voisine, établissement homonyme…)
+      const placeName = hit.name ?? "";
+      const similarity = diceSimilarity(nom, placeName);
+      if (similarity < PLACES_MIN_SIMILARITY) {
+        console.info(
+          `[places] skip "${placeName}" for "${nom}" — similarity ${similarity.toFixed(2)} < ${PLACES_MIN_SIMILARITY}`
+        );
+        continue;
+      }
 
       // 2. Place Details → téléphone + site
       const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?`
-        + `place_id=${placeId}&fields=formatted_phone_number,website&language=fr&key=${key}`;
+        + `place_id=${hit.place_id}&fields=formatted_phone_number,website&language=fr&key=${key}`;
 
       const detailRes = await fetch(detailUrl, { signal: AbortSignal.timeout(4_000) });
       if (!detailRes.ok) continue;
@@ -91,9 +105,17 @@ async function findViaGooglePlaces(nom: string, ville?: string): Promise<{
       const phone   = detail.result?.formatted_phone_number
         ? normalizePhone(detail.result.formatted_phone_number)
         : undefined;
-      const siteWeb = detail.result?.website
-        ? detail.result.website.replace(/^https?:\/\//, "").replace(/\/$/, "")
-        : undefined;
+
+      // ── Validation site web : rejeter les domaines blacklistés ───────────────
+      let siteWeb: string | undefined;
+      if (detail.result?.website) {
+        const raw = detail.result.website.replace(/^https?:\/\//, "").replace(/\/$/, "");
+        if (!isWebsiteBlacklisted(raw)) {
+          siteWeb = raw;
+        } else {
+          console.info(`[places] rejected website "${raw}" for "${nom}" (blacklisted domain)`);
+        }
+      }
 
       // Retourner dès qu'on trouve au moins un résultat utile
       if (phone || siteWeb) return { phone, siteWeb };
@@ -115,6 +137,76 @@ async function fetchSireneExtra(siren: string): Promise<Record<string, unknown> 
     const data = await res.json() as { results?: Array<Record<string, unknown>> };
     return data.results?.[0] ?? null;
   } catch { return null; }
+}
+
+// ── Domaines à ignorer pour sites web ────────────────────────────────────────
+// Sites qui ne sont clairement pas le site de l'entreprise cherchée
+const WEBSITE_BLACKLIST_DOMAINS = [
+  // Banques & finance
+  "credit-agricole","creditagricole","lcl.fr","bnpparibas","societegenerale",
+  "caisse-epargne","caisseepargne","banquepostale","labanquepostale",
+  "cic.fr","hsbc.fr","boursorama","fortuneo","ing.fr","axabanque",
+  // Portails / annuaires
+  "pagesjaunes","pagesblanches","societe.com","infogreffe","pappers",
+  "verif.com","manageo","kompass","europages","corporama","nomination.fr",
+  "societeinfo","annuaire-mairie","annuaire.free","11870.com","118000",
+  // Réseaux sociaux & plateformes
+  "facebook","instagram","linkedin","twitter","tiktok","youtube",
+  "google","apple","microsoft","amazon","ebay","leboncoin","seloger",
+  // CMS / hébergeurs (pas le site réel)
+  "wixpress","wix.com","squarespace","shopify","wordpress.com","blogger",
+  "jimdo","webflow","strikingly","webnode",
+  // Divers
+  "example.com","domain.com","sentry","localhost",
+  "mail.fr","laposte.net","orange.fr","free.fr","sfr.fr","bbox.fr",
+];
+
+function isWebsiteBlacklisted(site: string): boolean {
+  const lower = site.toLowerCase();
+  return WEBSITE_BLACKLIST_DOMAINS.some((blocked) => lower.includes(blocked));
+}
+
+// ── Emails à ignorer ──────────────────────────────────────────────────────────
+const EMAIL_BLACKLIST_PATTERNS = [
+  /^adresse@/i,
+  /^email@/i,
+  /^exemple@/i,
+  /^example@/i,
+  /^test@/i,
+  /^noreply@/i,
+  /^no-reply@/i,
+  /^donotreply@/i,
+  /^notifications@/i,
+  /^newsletter@/i,
+  /^mailer@/i,
+  /^bounce@/i,
+  /^postmaster@/i,
+  /^webmaster@/i,
+  /^admin@(?:mail|email|domain|example)/i,
+  // Domaines génériques non professionnels
+  /@mail\.fr$/i,
+  /@adresse\.fr$/i,
+  /@example\.com$/i,
+  /@domain\.com$/i,
+];
+
+function isEmailBlacklisted(email: string): boolean {
+  return EMAIL_BLACKLIST_PATTERNS.some((re) => re.test(email));
+}
+
+// ── Similarité de nom d'entreprise (Dice coefficient sur bigrammes) ───────────
+function diceSimilarity(a: string, b: string): number {
+  const normalize = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, " ").trim();
+  const bigrams = (s: string) => {
+    const words = normalize(s).split(/\s+/).join("");
+    const set = new Set<string>();
+    for (let i = 0; i < words.length - 1; i++) set.add(words.slice(i, i + 2));
+    return set;
+  };
+  const sa = bigrams(a), sb = bigrams(b);
+  const intersection = [...sa].filter((g) => sb.has(g)).length;
+  return (2 * intersection) / (sa.size + sb.size) || 0;
 }
 
 // ── Scraping site web (rapide, 1 page principale + contact) ──────────────────
@@ -149,7 +241,11 @@ async function scrapeWebsiteContacts(rawUrl: string): Promise<{
       const deobfuscated = html.replace(/\[at\]|\(at\)/gi, "@").replace(/\[dot\]|\(dot\)/gi, ".");
       for (const e of (deobfuscated.match(EMAIL_RE) ?? [])) {
         const lower = e.toLowerCase();
-        if (!IGNORE_DOMAINS.some((d) => lower.includes(d)) && lower.length <= 80)
+        if (
+          !IGNORE_DOMAINS.some((d) => lower.includes(d)) &&
+          !isEmailBlacklisted(lower) &&
+          lower.length <= 80
+        )
           emails.add(lower);
       }
 
@@ -248,9 +344,12 @@ export async function POST(req: NextRequest) {
         }
       }
       if (!siteWeb && siege?.site_internet) {
-        siteWeb = String(siege.site_internet).replace(/^https?:\/\//, "").replace(/\/$/, "");
-        patch.siteWeb = siteWeb;
-        actions.push({ date: now, type: "enrichissement", detail: `Site SIRENE : ${siteWeb}` });
+        const rawSite = String(siege.site_internet).replace(/^https?:\/\//, "").replace(/\/$/, "");
+        if (!isWebsiteBlacklisted(rawSite)) {
+          siteWeb = rawSite;
+          patch.siteWeb = siteWeb;
+          actions.push({ date: now, type: "enrichissement", detail: `Site SIRENE : ${siteWeb}` });
+        }
       }
 
       // Dirigeants
@@ -288,16 +387,24 @@ export async function POST(req: NextRequest) {
       const domaine = siteWeb.split("/")[0].replace(/^www\./, "");
       const { emails, phones } = await scrapeWebsiteContacts(siteWeb);
 
-      if (emails.length > 0) {
+      // Filtrer les emails blacklistés récupérés depuis le site
+      const validEmails = emails.filter((e) => !isEmailBlacklisted(e));
+
+      if (validEmails.length > 0) {
         sources.push("website_scraping");
         const dirLower = (dirigeantPrincipal ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
         const dirParts = dirLower.split(/\s+/).filter((p) => p.length > 2);
-        emailTrouve = emails.find((e) => dirParts.some((p) => e.includes(p))) ?? emails[0];
+        emailTrouve = validEmails.find((e) => dirParts.some((p) => e.includes(p))) ?? validEmails[0];
         actions.push({ date: now, type: "enrichissement", detail: `Email : ${emailTrouve}` });
-      } else {
-        emailPatterns = generateEmailPatterns(dirigeantPrincipal, domaine);
-        sources.push("pattern_email");
-        actions.push({ date: now, type: "enrichissement", detail: `${emailPatterns.length} patterns email` });
+      } else if (!isWebsiteBlacklisted(domaine)) {
+        // Ne générer des patterns que si le domaine est légitime
+        emailPatterns = generateEmailPatterns(dirigeantPrincipal, domaine).filter(
+          (e) => !isEmailBlacklisted(e)
+        );
+        if (emailPatterns.length > 0) {
+          sources.push("pattern_email");
+          actions.push({ date: now, type: "enrichissement", detail: `${emailPatterns.length} patterns email` });
+        }
       }
 
       if (phones.length > 0 && !patch.telephonePro) {
@@ -307,12 +414,13 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Patch final ───────────────────────────────────────────────────────────
-    if (emailTrouve) {
+    if (emailTrouve && !isEmailBlacklisted(emailTrouve)) {
       patch.emailDirigeant = emailTrouve;
       patch.emailSource    = "website_scraping";
       patch.emailVerifie   = false;
       patch.statut         = "email_trouve";
     } else if (emailPatterns.length > 0) {
+      // Pattern : afficher le premier candidat uniquement (pas stocké comme email vérifié)
       patch.emailDirigeant = emailPatterns[0];
       patch.emailSource    = "pattern_email";
       patch.emailVerifie   = false;
@@ -379,11 +487,12 @@ export async function POST(req: NextRequest) {
       phoneFound:   !!(telephonePro ?? patch.telephonePro),
       ...(dbError ? { dbError } : {}),
       debug: {
-        placesFound:  !!placesResult,
-        placesPhone:  placesResult?.phone,
-        placesSite:   placesResult?.siteWeb,
-        sirenePhone:  (sireneExtra?.siege as Record<string,unknown>)?.telephone,
-        sireneSite:   (sireneExtra?.siege as Record<string,unknown>)?.site_internet,
+        placesFound:       !!placesResult,
+        placesPhone:       placesResult?.phone,
+        placesSite:        placesResult?.siteWeb,
+        sirenePhone:       (sireneExtra?.siege as Record<string,unknown>)?.telephone,
+        sireneSite:        (sireneExtra?.siege as Record<string,unknown>)?.site_internet,
+        websiteBlacklist:  siteWeb ? isWebsiteBlacklisted(siteWeb) : false,
       },
     });
   } catch (err) {
