@@ -385,14 +385,21 @@ export default function ProspectionPage() {
 
   // ── Mise à jour optimiste ─────────────────────────────────────────────────
   const updateProspect = useCallback(async (id: string, patch: Partial<Prospect>) => {
+    // Optimistic update
     setProspects((prev) => prev.map((x) => x.id === id ? { ...x, ...patch } : x));
     setSelected((prev) => prev?.id === id ? { ...prev, ...patch } as Prospect : prev);
     try {
-      await fetch("/api/prospection/prospects", {
+      const res  = await fetch("/api/prospection/prospects", {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ id, patch }),
       });
+      const data = await res.json() as { prospect?: Prospect; crmSynced?: boolean };
+      // If CRM was synced server-side, update local state to reflect danscrm=true
+      if (data.crmSynced && data.prospect) {
+        setProspects((prev) => prev.map((x) => x.id === id ? data.prospect! : x));
+        setSelected((prev) => prev?.id === id ? data.prospect! : prev);
+      }
     } catch { /* silencieux */ }
   }, []);
 
@@ -882,9 +889,9 @@ export default function ProspectionPage() {
                       className="flex items-center gap-1 px-3 py-2.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300 text-xs transition-all">
                       <ExternalLink className="w-3.5 h-3.5" /> CRM
                     </a>
-                    <a href="/app"
+                    <a href="/scripts"
                       className="flex items-center gap-1 px-3 py-2.5 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 text-xs transition-all">
-                      <PhoneCall className="w-3.5 h-3.5" /> File d'appel
+                      <PhoneCall className="w-3.5 h-3.5" /> Scripts d'appel
                     </a>
                   </div>
                 ) : (

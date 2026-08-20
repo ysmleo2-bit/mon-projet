@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Phone, Plus, Download, Upload, Loader2,
   X, Save, Trash2, Mail, MapPin, ChevronLeft, ChevronRight,
-  Search, Globe,
+  Search, Globe, PhoneCall, PhoneMissed, PhoneOff, MessageSquare as MessageIcon, RotateCcw,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import type { Lead, LeadStatus } from "@/lib/types";
@@ -40,6 +40,27 @@ const OUTCOME_LABELS: Record<string, { label: string; color: string }> = {
   callback:       { label: "À rappeler",    color: "text-amber-700"   },
 };
 
+const CALL_STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  pas_decroche:     { label: "Pas décroché",    color: "text-amber-700",  bg: "bg-amber-50",  border: "border-amber-200"  },
+  decroche:         { label: "Décroché",         color: "text-green-700",  bg: "bg-green-50",  border: "border-green-200"  },
+  message_envoye:   { label: "Message laissé",   color: "text-violet-700", bg: "bg-violet-50", border: "border-violet-200" },
+  echange_effectue: { label: "Échange effectué", color: "text-brand-700",  bg: "bg-brand-50",  border: "border-brand-200"  },
+  a_rappeler:       { label: "À rappeler",       color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200" },
+  pas_interesse:    { label: "Pas intéressé",    color: "text-red-600",    bg: "bg-red-50",    border: "border-red-200"    },
+  numero_invalide:  { label: "N° invalide",      color: "text-gray-500",   bg: "bg-gray-100",  border: "border-gray-200"   },
+};
+
+const CALL_FILTER_TABS = [
+  { id: "all",              label: "Tous les appels" },
+  { id: "pas_decroche",     label: "Pas décroché" },
+  { id: "decroche",         label: "Décroché" },
+  { id: "message_envoye",   label: "Message laissé" },
+  { id: "echange_effectue", label: "Échange effectué" },
+  { id: "pas_interesse",    label: "Pas intéressé" },
+  { id: "numero_invalide",  label: "N° invalide" },
+  { id: "a_rappeler",       label: "À rappeler" },
+];
+
 const FILTER_TABS: Array<{ id: LeadStatus | "all"; label: string }> = [
   { id: "all",        label: "Tous"      },
   { id: "new",        label: "À appeler" },
@@ -52,12 +73,14 @@ const FILTER_TABS: Array<{ id: LeadStatus | "all"; label: string }> = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [leads,        setLeads]        = useState<Lead[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [selected,     setSelected]     = useState<Lead | null>(null);
-  const [search,       setSearch]       = useState("");
-  const [filterStatus, setFilterStatus] = useState<LeadStatus | "all">("all");
-  const [page,         setPage]         = useState(1);
+  const [leads,          setLeads]          = useState<Lead[]>([]);
+  const [loading,        setLoading]        = useState(true);
+  const [selected,       setSelected]       = useState<Lead | null>(null);
+  const [search,         setSearch]         = useState("");
+  const [filterStatus,   setFilterStatus]   = useState<LeadStatus | "all">("all");
+  const [page,           setPage]           = useState(1);
+  const [viewMode,       setViewMode]       = useState<"pipeline" | "appels">("pipeline");
+  const [callStatusFilter, setCallStatusFilter] = useState<string>("all");
   const [noteInput,    setNoteInput]    = useState("");
   const [saving,       setSaving]       = useState(false);
   const [showAddForm,  setShowAddForm]  = useState(false);
@@ -93,9 +116,14 @@ export default function DashboardPage() {
   }
 
   // ── Chargement ──────────────────────────────────────────────────────────────
-  const loadLeads = useCallback(async () => {
+  const loadLeads = useCallback(async (mode?: "pipeline" | "appels", csFilter?: string) => {
     try {
-      const res  = await fetch("/api/leads");
+      const currentMode = mode ?? "pipeline";
+      const currentCs   = csFilter ?? "all";
+      const url = currentMode === "appels" && currentCs !== "all"
+        ? `/api/leads?callStatus=${currentCs}`
+        : "/api/leads";
+      const res  = await fetch(url);
       const json = await res.json();
       setLeads(json.leads ?? []);
     } finally {
@@ -103,24 +131,28 @@ export default function DashboardPage() {
     }
   }, []);
 
-  useEffect(() => { loadLeads(); }, [loadLeads]);
+  useEffect(() => { loadLeads(viewMode, callStatusFilter); }, [loadLeads, viewMode, callStatusFilter]);
 
   // ── Filtrage + pagination ────────────────────────────────────────────────────
   const filtered = leads.filter((l) => {
-    const matchStatus = filterStatus === "all" || l.status === filterStatus;
-    const q           = search.toLowerCase();
-    const matchSearch = !q ||
-      l.name.toLowerCase().includes(q) ||
-      l.phone.includes(q) ||
-      l.city.toLowerCase().includes(q) ||
-      (l.email ?? "").toLowerCase().includes(q);
-    return matchStatus && matchSearch;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!l.name.toLowerCase().includes(q) && !l.phone.includes(q) && !l.city.toLowerCase().includes(q) && !(l.email ?? "").toLowerCase().includes(q)) return false;
+    }
+    if (viewMode === "pipeline") {
+      if (filterStatus !== "all" && l.status !== filterStatus) return false;
+    } else {
+      // In appels mode, only show leads with call status
+      if (!l.callStatus || l.callStatus === "non_appele") return false;
+      if (callStatusFilter !== "all" && l.callStatus !== callStatusFilter) return false;
+    }
+    return true;
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  useEffect(() => { setPage(1); }, [search, filterStatus]);
+  useEffect(() => { setPage(1); }, [search, filterStatus, viewMode, callStatusFilter]);
 
   // ── Stats ────────────────────────────────────────────────────────────────────
   const today = new Date().toDateString();
@@ -233,12 +265,17 @@ export default function DashboardPage() {
         {/* Stats */}
         <div className="p-3 border-b border-gray-100">
           <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: "Prospects",   v: stats.total,      color: "text-gray-900"     },
-              { label: "Intéressés",  v: stats.interested, color: "text-emerald-600"  },
-              { label: "Rappels",     v: stats.rappels,    color: "text-amber-600"    },
-              { label: "Aujourd'hui", v: stats.today,      color: "text-brand-600"    },
-            ].map(({ label, v, color }) => (
+            {(viewMode === "appels" ? [
+              { label: "Appelés total",  v: leads.filter(l => l.callStatus && l.callStatus !== "non_appele").length, color: "text-brand-600"   },
+              { label: "Pas décroché",   v: leads.filter(l => l.callStatus === "pas_decroche").length,               color: "text-amber-600"  },
+              { label: "Décroché",       v: leads.filter(l => l.callStatus === "decroche" || l.callStatus === "echange_effectue").length, color: "text-green-600" },
+              { label: "Pas intéressés", v: leads.filter(l => l.callStatus === "pas_interesse").length,              color: "text-red-600"    },
+            ] : [
+              { label: "Prospects",   v: stats.total,      color: "text-gray-900"    },
+              { label: "Intéressés",  v: stats.interested, color: "text-emerald-600" },
+              { label: "Rappels",     v: stats.rappels,    color: "text-amber-600"   },
+              { label: "Aujourd'hui", v: stats.today,      color: "text-brand-600"   },
+            ]).map(({ label, v, color }) => (
               <div key={label} className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
                 <div className={cn("text-xl font-black", color)}>{v}</div>
                 <div className="text-[9px] text-gray-400 mt-0.5 leading-tight">{label}</div>
@@ -262,25 +299,74 @@ export default function DashboardPage() {
 
         {/* Filtres statut */}
         <div className="flex-1 overflow-auto p-2 space-y-0.5">
-          <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wider mb-2 px-2 pt-1">Statut</p>
-          {FILTER_TABS.map((tab) => {
-            const count  = tab.id === "all" ? leads.length : leads.filter((l) => l.status === tab.id).length;
-            const active = filterStatus === tab.id;
-            return (
+          {/* Mode toggle */}
+          <div className="flex bg-gray-100 rounded-xl p-1 mb-4">
+            {(["pipeline", "appels"] as const).map((mode) => (
               <button
-                key={tab.id}
-                onClick={() => setFilterStatus(tab.id as LeadStatus | "all")}
+                key={mode}
+                onClick={() => { setViewMode(mode); setFilterStatus("all"); setCallStatusFilter("all"); }}
                 className={cn(
-                  "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all",
-                  active
-                    ? "bg-brand-50 text-brand-700 font-semibold border border-brand-200"
-                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-                )}>
-                <span>{tab.label}</span>
-                <span className={cn("text-[10px] font-mono", active ? "text-brand-500" : "text-gray-300")}>{count}</span>
+                  "flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                  viewMode === mode
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                )}
+              >
+                {mode === "pipeline" ? "📊 Pipeline" : "📞 Appels"}
               </button>
-            );
-          })}
+            ))}
+          </div>
+
+          {viewMode === "pipeline" && (
+            <>
+              <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wider mb-2 px-2 pt-1">Statut</p>
+              {FILTER_TABS.map((tab) => {
+                const count  = tab.id === "all" ? leads.length : leads.filter((l) => l.status === tab.id).length;
+                const active = filterStatus === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setFilterStatus(tab.id as LeadStatus | "all")}
+                    className={cn(
+                      "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all",
+                      active
+                        ? "bg-brand-50 text-brand-700 font-semibold border border-brand-200"
+                        : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                    )}>
+                    <span>{tab.label}</span>
+                    <span className={cn("text-[10px] font-mono", active ? "text-brand-500" : "text-gray-300")}>{count}</span>
+                  </button>
+                );
+              })}
+            </>
+          )}
+
+          {viewMode === "appels" && (
+            <>
+              <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wider mb-2 px-2 pt-1">Statut d&apos;appel</p>
+              <div className="space-y-0.5">
+                {CALL_FILTER_TABS.map(({ id, label }) => (
+                  <button
+                    key={id}
+                    onClick={() => setCallStatusFilter(id)}
+                    className={cn(
+                      "w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left",
+                      callStatusFilter === id
+                        ? "bg-brand-50 text-brand-700 border border-brand-200"
+                        : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                    )}
+                  >
+                    <span>{label}</span>
+                    <span className="text-gray-400 text-[10px]">
+                      {id === "all"
+                        ? leads.filter((l) => l.callStatus && l.callStatus !== "non_appele").length
+                        : leads.filter((l) => l.callStatus === id).length}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Plan / CRM */}
@@ -383,12 +469,24 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Badge statut */}
-                  <span className={cn(
-                    "text-[10px] font-semibold px-2.5 py-1 rounded-full border shrink-0",
-                    cfg.bg, cfg.border, cfg.color
-                  )}>
-                    {cfg.label}
-                  </span>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className={cn(
+                      "text-[10px] font-semibold px-2.5 py-1 rounded-full border",
+                      cfg.bg, cfg.border, cfg.color
+                    )}>
+                      {cfg.label}
+                    </span>
+                    {lead.callStatus && lead.callStatus !== "non_appele" && CALL_STATUS_CFG[lead.callStatus] && (
+                      <span className={cn(
+                        "text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap",
+                        CALL_STATUS_CFG[lead.callStatus].bg,
+                        CALL_STATUS_CFG[lead.callStatus].border,
+                        CALL_STATUS_CFG[lead.callStatus].color
+                      )}>
+                        {CALL_STATUS_CFG[lead.callStatus].label}
+                      </span>
+                    )}
+                  </div>
 
                   {/* Bouton appel */}
                   <a

@@ -28,6 +28,9 @@ export interface Lead {
   detectedAt: string;
   callCount: number;
   callHistory?: CallRecord[];
+  callStatus?: string;    // StatutAppel from prospection (pas_decroche, decroche, etc.)
+  prospectId?: string;    // Original prospect ID for cross-reference
+  crmSyncedAt?: string;   // ISO date of last sync from prospection
   // Conformité RGPD / droit d'opposition : si true, ce lead ne doit plus
   // jamais être appelé (voir src/lib/blacklist.ts + /api/leads/:id/optout).
   doNotCall?: boolean;

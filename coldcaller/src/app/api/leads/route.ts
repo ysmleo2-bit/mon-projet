@@ -7,10 +7,10 @@ export const dynamic = "force-dynamic";
 // GET /api/leads?status=new&category=Plombier
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const status   = searchParams.get("status")   ?? undefined;
-  const category = searchParams.get("category") ?? undefined;
-
-  const leads = await dbGetLeads({ status, category });
+  const status     = searchParams.get("status")     ?? undefined;
+  const category   = searchParams.get("category")   ?? undefined;
+  const callStatus = searchParams.get("callStatus") ?? undefined;
+  const leads = await dbGetLeads({ status, category, callStatus });
   return NextResponse.json({ leads, total: leads.length });
 }
 

@@ -11,6 +11,7 @@ export function toLeadStatus(statut: ProspectStatut, statutAppel?: StatutAppel):
   if (statut === "pas_interesse") return "lost";
   if (statut === "interesse")     return "interested";
   if (statut === "repondu")       return "interested";
+  if (statutAppel === "echange_effectue") return "interested";
   if (statutAppel && statutAppel !== "non_appele") return "contacted";
   return "new";
 }
@@ -67,7 +68,7 @@ export function prospectToLead(prospect: Prospect): Lead {
   }
 
   return {
-    id:          `crm-${prospect.siren}`,
+    id:          prospect.siren ? `crm-${prospect.siren}` : `crm-${prospect.id}`,
     name:        prospect.nom,
     category:    prospect.libelleNaf || prospect.secteur || "B2B",
     phone:       prospect.telephonePro ?? "",
@@ -84,6 +85,9 @@ export function prospectToLead(prospect: Prospect): Lead {
     detectedAt:  prospect.createdAt,
     callCount:   callHistory.length,
     callHistory,
-    lastContact: prospect.dateAppel,
+    lastContact: prospect.dateAppel ?? prospect.updatedAt,
+    callStatus:  prospect.statutAppel ?? "non_appele",
+    prospectId:  prospect.id,
+    crmSyncedAt: new Date().toISOString(),
   };
 }

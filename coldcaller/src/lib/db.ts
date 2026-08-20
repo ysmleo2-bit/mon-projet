@@ -61,7 +61,7 @@ const USE_PG = !!(process.env.POSTGRES_URL || process.env.DATABASE_URL);
 
 // ── API publique ──────────────────────────────────────────────────────────────
 
-export async function dbGetLeads(filter?: { status?: string; category?: string }): Promise<Lead[]> {
+export async function dbGetLeads(filter?: { status?: string; category?: string; callStatus?: string }): Promise<Lead[]> {
   if (USE_PG) {
     await ensureTable();
     let sql = "SELECT data FROM leads";
@@ -75,14 +75,19 @@ export async function dbGetLeads(filter?: { status?: string; category?: string }
       params.push(filter.category);
       conds.push(`data->>'category' = $${params.length}`);
     }
+    if (filter?.callStatus) {
+      params.push(filter.callStatus);
+      conds.push(`data->>'callStatus' = $${params.length}`);
+    }
     if (conds.length) sql += " WHERE " + conds.join(" AND ");
     sql += " ORDER BY created_at DESC";
     const result = await pgQuery(sql, params);
     return result.rows.map((r) => (r as { data: Lead }).data);
   } else {
     let leads = readJson();
-    if (filter?.status)   leads = leads.filter((l) => l.status === filter.status);
-    if (filter?.category) leads = leads.filter((l) => l.category === filter.category);
+    if (filter?.status)     leads = leads.filter((l) => l.status === filter.status);
+    if (filter?.category)   leads = leads.filter((l) => l.category === filter.category);
+    if (filter?.callStatus) leads = leads.filter((l) => l.callStatus === filter.callStatus);
     return leads;
   }
 }

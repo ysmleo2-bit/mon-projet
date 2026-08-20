@@ -51,8 +51,11 @@ export async function PATCH(req: NextRequest) {
       const lead = prospectToLead(updated);
       await dbUpsertLeads([lead]);
       // Marquer comme étant dans le CRM
-      if (!updated.danscrm) {
-        await dbUpdateProspect(id, { danscrm: true, dateCrm: new Date().toISOString() });
+      await dbUpdateProspect(id, { danscrm: true, dateCrm: new Date().toISOString() });
+      // Update the returned object to reflect CRM sync
+      if (updated) {
+        updated.danscrm = true;
+        updated.dateCrm = new Date().toISOString();
       }
     } catch (crmErr) {
       // Non-bloquant : la mise à jour prospect est déjà faite
@@ -60,7 +63,7 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, prospect: updated, crmSynced: !!triggerCrm });
+  return NextResponse.json({ ok: true, prospect: updated, crmSynced: triggerCrm });
 }
 
 export async function DELETE(req: NextRequest) {
