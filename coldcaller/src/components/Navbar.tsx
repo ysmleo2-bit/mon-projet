@@ -59,11 +59,11 @@ export default function Navbar({ variant = "app" }: { variant?: "landing" | "app
       <header className="fixed top-0 inset-x-0 z-50 border-b border-white/[0.06] bg-ink-950/90 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-brand-400 rounded-lg flex items-center justify-center shadow-glow-sm">
-              <Phone className="w-4 h-4 text-ink-950" />
+            <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center shadow-glow-sm">
+              <Phone className="w-4 h-4 text-white" />
             </div>
             <span className="font-extrabold text-white text-lg tracking-tight">ColdCaller</span>
-            <span className="badge bg-brand-400/20 text-brand-300 border border-brand-400/30 ml-1">PRO</span>
+            <span className="badge bg-brand-500/20 text-brand-300 border border-brand-500/30 ml-1">PRO</span>
           </Link>
           <nav className="hidden md:flex items-center gap-1">
             {[
@@ -94,8 +94,8 @@ export default function Navbar({ variant = "app" }: { variant?: "landing" | "app
       {/* Logo */}
       <div className="px-5 py-5 border-b border-white/[0.06]">
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-brand-400 rounded-lg flex items-center justify-center shadow-glow-sm">
-            <Phone className="w-4 h-4 text-ink-950" />
+          <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center shadow-glow-sm">
+            <Phone className="w-4 h-4 text-white" />
           </div>
           <span className="font-extrabold text-white text-base tracking-tight">ColdCaller</span>
         </Link>
@@ -115,7 +115,7 @@ export default function Navbar({ variant = "app" }: { variant?: "landing" | "app
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
                 active
-                  ? "bg-brand-500/15 text-brand-300 border border-brand-500/25"
+                  ? "bg-brand-500/20 text-brand-300 border border-brand-500/30"
                   : "text-white/50 hover:text-white hover:bg-white/[0.05]"
               )}>
               <Icon className="w-4 h-4 shrink-0" />
@@ -130,12 +130,12 @@ export default function Navbar({ variant = "app" }: { variant?: "landing" | "app
         <div className="glass rounded-xl p-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-white/40">Leads restants</span>
-            <span className="text-xs font-bold text-brand-400">143 / 300</span>
+            <span className="text-xs font-bold text-brand-300">143 / 300</span>
           </div>
           <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-            <div className="h-full bg-brand-400 rounded-full shadow-glow-sm" style={{ width: "48%" }} />
+            <div className="h-full bg-brand-500 rounded-full shadow-glow-sm" style={{ width: "48%" }} />
           </div>
-          <Link href="/pricing" className="mt-3 text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors">
+          <Link href="/pricing" className="mt-3 text-xs text-brand-400 hover:text-brand-200 flex items-center gap-1 transition-colors">
             Passer au Pro <ChevronRight className="w-3 h-3" />
           </Link>
         </div>

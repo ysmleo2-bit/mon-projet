@@ -33,18 +33,18 @@ export const STATUT_LABELS: Record<ProspectStatut, string> = {
 };
 
 export const STATUT_COLORS: Record<ProspectStatut, string> = {
-  nouveau:          "bg-white/10 text-white/50",
-  a_enrichir:       "bg-amber-500/15 text-amber-300",
-  enrichi:          "bg-sky-500/15 text-sky-300",
-  email_trouve:     "bg-violet-500/15 text-violet-300",
-  email_verifie:    "bg-blue-500/15 text-blue-300",
-  pret_a_envoyer:   "bg-green-500/15 text-green-300",
-  email_envoye:     "bg-brand-500/15 text-brand-300",
-  repondu:          "bg-teal-500/15 text-teal-300",
-  interesse:        "bg-emerald-500/15 text-emerald-300",
-  pas_interesse:    "bg-red-500/15 text-red-400",
-  a_relancer:       "bg-orange-500/15 text-orange-300",
-  erreur:           "bg-red-900/20 text-red-400",
+  nouveau:          "bg-gray-100 text-gray-500",
+  a_enrichir:       "bg-amber-50 text-amber-700",
+  enrichi:          "bg-sky-50 text-sky-700",
+  email_trouve:     "bg-violet-50 text-violet-700",
+  email_verifie:    "bg-blue-50 text-blue-700",
+  pret_a_envoyer:   "bg-green-50 text-green-700",
+  email_envoye:     "bg-brand-50 text-brand-700",
+  repondu:          "bg-teal-50 text-teal-700",
+  interesse:        "bg-emerald-50 text-emerald-700",
+  pas_interesse:    "bg-red-50 text-red-600",
+  a_relancer:       "bg-orange-50 text-orange-700",
+  erreur:           "bg-red-100 text-red-600",
 };
 
 // ── Statuts d'appel commercial ────────────────────────────────────────────────
@@ -68,13 +68,13 @@ export const STATUT_APPEL_LABELS: Record<StatutAppel, string> = {
 };
 
 export const STATUT_APPEL_COLORS: Record<StatutAppel, string> = {
-  non_appele:       "bg-white/[0.06] text-white/30 border-white/10",
-  decroche:         "bg-green-500/20 text-green-300 border-green-500/30",
-  pas_decroche:     "bg-amber-500/20 text-amber-300 border-amber-500/30",
-  numero_invalide:  "bg-red-500/20 text-red-400 border-red-500/30",
-  echange_effectue: "bg-teal-500/20 text-teal-300 border-teal-500/30",
-  message_envoye:   "bg-violet-500/20 text-violet-300 border-violet-500/30",
-  a_rappeler:       "bg-orange-500/20 text-orange-300 border-orange-500/30",
+  non_appele:       "bg-gray-100 text-gray-500 border-gray-200",
+  decroche:         "bg-green-50 text-green-700 border-green-200",
+  pas_decroche:     "bg-amber-50 text-amber-700 border-amber-200",
+  numero_invalide:  "bg-red-50 text-red-600 border-red-200",
+  echange_effectue: "bg-teal-50 text-teal-700 border-teal-200",
+  message_envoye:   "bg-violet-50 text-violet-700 border-violet-200",
+  a_rappeler:       "bg-orange-50 text-orange-700 border-orange-200",
 };
 
 // ── Action (historique) ───────────────────────────────────────────────────────

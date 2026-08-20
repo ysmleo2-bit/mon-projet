@@ -100,7 +100,7 @@ function EmailSourceIcon({ source }: { source?: string }) {
   if (!source) return null;
   if (source === "website_scraping") return <span title="Trouvé sur le site"><CheckCircle className="w-3 h-3 text-green-400 shrink-0" /></span>;
   if (source === "pattern_email")    return <span title="Pattern email — à vérifier"><AlertCircle className="w-3 h-3 text-amber-400 shrink-0" /></span>;
-  if (source === "google_places")    return <span title="Google Places"><Star className="w-3 h-3 text-brand-400 shrink-0" /></span>;
+  if (source === "google_places")    return <span title="Google Places"><Star className="w-3 h-3 text-brand-500 shrink-0" /></span>;
   return null;
 }
 
@@ -111,8 +111,8 @@ function CopyBtn({ text, label }: { text: string; label?: string }) {
     navigator.clipboard.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); });
   };
   return (
-    <button onClick={copy} className="flex items-center gap-1 p-1 rounded text-white/20 hover:text-white/60 transition-colors shrink-0" title="Copier">
-      {done ? <CheckCircle className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+    <button onClick={copy} className="flex items-center gap-1 p-1 rounded text-gray-300 hover:text-gray-600 transition-colors shrink-0" title="Copier">
+      {done ? <CheckCircle className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
       {label && <span className="text-[10px]">{done ? "Copié !" : label}</span>}
     </button>
   );
@@ -135,9 +135,9 @@ function InfoRow({ icon: Icon, label, value, copy }: {
   if (!value) return null;
   return (
     <div className="flex items-start gap-2">
-      <Icon className="w-3.5 h-3.5 text-white/25 shrink-0 mt-0.5" />
-      <span className="text-[10px] text-white/35 shrink-0 w-20">{label}</span>
-      <span className="text-xs text-white/70 flex-1 break-words">{value}</span>
+      <Icon className="w-3.5 h-3.5 text-gray-300 shrink-0 mt-0.5" />
+      <span className="text-[10px] text-gray-400 shrink-0 w-20">{label}</span>
+      <span className="text-xs text-gray-700 flex-1 break-words">{value}</span>
       {copy && <CopyBtn text={value} />}
     </div>
   );
@@ -560,7 +560,7 @@ export default function ProspectionPage() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-screen overflow-hidden bg-ink-950">
+    <div className="flex h-screen overflow-hidden bg-slate-50">
       <Navbar />
 
       {/* ── Email composer modal ── */}
@@ -574,20 +574,20 @@ export default function ProspectionPage() {
         <div className="flex-1 flex flex-col overflow-hidden">
 
           {/* ── Header ── */}
-          <div className="shrink-0 px-6 pt-5 pb-3 border-b border-white/[0.06]">
+          <div className="shrink-0 px-6 pt-5 pb-3 border-b border-gray-200 bg-white">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h1 className="text-base font-bold text-white">Agent de prospection B2B</h1>
-                <p className="text-xs text-white/30 mt-0.5">SIRENE → enrichissement auto → suivi commercial → CRM</p>
+                <h1 className="text-base font-bold text-gray-900">Agent de prospection B2B</h1>
+                <p className="text-xs text-gray-400 mt-0.5">SIRENE → enrichissement auto → suivi commercial → CRM</p>
               </div>
               <div className="flex items-center gap-2">
                 {prospects.length > 0 && (
-                  <button onClick={exportCsv} className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white border border-white/10 hover:border-white/20 rounded-lg px-3 py-1.5 transition-all">
+                  <button onClick={exportCsv} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 border border-gray-200 hover:border-gray-300 rounded-lg px-3 py-1.5 transition-all bg-white">
                     <Download className="w-3.5 h-3.5" /> Export CSV
                   </button>
                 )}
                 <button onClick={() => setShowSearch(!showSearch)}
-                  className="flex items-center gap-1.5 text-xs text-brand-300 border border-brand-500/30 hover:bg-brand-500/10 rounded-lg px-3 py-1.5 transition-all">
+                  className="flex items-center gap-1.5 text-xs text-brand-600 border border-brand-300 hover:bg-brand-50 rounded-lg px-3 py-1.5 transition-all bg-white font-medium">
                   <Search className="w-3.5 h-3.5" />
                   {showSearch ? "Masquer" : "Nouvelle recherche"}
                 </button>
@@ -595,27 +595,27 @@ export default function ProspectionPage() {
             </div>
 
             {showSearch && (
-              <div className="glass rounded-xl p-4 space-y-3">
+              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-sm">
                 <div className="grid grid-cols-4 gap-3">
                   <div>
-                    <label className="text-[10px] text-white/40 mb-1 block">Secteur d'activité</label>
+                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Secteur d'activité</label>
                     <select value={secteurIdx} onChange={(e) => setSecteurIdx(Number(e.target.value))} className="select w-full text-xs">
                       {SECTEURS.map((s, i) => <option key={s.label} value={i}>{s.label}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] text-white/40 mb-1 block">Codes NAF (optionnel)</label>
+                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Codes NAF (optionnel)</label>
                     <input value={nafCustom} onChange={(e) => setNafCustom(e.target.value)}
-                      placeholder="ex: 62.01Z, 70.22Z" className="input w-full text-xs placeholder:text-white/20" />
+                      placeholder="ex: 62.01Z, 70.22Z" className="input w-full text-xs" />
                   </div>
                   <div>
-                    <label className="text-[10px] text-white/40 mb-1 block">Département</label>
+                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Département</label>
                     <select value={departement} onChange={(e) => setDepartement(e.target.value)} className="select w-full text-xs">
                       {DEPARTEMENTS.map((d) => <option key={d} value={d}>{DEPT_LABELS[d] ?? d}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] text-white/40 mb-1 block">Taille min.</label>
+                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Taille min.</label>
                     <select value={tranche} onChange={(e) => setTranche(e.target.value)} className="select w-full text-xs">
                       <option value="">Toutes</option>
                       {Object.entries(TRANCHES_EFFECTIFS).map(([k, v]) => k !== "NN" && <option key={k} value={k}>{v}</option>)}
@@ -627,7 +627,7 @@ export default function ProspectionPage() {
                     className={cn("btn-primary flex items-center gap-2 text-sm px-6 py-2.5", loading && "opacity-70 cursor-not-allowed")}>
                     {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Recherche…</> : <><Zap className="w-4 h-4" /> Trouver des prospects</>}
                   </button>
-                  <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="bg-transparent border border-white/10 rounded-lg px-2 py-2 text-white/50 text-xs">
+                  <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="bg-white border border-gray-200 rounded-lg px-2 py-2 text-gray-500 text-xs focus:outline-none focus:border-brand-400">
                     <option value={25}>25 résultats</option>
                     <option value={50}>50 résultats</option>
                     <option value={100}>100 résultats</option>
@@ -637,67 +637,67 @@ export default function ProspectionPage() {
             )}
 
             {error && (
-              <div className="mt-2 glass rounded-lg px-4 py-2.5 text-red-400 text-xs flex items-center gap-2">
+              <div className="mt-2 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-red-600 text-xs flex items-center gap-2">
                 <X className="w-3.5 h-3.5 shrink-0" /> {error}
-                <button onClick={() => setError(null)} className="ml-auto text-white/30 hover:text-white"><X className="w-3 h-3" /></button>
+                <button onClick={() => setError(null)} className="ml-auto text-red-300 hover:text-red-600"><X className="w-3 h-3" /></button>
               </div>
             )}
           </div>
 
           {/* ── Stats + progress ── */}
           {searched && !loading && prospects.length > 0 && (
-            <div className="shrink-0 px-6 py-3 border-b border-white/[0.06] space-y-2">
+            <div className="shrink-0 px-6 py-3 border-b border-gray-200 bg-white space-y-2">
               <div className="grid grid-cols-5 gap-2">
                 {[
-                  { label: "Prospects",  value: prospects.length, icon: Users,     color: "text-white" },
-                  { label: "Avec site",  value: withSite,         icon: Globe,     color: "text-sky-400" },
-                  { label: "Avec email", value: withEmail,        icon: Mail,      color: "text-violet-400" },
-                  { label: "Avec tél.",  value: withTel,          icon: Phone,     color: "text-brand-400" },
-                  { label: "Appelés",    value: appeles,          icon: PhoneCall, color: "text-green-400" },
+                  { label: "Prospects",  value: prospects.length, icon: Users,     color: "text-gray-600" },
+                  { label: "Avec site",  value: withSite,         icon: Globe,     color: "text-sky-500" },
+                  { label: "Avec email", value: withEmail,        icon: Mail,      color: "text-violet-500" },
+                  { label: "Avec tél.",  value: withTel,          icon: Phone,     color: "text-brand-500" },
+                  { label: "Appelés",    value: appeles,          icon: PhoneCall, color: "text-green-500" },
                 ].map(({ label, value, icon: Icon, color }) => (
-                  <div key={label} className="glass rounded-lg p-2.5 flex items-center gap-2">
+                  <div key={label} className="bg-white border border-gray-200 rounded-lg p-2.5 flex items-center gap-2 shadow-sm">
                     <Icon className={cn("w-4 h-4 shrink-0", color)} />
                     <div>
-                      <div className="text-sm font-bold text-white">{value}</div>
-                      <div className="text-[9px] text-white/35">{label}</div>
+                      <div className="text-sm font-bold text-gray-900">{value}</div>
+                      <div className="text-[9px] text-gray-400">{label}</div>
                     </div>
                   </div>
                 ))}
               </div>
               {enrichProgress && (
-                <div className="flex items-center gap-3 glass rounded-lg px-3 py-2">
-                  <Loader2 className="w-3.5 h-3.5 text-sky-400 animate-spin shrink-0" />
+                <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">
+                  <Loader2 className="w-3.5 h-3.5 text-brand-500 animate-spin shrink-0" />
                   <div className="flex-1">
-                    <div className="flex justify-between text-[10px] text-white/40 mb-1">
+                    <div className="flex justify-between text-[10px] text-gray-400 mb-1">
                       <span>Enrichissement en cours…</span>
-                      <span className="text-white font-medium">{enrichProgress.done}/{enrichProgress.total}</span>
+                      <span className="text-gray-900 font-semibold">{enrichProgress.done}/{enrichProgress.total}</span>
                     </div>
-                    <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
-                      <div className="h-full bg-sky-400 rounded-full transition-all duration-300"
+                    <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-brand-500 rounded-full transition-all duration-300"
                         style={{ width: `${Math.round((enrichProgress.done / enrichProgress.total) * 100)}%` }} />
                     </div>
                   </div>
-                  <button onClick={() => setEnrichProgress(null)} className="text-white/20 hover:text-white/50"><X className="w-3 h-3" /></button>
+                  <button onClick={() => setEnrichProgress(null)} className="text-gray-300 hover:text-gray-600"><X className="w-3 h-3" /></button>
                 </div>
               )}
             </div>
           )}
 
           {/* ── Tableau ── */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto bg-slate-50">
             {searched && !loading && prospects.length > 0 && (
               <table className="w-full text-xs">
-                <thead className="sticky top-0 z-10 bg-ink-950/95 backdrop-blur">
-                  <tr className="border-b border-white/[0.06]">
-                    <th className="text-left text-white/30 font-medium px-4 py-2.5 whitespace-nowrap">Entreprise</th>
-                    <th className="text-left text-white/30 font-medium px-4 py-2.5 whitespace-nowrap">Dirigeant</th>
-                    <th className="text-left text-white/30 font-medium px-4 py-2.5 whitespace-nowrap">Site</th>
-                    <th className="text-left text-white/30 font-medium px-4 py-2.5 whitespace-nowrap">Email</th>
-                    <th className="text-left text-white/30 font-medium px-4 py-2.5 whitespace-nowrap">Tél.</th>
-                    <th className="text-left text-white/30 font-medium px-4 py-2.5 whitespace-nowrap">Appel</th>
-                    <th className="text-left text-white/30 font-medium px-4 py-2.5 whitespace-nowrap">Pipeline</th>
-                    <th className="text-left text-white/30 font-medium px-4 py-2.5 whitespace-nowrap">Score</th>
-                    <th className="text-left text-white/30 font-medium px-4 py-2.5 whitespace-nowrap">CRM</th>
+                <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-200 shadow-sm">
+                  <tr>
+                    <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Entreprise</th>
+                    <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Dirigeant</th>
+                    <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Site</th>
+                    <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Email</th>
+                    <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Tél.</th>
+                    <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Appel</th>
+                    <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Pipeline</th>
+                    <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Score</th>
+                    <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">CRM</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -706,63 +706,63 @@ export default function ProspectionPage() {
                     return (
                       <tr key={p.id} onClick={() => setSelected(p)}
                         className={cn(
-                          "border-b border-white/[0.04] hover:bg-white/[0.03] cursor-pointer transition-colors",
-                          selected?.id === p.id && "bg-violet-500/[0.07] border-l-2 border-l-violet-500/50"
+                          "border-b border-gray-100 hover:bg-blue-50/40 cursor-pointer transition-colors bg-white",
+                          selected?.id === p.id && "bg-brand-50 border-l-2 border-l-brand-500"
                         )}>
                         <td className="px-4 py-2.5">
-                          <div className="font-medium text-white truncate max-w-[160px]">{p.nom}</div>
-                          <div className="text-white/30 text-[10px]">{p.ville} · {p.codeNaf}</div>
+                          <div className="font-semibold text-gray-900 truncate max-w-[160px]">{p.nom}</div>
+                          <div className="text-gray-400 text-[10px] mt-0.5">{p.ville} · {p.codeNaf}</div>
                         </td>
                         <td className="px-4 py-2.5 whitespace-nowrap">
                           {p.dirigeantPrincipal
-                            ? <><div className="text-white/80 truncate max-w-[140px]">{p.dirigeantPrincipal}</div>
-                               <div className="text-white/30 text-[10px]">{roleBadge(p.fonctionDirigeant)}</div></>
-                            : <span className="text-white/20">—</span>}
+                            ? <><div className="text-gray-700 truncate max-w-[140px]">{p.dirigeantPrincipal}</div>
+                               <div className="text-gray-400 text-[10px]">{roleBadge(p.fonctionDirigeant)}</div></>
+                            : <span className="text-gray-200">—</span>}
                         </td>
                         <td className="px-4 py-2.5 whitespace-nowrap">
                           {isEnriching && !p.siteWeb
-                            ? <Loader2 className="w-3 h-3 text-sky-400/50 animate-spin" />
+                            ? <Loader2 className="w-3 h-3 text-brand-400/50 animate-spin" />
                             : p.siteWeb
                               ? <a href={`https://${p.siteWeb}`} target="_blank" rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="flex items-center gap-1 text-sky-400 hover:text-sky-300 text-[10px] font-mono max-w-[130px] truncate">
+                                  className="flex items-center gap-1 text-sky-600 hover:text-sky-700 text-[10px] font-mono max-w-[130px] truncate">
                                   <Globe className="w-3 h-3 shrink-0" />
                                   <span className="truncate">{p.siteWeb.replace(/^www\./, "")}</span>
                                 </a>
-                              : <span className="text-white/15">—</span>}
+                              : <span className="text-gray-200">—</span>}
                         </td>
                         <td className="px-4 py-2.5 whitespace-nowrap max-w-[170px]">
                           {p.emailDirigeant
                             ? <div className="flex items-center gap-1"><EmailSourceIcon source={p.emailSource} />
-                                <span className="font-mono text-violet-300 text-[10px] truncate">{p.emailDirigeant}</span></div>
+                                <span className="font-mono text-violet-600 text-[10px] truncate">{p.emailDirigeant}</span></div>
                             : isEnriching
-                              ? <span className="text-white/20 text-[10px] animate-pulse">Recherche…</span>
-                              : <span className="text-white/15">—</span>}
+                              ? <span className="text-gray-300 text-[10px] animate-pulse">Recherche…</span>
+                              : <span className="text-gray-200">—</span>}
                         </td>
                         <td className="px-4 py-2.5 whitespace-nowrap">
                           {p.telephonePro
                             ? <a href={`tel:${p.telephonePro.replace(/\s/g,"")}`} onClick={(e)=>e.stopPropagation()}
-                                className="font-mono text-brand-300 hover:text-brand-200 text-[10px]">{p.telephonePro}</a>
-                            : isEnriching ? <span className="text-white/20 text-[10px] animate-pulse">…</span>
-                            : <span className="text-white/15">—</span>}
+                                className="font-mono text-brand-600 hover:text-brand-700 text-[10px] font-medium">{p.telephonePro}</a>
+                            : isEnriching ? <span className="text-gray-300 text-[10px] animate-pulse">…</span>
+                            : <span className="text-gray-200">—</span>}
                         </td>
                         <td className="px-4 py-2.5 whitespace-nowrap"><AppelBadge statut={p.statutAppel} /></td>
                         <td className="px-4 py-2.5 whitespace-nowrap"><StatutBadge statut={p.statut} /></td>
                         <td className="px-4 py-2.5 whitespace-nowrap">
                           {p.scoreQualif != null
                             ? <div className="flex items-center gap-1.5">
-                                <div className="h-1 w-10 bg-white/10 rounded-full overflow-hidden">
-                                  <div className={cn("h-full rounded-full", p.scoreQualif >= 70 ? "bg-green-400" : p.scoreQualif >= 40 ? "bg-amber-400" : "bg-red-400")}
+                                <div className="h-1.5 w-12 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className={cn("h-full rounded-full", p.scoreQualif >= 70 ? "bg-green-500" : p.scoreQualif >= 40 ? "bg-amber-400" : "bg-red-400")}
                                     style={{ width: `${p.scoreQualif}%` }} />
                                 </div>
-                                <span className="text-white/50">{p.scoreQualif}</span>
+                                <span className="text-gray-500 font-medium">{p.scoreQualif}</span>
                               </div>
-                            : <span className="text-white/15">—</span>}
+                            : <span className="text-gray-200">—</span>}
                         </td>
                         <td className="px-4 py-2.5 whitespace-nowrap">
                           {p.danscrm
-                            ? <span className="inline-flex items-center gap-1 text-[10px] text-green-400"><CheckCircle className="w-3 h-3" /> CRM</span>
-                            : <span className="text-white/15">—</span>}
+                            ? <span className="inline-flex items-center gap-1 text-[10px] text-green-600 font-medium"><CheckCircle className="w-3 h-3" /> CRM</span>
+                            : <span className="text-gray-200">—</span>}
                         </td>
                       </tr>
                     );
@@ -773,16 +773,16 @@ export default function ProspectionPage() {
 
             {searched && !loading && prospects.length === 0 && (
               <div className="flex flex-col items-center justify-center h-48 text-center">
-                <Users className="w-8 h-8 text-white/15 mb-3" />
-                <p className="text-white/40 text-sm">Aucun prospect trouvé.</p>
-                <p className="text-white/25 text-xs mt-1">Essayez un autre département ou secteur.</p>
+                <Users className="w-8 h-8 text-gray-200 mb-3" />
+                <p className="text-gray-400 text-sm">Aucun prospect trouvé.</p>
+                <p className="text-gray-300 text-xs mt-1">Essayez un autre département ou secteur.</p>
               </div>
             )}
             {!searched && (
               <div className="flex flex-col items-center justify-center h-48 text-center">
-                <Target className="w-8 h-8 text-violet-400/30 mb-3" />
-                <p className="text-white/40 text-sm font-medium">Lancez votre première recherche</p>
-                <p className="text-white/25 text-xs mt-1">Sélectionnez un secteur et un département ci-dessus.</p>
+                <Target className="w-8 h-8 text-brand-200 mb-3" />
+                <p className="text-gray-500 text-sm font-medium">Lancez votre première recherche</p>
+                <p className="text-gray-300 text-xs mt-1">Sélectionnez un secteur et un département ci-dessus.</p>
               </div>
             )}
           </div>
@@ -790,31 +790,31 @@ export default function ProspectionPage() {
 
         {/* ── Panneau détail ── */}
         {selected && (
-          <div className="w-[460px] shrink-0 border-l border-white/[0.06] flex flex-col bg-ink-950/60 overflow-hidden">
+          <div className="w-[460px] shrink-0 border-l border-gray-200 flex flex-col bg-white overflow-hidden">
 
             {/* Header sticky */}
-            <div className="shrink-0 px-5 py-4 border-b border-white/[0.06] bg-ink-950/95 backdrop-blur">
+            <div className="shrink-0 px-5 py-4 border-b border-gray-200 bg-white">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-white leading-tight truncate">{selected.nom}</h3>
+                  <h3 className="text-sm font-bold text-gray-900 leading-tight truncate">{selected.nom}</h3>
                   {selected.nomCommercial && selected.nomCommercial !== selected.nom && (
-                    <p className="text-[10px] text-white/40">« {selected.nomCommercial} »</p>
+                    <p className="text-[10px] text-gray-400">« {selected.nomCommercial} »</p>
                   )}
-                  <p className="text-[10px] text-white/40 mt-0.5">{selected.libelleNaf || selected.secteur}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{selected.libelleNaf || selected.secteur}</p>
                 </div>
-                <button onClick={() => setSelected(null)} className="text-white/30 hover:text-white transition-colors shrink-0"><X className="w-4 h-4" /></button>
+                <button onClick={() => setSelected(null)} className="text-gray-300 hover:text-gray-700 transition-colors shrink-0"><X className="w-4 h-4" /></button>
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 <StatutBadge statut={selected.statut} />
                 <AppelBadge statut={selected.statutAppel} />
                 {selected.danscrm && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-green-500/20 text-green-300 border-green-500/30">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200">
                     <Database className="w-2.5 h-2.5" /> Dans le CRM
                   </span>
                 )}
                 {selected.scoreQualif != null && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-white/[0.06] text-white/50 border-white/10">
-                    <TrendingUp className="w-2.5 h-2.5 text-green-400" /> Score {selected.scoreQualif}/100
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-gray-100 text-gray-600 border-gray-200">
+                    <TrendingUp className="w-2.5 h-2.5 text-green-500" /> Score {selected.scoreQualif}/100
                   </span>
                 )}
               </div>
@@ -824,7 +824,7 @@ export default function ProspectionPage() {
             <div className="flex-1 overflow-y-auto">
 
               {/* ── Actions rapides ── */}
-              <div className="px-5 py-3 border-b border-white/[0.04] flex flex-wrap gap-2">
+              <div className="px-5 py-3 border-b border-gray-100 flex flex-wrap gap-2">
                 {selected.telephonePro && (
                   <a href={`tel:${selected.telephonePro.replace(/\s/g,"")}`}
                     className="flex items-center gap-1.5 bg-green-500/15 hover:bg-green-500/25 text-green-300 border border-green-500/30 rounded-lg px-3 py-1.5 text-xs font-medium transition-all">
@@ -848,11 +848,11 @@ export default function ProspectionPage() {
               </div>
 
               {/* ── Suivi commercial ── */}
-              <div className="px-5 py-4 border-b border-white/[0.06]">
-                <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-3">Suivi commercial</p>
+              <div className="px-5 py-4 border-b border-gray-100">
+                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-3">Suivi commercial</p>
 
                 {/* Statuts d'appel */}
-                <p className="text-[10px] text-white/40 mb-2">État de l'appel</p>
+                <p className="text-[10px] text-gray-500 font-medium mb-2">État de l'appel</p>
                 <div className="grid grid-cols-2 gap-1.5 mb-4">
                   {(Object.entries(STATUT_APPEL_LABELS) as [StatutAppel, string][]).map(([k, v]) => {
                     const Icon   = STATUT_APPEL_ICONS[k];
@@ -862,7 +862,7 @@ export default function ProspectionPage() {
                         onClick={() => updateProspect(selected.id, { statutAppel: k, dateAppel: new Date().toISOString() })}
                         className={cn(
                           "flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all text-left",
-                          active ? STATUT_APPEL_COLORS[k] : "bg-white/[0.03] border-white/[0.06] text-white/40 hover:text-white/70 hover:bg-white/[0.06]"
+                          active ? STATUT_APPEL_COLORS[k] : "bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100"
                         )}>
                         <Icon className="w-3.5 h-3.5 shrink-0" />{v}
                       </button>
@@ -873,17 +873,17 @@ export default function ProspectionPage() {
                 {/* CRM Sync */}
                 {selected.danscrm ? (
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg border bg-green-500/15 border-green-500/30 text-green-300 text-xs font-medium">
+                    <div className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg border bg-green-50 border-green-200 text-green-700 text-xs font-medium">
                       <Database className="w-4 h-4" />
                       Dans le CRM
-                      {selected.dateCrm && <span className="ml-auto text-green-400/60 text-[10px]">{new Date(selected.dateCrm).toLocaleDateString("fr-FR")}</span>}
+                      {selected.dateCrm && <span className="ml-auto text-green-500 text-[10px]">{new Date(selected.dateCrm).toLocaleDateString("fr-FR")}</span>}
                     </div>
                     <a href="/dashboard" target="_blank"
-                      className="flex items-center gap-1 px-3 py-2.5 rounded-lg border border-white/10 text-white/40 hover:text-white hover:border-white/20 text-xs transition-all">
+                      className="flex items-center gap-1 px-3 py-2.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300 text-xs transition-all">
                       <ExternalLink className="w-3.5 h-3.5" /> CRM
                     </a>
                     <a href="/app"
-                      className="flex items-center gap-1 px-3 py-2.5 rounded-lg border border-green-500/30 text-green-300 hover:bg-green-500/10 text-xs transition-all">
+                      className="flex items-center gap-1 px-3 py-2.5 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 text-xs transition-all">
                       <PhoneCall className="w-3.5 h-3.5" /> File d'appel
                     </a>
                   </div>
@@ -891,31 +891,31 @@ export default function ProspectionPage() {
                   <button
                     onClick={() => syncToCrm(selected)}
                     disabled={isSyncing}
-                    className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg border text-xs font-medium transition-all mb-3 bg-white/[0.03] border-white/[0.06] text-white/50 hover:text-white hover:bg-white/[0.06] disabled:opacity-50">
+                    className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg border text-xs font-medium transition-all mb-3 bg-gray-50 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-50">
                     {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
                     {isSyncing ? "Synchronisation…" : "Ajouter au CRM & file d'appel"}
-                    {!isSyncing && <ChevronRight className="w-3.5 h-3.5 ml-auto text-white/25" />}
+                    {!isSyncing && <ChevronRight className="w-3.5 h-3.5 ml-auto text-gray-300" />}
                   </button>
                 )}
 
                 {/* Notes */}
-                <p className="text-[10px] text-white/40 mb-1.5">Notes commerciales</p>
+                <p className="text-[10px] text-gray-500 font-medium mb-1.5">Notes commerciales</p>
                 <textarea
                   value={editNotes}
                   onChange={(e) => { setEditNotes(e.target.value); setNotesDirty(true); }}
                   onBlur={saveNotes}
                   placeholder="Observations, prochaine action, contexte…"
                   rows={3}
-                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-white/70 text-xs resize-none placeholder:text-white/20 focus:outline-none focus:border-brand-500/50 transition-colors"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-700 text-xs resize-none placeholder:text-gray-400 focus:outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-400/20 transition-colors"
                 />
                 {notesDirty && (
-                  <button onClick={saveNotes} className="mt-1 text-[10px] text-brand-400 hover:text-brand-300">Sauvegarder →</button>
+                  <button onClick={saveNotes} className="mt-1 text-[10px] text-brand-500 hover:text-brand-600 font-medium">Sauvegarder →</button>
                 )}
               </div>
 
               {/* ── Fiche entreprise ── */}
-              <div className="px-5 py-4 border-b border-white/[0.06]">
-                <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-3">Fiche entreprise</p>
+              <div className="px-5 py-4 border-b border-gray-100">
+                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-3">Fiche entreprise</p>
                 <div className="space-y-2">
                   <InfoRow icon={Hash}     label="SIREN"          value={selected.siren}   copy />
                   {selected.siret && <InfoRow icon={Hash} label="SIRET (siège)" value={selected.siret} copy />}
@@ -927,17 +927,17 @@ export default function ProspectionPage() {
               </div>
 
               {/* ── Dirigeant ── */}
-              <div className="px-5 py-4 border-b border-white/[0.06]">
-                <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-3">Dirigeant principal</p>
+              <div className="px-5 py-4 border-b border-gray-100">
+                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-3">Dirigeant principal</p>
                 {selected.dirigeantPrincipal ? (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-brand-500/20 flex items-center justify-center text-brand-400 font-bold text-xs shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold text-xs shrink-0">
                         {selected.dirigeantPrincipal.split(" ").map((w) => w[0]).slice(0, 2).join("")}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white">{selected.dirigeantPrincipal}</p>
-                        <p className="text-[10px] text-white/40">{selected.fonctionDirigeant ?? "—"}</p>
+                        <p className="text-sm font-medium text-gray-900">{selected.dirigeantPrincipal}</p>
+                        <p className="text-[10px] text-gray-400">{selected.fonctionDirigeant ?? "—"}</p>
                       </div>
                       {selected.linkedinDirigeant && (
                         <a href={selected.linkedinDirigeant} target="_blank" rel="noopener noreferrer"
@@ -949,83 +949,83 @@ export default function ProspectionPage() {
                     </div>
                     {selected.dirigeants.length > 1 && (
                       <details className="mt-1">
-                        <summary className="text-[10px] text-white/30 cursor-pointer hover:text-white/50">{selected.dirigeants.length} dirigeants au total</summary>
-                        <div className="mt-2 space-y-1 pl-2 border-l border-white/[0.06]">
+                        <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">{selected.dirigeants.length} dirigeants au total</summary>
+                        <div className="mt-2 space-y-1 pl-2 border-l border-gray-200">
                           {selected.dirigeants.map((d, i) => (
-                            <div key={i} className="text-[10px] text-white/50">
-                              <span className="text-white/70">{[d.prenoms, d.nom].filter(Boolean).join(" ")}</span>
-                              {d.qualite && <span className="text-white/30"> · {d.qualite}</span>}
+                            <div key={i} className="text-[10px] text-gray-500">
+                              <span className="text-gray-700">{[d.prenoms, d.nom].filter(Boolean).join(" ")}</span>
+                              {d.qualite && <span className="text-gray-400"> · {d.qualite}</span>}
                             </div>
                           ))}
                         </div>
                       </details>
                     )}
                   </div>
-                ) : <p className="text-xs text-white/30 italic">Non identifié — cliquer sur Enrichir</p>}
+                ) : <p className="text-xs text-gray-400 italic">Non identifié — cliquer sur Enrichir</p>}
               </div>
 
               {/* ── Contact ── */}
-              <div className="px-5 py-4 border-b border-white/[0.06]">
+              <div className="px-5 py-4 border-b border-gray-100">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider">Contact</p>
+                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Contact</p>
                   <button onClick={() => copyContactCard(selected)}
-                    className="flex items-center gap-1 text-[10px] text-white/25 hover:text-white/50 transition-colors">
+                    className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-700 transition-colors">
                     <Copy className="w-3 h-3" /> Tout copier
                   </button>
                 </div>
                 <div className="space-y-2">
                   {/* Email */}
                   {selected.emailDirigeant ? (
-                    <div className="flex items-center gap-2 bg-white/[0.04] rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                       <EmailSourceIcon source={selected.emailSource} />
-                      <Mail className="w-3.5 h-3.5 text-violet-400 shrink-0" />
-                      <span className="font-mono text-violet-300 text-xs truncate flex-1">{selected.emailDirigeant}</span>
+                      <Mail className="w-3.5 h-3.5 text-violet-500 shrink-0" />
+                      <span className="font-mono text-violet-600 text-xs truncate flex-1">{selected.emailDirigeant}</span>
                       <CopyBtn text={selected.emailDirigeant} />
                       <button onClick={() => setShowComposer(true)} title="Composer un email"
-                        className="p-1 rounded text-white/20 hover:text-violet-300 transition-colors">
+                        className="p-1 rounded text-gray-300 hover:text-violet-500 transition-colors">
                         <Send className="w-3 h-3" />
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 bg-white/[0.02] rounded-lg px-3 py-2 border border-dashed border-white/[0.08]">
-                      <Mail className="w-3.5 h-3.5 text-white/20 shrink-0" />
-                      <span className="text-white/25 text-xs italic">Email non trouvé — cliquer sur Enrichir</span>
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-dashed border-gray-200">
+                      <Mail className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                      <span className="text-gray-400 text-xs italic">Email non trouvé — cliquer sur Enrichir</span>
                     </div>
                   )}
                   {/* Téléphone */}
                   {selected.telephonePro ? (
-                    <div className="flex items-center gap-2 bg-white/[0.04] rounded-lg px-3 py-2">
-                      <Phone className="w-3.5 h-3.5 text-brand-400 shrink-0" />
+                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                      <Phone className="w-3.5 h-3.5 text-brand-500 shrink-0" />
                       <a href={`tel:${selected.telephonePro.replace(/\s/g,"")}`}
-                        className="font-mono text-brand-300 hover:text-brand-200 text-xs flex-1 transition-colors">
+                        className="font-mono text-brand-600 hover:text-brand-700 text-xs flex-1 transition-colors font-semibold">
                         {selected.telephonePro}
                       </a>
                       <CopyBtn text={selected.telephonePro} />
                       <a href={`tel:${selected.telephonePro.replace(/\s/g,"")}`}
-                        className="p-1 rounded text-white/20 hover:text-green-300 transition-colors" title="Appeler">
+                        className="p-1 rounded text-gray-300 hover:text-green-600 transition-colors" title="Appeler">
                         <PhoneCall className="w-3 h-3" />
                       </a>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 bg-white/[0.02] rounded-lg px-3 py-2 border border-dashed border-white/[0.08]">
-                      <Phone className="w-3.5 h-3.5 text-white/20 shrink-0" />
-                      <span className="text-white/25 text-xs italic">Téléphone non trouvé</span>
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-dashed border-gray-200">
+                      <Phone className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                      <span className="text-gray-400 text-xs italic">Téléphone non trouvé</span>
                     </div>
                   )}
                   {/* Site */}
                   {selected.siteWeb ? (
-                    <div className="flex items-center gap-2 bg-white/[0.04] rounded-lg px-3 py-2">
-                      <Globe className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                      <Globe className="w-3.5 h-3.5 text-sky-500 shrink-0" />
                       <a href={`https://${selected.siteWeb}`} target="_blank" rel="noopener noreferrer"
-                        className="text-sky-300 hover:text-sky-200 text-xs flex-1 truncate transition-colors">
+                        className="text-sky-600 hover:text-sky-700 text-xs flex-1 truncate transition-colors">
                         {selected.siteWeb}
                       </a>
-                      <ExternalLink className="w-3 h-3 text-white/20" />
+                      <ExternalLink className="w-3 h-3 text-gray-300" />
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 bg-white/[0.02] rounded-lg px-3 py-2 border border-dashed border-white/[0.08]">
-                      <Globe className="w-3.5 h-3.5 text-white/20 shrink-0" />
-                      <span className="text-white/25 text-xs italic">Site non trouvé</span>
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-dashed border-gray-200">
+                      <Globe className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                      <span className="text-gray-400 text-xs italic">Site non trouvé</span>
                     </div>
                   )}
                 </div>
@@ -1033,45 +1033,45 @@ export default function ProspectionPage() {
 
               {/* ── Qualification IA ── */}
               {(selected.problematique || selected.observation || selected.angleApproche) && (
-                <div className="px-5 py-4 border-b border-white/[0.06]">
-                  <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-3">Qualification IA</p>
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-3">Qualification IA</p>
                   <div className="space-y-2.5">
-                    {selected.problematique && <div><p className="text-[10px] text-white/30 mb-1">Problématique</p><p className="text-xs text-white/70 leading-relaxed">{selected.problematique}</p></div>}
-                    {selected.observation   && <div><p className="text-[10px] text-white/30 mb-1">Observation</p><p className="text-xs text-white/70 leading-relaxed">{selected.observation}</p></div>}
-                    {selected.angleApproche && <div><p className="text-[10px] text-white/30 mb-1">Angle d'approche</p><p className="text-xs text-white/70 leading-relaxed">{selected.angleApproche}</p></div>}
+                    {selected.problematique && <div><p className="text-[10px] text-gray-400 font-medium mb-1">Problématique</p><p className="text-xs text-gray-600 leading-relaxed">{selected.problematique}</p></div>}
+                    {selected.observation   && <div><p className="text-[10px] text-gray-400 font-medium mb-1">Observation</p><p className="text-xs text-gray-600 leading-relaxed">{selected.observation}</p></div>}
+                    {selected.angleApproche && <div><p className="text-[10px] text-gray-400 font-medium mb-1">Angle d'approche</p><p className="text-xs text-gray-600 leading-relaxed">{selected.angleApproche}</p></div>}
                   </div>
                 </div>
               )}
 
               {/* ── Email généré ── */}
               {selected.emailObjet && (
-                <div className="px-5 py-4 border-b border-white/[0.06]">
+                <div className="px-5 py-4 border-b border-gray-100">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider">Email généré</p>
+                    <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Email généré</p>
                     <div className="flex items-center gap-2">
                       <button onClick={() => setShowComposer(true)}
-                        className="flex items-center gap-1 text-[10px] text-violet-400 hover:text-violet-300 transition-colors">
+                        className="flex items-center gap-1 text-[10px] text-violet-500 hover:text-violet-700 transition-colors font-medium">
                         <FileText className="w-3 h-3" /> Ouvrir compositeur
                       </button>
                       <button onClick={() => navigator.clipboard.writeText(`Objet: ${selected.emailObjet}\n\n${selected.emailCorps ?? ""}`)}
-                        className="flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors">
+                        className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-700 transition-colors">
                         <Copy className="w-3 h-3" /> Copier
                       </button>
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <div className="flex items-start gap-2 bg-white/[0.04] rounded-lg px-3 py-2">
-                      <span className="text-[10px] text-white/30 shrink-0 mt-0.5">Objet</span>
-                      <span className="text-xs text-white font-medium flex-1">{selected.emailObjet}</span>
+                    <div className="flex items-start gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                      <span className="text-[10px] text-gray-400 shrink-0 mt-0.5">Objet</span>
+                      <span className="text-xs text-gray-900 font-medium flex-1">{selected.emailObjet}</span>
                       <CopyBtn text={selected.emailObjet} />
                     </div>
                     {selected.emailCorps && (
-                      <div className="bg-white/[0.04] rounded-lg px-3 py-2">
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                         <div className="flex justify-between mb-1.5">
-                          <span className="text-[10px] text-white/30">Corps</span>
+                          <span className="text-[10px] text-gray-400">Corps</span>
                           <CopyBtn text={selected.emailCorps} />
                         </div>
-                        <p className="text-xs text-white/70 whitespace-pre-wrap leading-relaxed">{selected.emailCorps}</p>
+                        <p className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">{selected.emailCorps}</p>
                       </div>
                     )}
                   </div>
@@ -1081,13 +1081,13 @@ export default function ProspectionPage() {
               {/* ── Historique ── */}
               {selected.actions && selected.actions.length > 0 && (
                 <div className="px-5 py-4">
-                  <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-3">Historique</p>
+                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-3">Historique</p>
                   <div className="space-y-1.5">
                     {[...selected.actions].reverse().slice(0, 8).map((a, i) => (
                       <div key={i} className="flex items-start gap-2 text-[10px]">
-                        <Clock className="w-3 h-3 text-white/20 shrink-0 mt-0.5" />
-                        <span className="text-white/25 shrink-0">{new Date(a.date).toLocaleDateString("fr-FR")}</span>
-                        <span className="text-white/50">{a.detail}</span>
+                        <Clock className="w-3 h-3 text-gray-300 shrink-0 mt-0.5" />
+                        <span className="text-gray-400 shrink-0">{new Date(a.date).toLocaleDateString("fr-FR")}</span>
+                        <span className="text-gray-600">{a.detail}</span>
                       </div>
                     ))}
                   </div>
