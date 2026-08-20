@@ -564,12 +564,24 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 <h2 className="text-sm font-bold text-gray-900 truncate">{selected.name}</h2>
               </div>
-              <span className={cn(
-                "text-[9px] font-semibold px-2 py-0.5 rounded-full border",
-                STATUS_CFG[selected.status].bg, STATUS_CFG[selected.status].border, STATUS_CFG[selected.status].color
-              )}>
-                {STATUS_CFG[selected.status].label}
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={cn(
+                  "text-[9px] font-semibold px-2 py-0.5 rounded-full border",
+                  STATUS_CFG[selected.status].bg, STATUS_CFG[selected.status].border, STATUS_CFG[selected.status].color
+                )}>
+                  {STATUS_CFG[selected.status].label}
+                </span>
+                {selected.callStatus && selected.callStatus !== "non_appele" && CALL_STATUS_CFG[selected.callStatus] && (
+                  <span className={cn(
+                    "text-[9px] font-semibold px-2 py-0.5 rounded-full border",
+                    CALL_STATUS_CFG[selected.callStatus].bg,
+                    CALL_STATUS_CFG[selected.callStatus].border,
+                    CALL_STATUS_CFG[selected.callStatus].color
+                  )}>
+                    {CALL_STATUS_CFG[selected.callStatus].label}
+                  </span>
+                )}
+              </div>
               {selected.rating > 0 && (
                 <span className="text-xs text-amber-500 ml-2">★ {selected.rating}</span>
               )}
