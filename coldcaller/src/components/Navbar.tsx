@@ -37,10 +37,10 @@ function CallWindowBadge() {
   return (
     <div
       className={cn(
-        "glass rounded-xl p-3 text-xs font-medium border",
+        "rounded-xl p-3 text-xs font-semibold border",
         status.open
-          ? "text-emerald-300 border-emerald-500/25 bg-emerald-500/10"
-          : "text-red-300 border-red-500/25 bg-red-500/10"
+          ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/15"
+          : "text-red-300 border-red-500/30 bg-red-500/15"
       )}
       title={status.reason ?? undefined}
     >
@@ -115,8 +115,8 @@ export default function Navbar({ variant = "app" }: { variant?: "landing" | "app
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
                 active
-                  ? "bg-brand-500/20 text-brand-300 border border-brand-500/30"
-                  : "text-white/50 hover:text-white hover:bg-white/[0.05]"
+                  ? "bg-brand-500 text-white shadow-glow-sm"
+                  : "text-white/50 hover:text-white hover:bg-white/[0.07]"
               )}>
               <Icon className="w-4 h-4 shrink-0" />
               {label}
@@ -127,15 +127,15 @@ export default function Navbar({ variant = "app" }: { variant?: "landing" | "app
 
       {/* Credits */}
       <div className="p-4 border-t border-white/[0.06]">
-        <div className="glass rounded-xl p-3">
+        <div className="bg-white/[0.06] border border-white/[0.10] rounded-xl p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-white/40">Leads restants</span>
-            <span className="text-xs font-bold text-brand-300">143 / 300</span>
+            <span className="text-xs text-white/60 font-medium">Leads restants</span>
+            <span className="text-xs font-bold text-brand-400">143 / 300</span>
           </div>
-          <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+          <div className="h-1.5 bg-white/[0.08] rounded-full overflow-hidden">
             <div className="h-full bg-brand-500 rounded-full shadow-glow-sm" style={{ width: "48%" }} />
           </div>
-          <Link href="/pricing" className="mt-3 text-xs text-brand-400 hover:text-brand-200 flex items-center gap-1 transition-colors">
+          <Link href="/pricing" className="mt-3 text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors font-medium">
             Passer au Pro <ChevronRight className="w-3 h-3" />
           </Link>
         </div>
