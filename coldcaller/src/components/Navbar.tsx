@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Phone, BarChart2, ChevronRight, Target } from "lucide-react";
+import { Phone, BarChart2, ChevronRight, Target, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/prospection", label: "Prospection B2B", icon: Target },
   { href: "/dashboard",   label: "CRM",             icon: BarChart2 },
-  { href: "/app",         label: "Appeler",          icon: Phone },
+  { href: "/scripts",     label: "Scripts",          icon: FileText },
 ];
 
 // Bandeau de conformité : indique si on est dans le créneau légal d'appel
