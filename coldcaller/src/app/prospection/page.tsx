@@ -628,7 +628,9 @@ export default function ProspectionPage() {
                     <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Taille min.</label>
                     <select value={tranche} onChange={(e) => setTranche(e.target.value)} className="select w-full text-xs">
                       <option value="">Toutes</option>
-                      {Object.entries(TRANCHES_EFFECTIFS).map(([k, v]) => k !== "NN" && <option key={k} value={k}>{v}</option>)}
+                      {(["00","01","02","03","11","12","21","22","31","32","41","42","51","52","53"] as const).map((k) => (
+                        <option key={k} value={k}>{TRANCHES_EFFECTIFS[k]}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
