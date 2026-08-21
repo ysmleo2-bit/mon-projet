@@ -41,6 +41,9 @@ const SECTEURS: Array<{ label: string; nafCodes: string[] }> = [
   { label: "Médecin / Santé",           nafCodes: ["86.21Z", "86.22A"] },
   { label: "Kiné / Para-médical",       nafCodes: ["86.90A", "86.90B"] },
   { label: "Assurance / Courtage",      nafCodes: ["65.12Z", "66.22Z"] },
+  { label: "Transport / Logistique",    nafCodes: ["49.41A", "49.41B", "49.41C", "49.42Z", "52.10A", "52.10B", "52.21Z"] },
+  { label: "Transport de personnes",    nafCodes: ["49.32Z", "49.39A", "49.39B", "49.31Z"] },
+  { label: "Livraison / Coursiers",     nafCodes: ["53.20Z", "49.41B", "52.29A"] },
 ];
 
 const DEPARTEMENTS = [
