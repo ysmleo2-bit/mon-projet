@@ -362,6 +362,7 @@ export default function ProspectionPage() {
   const [nafCustom,   setNafCustom]   = useState("");
   const [departement, setDepartement] = useState("69");
   const [tranche,     setTranche]     = useState("");
+  const [trancheMax,  setTrancheMax]  = useState("");
   const [perPage,     setPerPage]     = useState(50);
   const [showSearch,  setShowSearch]  = useState(true);
 
@@ -512,7 +513,7 @@ export default function ProspectionPage() {
       const res  = await fetch("/api/prospection/search", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ nafCodes, secteur: secteur.label, departement, trancheMin: tranche || undefined, perPage, page: 1 }),
+        body:    JSON.stringify({ nafCodes, secteur: secteur.label, departement, trancheMin: tranche || undefined, trancheMax: trancheMax || undefined, perPage, page: 1 }),
       });
       const data = await res.json() as { prospects: Prospect[]; total: number; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
@@ -520,7 +521,7 @@ export default function ProspectionPage() {
       setShowSearch(false);
       if (data.prospects.length > 0) enrichAll(data.prospects).catch(() => setEnrichProgress(null));
     } catch (e) { setError(String(e)); } finally { setLoading(false); }
-  }, [secteurIdx, nafCustom, departement, tranche, perPage, enrichAll]);
+  }, [secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, enrichAll]);
 
   // ── Save notes ────────────────────────────────────────────────────────────
   const saveNotes = useCallback(() => {
@@ -606,7 +607,7 @@ export default function ProspectionPage() {
 
             {showSearch && (
               <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-sm">
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-5 gap-3">
                   <div>
                     <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Secteur d'activité</label>
                     <select value={secteurIdx} onChange={(e) => setSecteurIdx(Number(e.target.value))} className="select w-full text-xs">
@@ -625,9 +626,18 @@ export default function ProspectionPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Taille min.</label>
+                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Effectifs min.</label>
                     <select value={tranche} onChange={(e) => setTranche(e.target.value)} className="select w-full text-xs">
-                      <option value="">Toutes</option>
+                      <option value="">Aucun</option>
+                      {(["00","01","02","03","11","12","21","22","31","32","41","42","51","52","53"] as const).map((k) => (
+                        <option key={k} value={k}>{TRANCHES_EFFECTIFS[k]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Effectifs max.</label>
+                    <select value={trancheMax} onChange={(e) => setTrancheMax(e.target.value)} className="select w-full text-xs">
+                      <option value="">Aucun</option>
                       {(["00","01","02","03","11","12","21","22","31","32","41","42","51","52","53"] as const).map((k) => (
                         <option key={k} value={k}>{TRANCHES_EFFECTIFS[k]}</option>
                       ))}
@@ -1006,17 +1016,23 @@ export default function ProspectionPage() {
                   )}
                   {/* Téléphone */}
                   {selected.telephonePro ? (
-                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                      <Phone className="w-3.5 h-3.5 text-brand-500 shrink-0" />
-                      <a href={`tel:${selected.telephonePro.replace(/\s/g,"")}`}
-                        className="font-mono text-brand-600 hover:text-brand-700 text-xs flex-1 transition-colors font-semibold">
-                        {selected.telephonePro}
-                      </a>
-                      <CopyBtn text={selected.telephonePro} />
-                      <a href={`tel:${selected.telephonePro.replace(/\s/g,"")}`}
-                        className="p-1 rounded text-gray-300 hover:text-green-600 transition-colors" title="Appeler">
-                        <PhoneCall className="w-3 h-3" />
-                      </a>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                        <Phone className="w-3.5 h-3.5 text-brand-500 shrink-0" />
+                        <a href={`tel:${selected.telephonePro.replace(/\s/g,"")}`}
+                          className="font-mono text-brand-600 hover:text-brand-700 text-xs flex-1 transition-colors font-semibold">
+                          {selected.telephonePro}
+                        </a>
+                        <CopyBtn text={selected.telephonePro} />
+                        <a href={`tel:${selected.telephonePro.replace(/\s/g,"")}`}
+                          className="p-1 rounded text-gray-300 hover:text-green-600 transition-colors" title="Appeler">
+                          <PhoneCall className="w-3 h-3" />
+                        </a>
+                      </div>
+                      <p className="text-[10px] text-amber-600 flex items-center gap-1 px-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" />
+                        Numéro source SIRENE — peut être obsolète. Vérifiez avant d'appeler.
+                      </p>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-dashed border-gray-200">

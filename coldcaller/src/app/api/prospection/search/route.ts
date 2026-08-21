@@ -55,6 +55,9 @@ const TRANCHE_ORDER = ["00","01","02","03","11","12","21","22","31","32","41","4
 function trancheGte(code: string, min: string): boolean {
   return TRANCHE_ORDER.indexOf(code) >= TRANCHE_ORDER.indexOf(min);
 }
+function trancheLte(code: string, max: string): boolean {
+  return TRANCHE_ORDER.indexOf(code) <= TRANCHE_ORDER.indexOf(max);
+}
 
 function sireneToProspect(r: SireneResult, secteur: string): Prospect {
   const now = new Date().toISOString();
@@ -138,6 +141,7 @@ export async function POST(req: NextRequest) {
     secteur     = "",
     departement,
     trancheMin,
+    trancheMax,
     perPage     = 50,
   } = body;
 
@@ -180,11 +184,14 @@ export async function POST(req: NextRequest) {
       ? allRaw.filter((r) => r.siege?.departement === departement)
       : allRaw;
 
-    // ── Post-filtre taille min ────────────────────────────────────────────────
-    const trancheFiltered = trancheMin
+    // ── Post-filtre taille (plage min–max) ───────────────────────────────────
+    const trancheFiltered = (trancheMin || trancheMax)
       ? deptFiltered.filter((r) => {
           const t = r.siege?.tranche_effectif_salarie ?? r.tranche_effectif_salarie;
-          return t ? trancheGte(t, trancheMin) : false;
+          if (!t) return false; // exclure les entreprises sans donnée effectifs
+          if (trancheMin && !trancheGte(t, trancheMin)) return false;
+          if (trancheMax && !trancheLte(t, trancheMax)) return false;
+          return true;
         })
       : deptFiltered;
 
