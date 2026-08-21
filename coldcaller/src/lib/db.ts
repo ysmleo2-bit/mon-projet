@@ -17,9 +17,17 @@ interface PgResult { rows: Record<string, unknown>[]; rowCount: number }
 async function pgQuery(sql: string, params: unknown[] = []): Promise<PgResult> {
   const { neon } = await import("@neondatabase/serverless");
   const db  = neon(process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "");
-  const res = await db.query(sql, params);
-  // neon() returns NeonQueryResult which has rows + rowCount
-  return res as unknown as PgResult;
+  // neon tagged template returns rows[] directly; .query() returns { rows, rowCount }.
+  // Normalise both shapes so callers always get { rows, rowCount }.
+  const res = await db.query(sql, params) as unknown;
+  if (Array.isArray(res)) {
+    return { rows: res as Record<string, unknown>[], rowCount: (res as unknown[]).length };
+  }
+  const qr = res as { rows?: Record<string, unknown>[]; rowCount?: number };
+  return {
+    rows:     qr.rows     ?? [],
+    rowCount: qr.rowCount ?? 0,
+  };
 }
 
 async function ensureTable() {

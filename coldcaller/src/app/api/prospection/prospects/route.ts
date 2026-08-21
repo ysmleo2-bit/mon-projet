@@ -44,26 +44,29 @@ export async function PATCH(req: NextRequest) {
     (patch.statutAppel && CRM_TRIGGER_APPELS.includes(patch.statutAppel as StatutAppel)) ||
     (patch.statut      && CRM_TRIGGER_STATUTS.includes(patch.statut as ProspectStatut));
 
+  let crmSynced = false;
   if (triggerCrm && updated) {
     try {
       const { dbUpsertLeads } = await import("@/lib/db");
       const { prospectToLead } = await import("@/lib/crm-utils");
       const lead = prospectToLead(updated);
       await dbUpsertLeads([lead]);
-      // Marquer comme étant dans le CRM
-      await dbUpdateProspect(id, { danscrm: true, dateCrm: new Date().toISOString() });
-      // Update the returned object to reflect CRM sync
-      if (updated) {
-        updated.danscrm = true;
-        updated.dateCrm = new Date().toISOString();
-      }
+      crmSynced = true;
     } catch (crmErr) {
-      // Non-bloquant : la mise à jour prospect est déjà faite
-      console.warn("[prospects/patch] CRM sync skipped:", crmErr);
+      console.error("[prospects/patch] CRM upsert failed:", crmErr);
     }
+
+    // Marquer danscrm:true indépendamment de l'upsert
+    // (évite de re-déclencher le sync à chaque action)
+    const now = new Date().toISOString();
+    try {
+      await dbUpdateProspect(id, { danscrm: true, dateCrm: now });
+    } catch { /* non-bloquant */ }
+    updated.danscrm = true;
+    updated.dateCrm = now;
   }
 
-  return NextResponse.json({ ok: true, prospect: updated, crmSynced: triggerCrm });
+  return NextResponse.json({ ok: true, prospect: updated, crmSynced });
 }
 
 export async function DELETE(req: NextRequest) {
