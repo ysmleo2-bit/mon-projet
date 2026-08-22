@@ -19,7 +19,7 @@ const CRM_TRIGGER_STATUTS: ProspectStatut[] = [
   "interesse", "pas_interesse", "repondu", "email_envoye", "a_relancer",
 ];
 const CRM_TRIGGER_APPELS: StatutAppel[] = [
-  "decroche", "pas_decroche", "echange_effectue", "message_envoye", "a_rappeler", "numero_invalide",
+  "decroche", "pas_decroche", "mail_envoye", "echange_sans_suite", "r1_booke", "a_rappeler",
 ];
 
 export async function GET(req: NextRequest) {
