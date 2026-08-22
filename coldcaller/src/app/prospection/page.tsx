@@ -378,7 +378,10 @@ export default function ProspectionPage() {
   const [isSyncing,      setIsSyncing]      = useState(false);
   const [showComposer,   setShowComposer]   = useState(false);
 
-  // ── Notes locales ────────────────────────────────────────────────────────
+  // ── localStorage persistence ──────────────────────────────────────────────
+  const [hydrated, setHydrated] = useState(false);
+
+  // Notes locales
   const [editNotes,  setEditNotes]  = useState("");
   const [notesDirty, setNotesDirty] = useState(false);
 
@@ -386,6 +389,49 @@ export default function ProspectionPage() {
     setEditNotes(selected?.notesCommercial ?? "");
     setNotesDirty(false);
   }, [selected?.id]);
+
+  // Restore state from localStorage on first mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("coldcaller_prospection_state");
+      if (raw) {
+        const saved = JSON.parse(raw) as {
+          secteurIdx?: number; nafCustom?: string; departement?: string;
+          tranche?: string; trancheMax?: string; perPage?: number;
+          prospects?: Prospect[]; searched?: boolean; showSearch?: boolean;
+        };
+        if (saved.secteurIdx  !== undefined) setSecteurIdx(saved.secteurIdx);
+        if (saved.nafCustom   !== undefined) setNafCustom(saved.nafCustom);
+        if (saved.departement !== undefined) setDepartement(saved.departement);
+        if (saved.tranche     !== undefined) setTranche(saved.tranche);
+        if (saved.trancheMax  !== undefined) setTrancheMax(saved.trancheMax);
+        if (saved.perPage     !== undefined) setPerPage(saved.perPage);
+        if (Array.isArray(saved.prospects) && saved.prospects.length > 0) {
+          setProspects(saved.prospects);
+          setSearched(true);
+          // If there are results, hide the search panel by default
+          setShowSearch(false);
+        } else {
+          if (saved.searched  !== undefined) setSearched(saved.searched);
+          if (saved.showSearch !== undefined) setShowSearch(saved.showSearch);
+        }
+      }
+    } catch { /* ignore storage errors */ } finally {
+      setHydrated(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist search params + results to localStorage after hydration
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem("coldcaller_prospection_state", JSON.stringify({
+        secteurIdx, nafCustom, departement, tranche, trancheMax, perPage,
+        prospects, searched, showSearch,
+      }));
+    } catch { /* ignore storage errors */ }
+  }, [hydrated, secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, prospects, searched, showSearch]);
 
   // ── Mise à jour optimiste ─────────────────────────────────────────────────
   const updateProspect = useCallback(async (id: string, patch: Partial<Prospect>) => {
