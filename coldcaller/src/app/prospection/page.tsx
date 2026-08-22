@@ -70,13 +70,13 @@ const DEPT_LABELS: Record<string, string> = {
 };
 
 const STATUT_APPEL_ICONS: Record<StatutAppel, typeof PhoneCall> = {
-  non_appele:       Clock,
-  decroche:         PhoneCall,
-  pas_decroche:     PhoneMissed,
-  numero_invalide:  PhoneOff,
-  echange_effectue: MessageSquare,
-  message_envoye:   MessageSquare,
-  a_rappeler:       RotateCcw,
+  non_appele:         Clock,
+  decroche:           PhoneCall,
+  pas_decroche:       PhoneMissed,
+  mail_envoye:        Mail,
+  echange_sans_suite: MessageSquare,
+  r1_booke:           Calendar,
+  a_rappeler:         RotateCcw,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

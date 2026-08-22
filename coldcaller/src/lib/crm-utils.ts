@@ -11,20 +11,20 @@ export function toLeadStatus(statut: ProspectStatut, statutAppel?: StatutAppel):
   if (statut === "pas_interesse") return "lost";
   if (statut === "interesse")     return "interested";
   if (statut === "repondu")       return "interested";
-  if (statutAppel === "echange_effectue") return "interested";
+  if (statutAppel === "r1_booke")          return "rdv";
   if (statutAppel && statutAppel !== "non_appele") return "contacted";
   return "new";
 }
 
 export function toCallOutcome(sa: StatutAppel): CallOutcome {
   switch (sa) {
-    case "echange_effectue":  return "interested";
-    case "decroche":          return "interested";
-    case "pas_decroche":      return "no_answer";
-    case "numero_invalide":   return "not_interested";
-    case "message_envoye":    return "callback";
-    case "a_rappeler":        return "callback";
-    default:                  return "no_answer";
+    case "r1_booke":           return "rdv";
+    case "decroche":           return "interested";
+    case "echange_sans_suite": return "callback";
+    case "pas_decroche":       return "no_answer";
+    case "mail_envoye":        return "callback";
+    case "a_rappeler":         return "callback";
+    default:                   return "no_answer";
   }
 }
 

@@ -41,23 +41,21 @@ const OUTCOME_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 const CALL_STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  pas_decroche:     { label: "Pas décroché",    color: "text-amber-700",  bg: "bg-amber-50",  border: "border-amber-200"  },
-  decroche:         { label: "Décroché",         color: "text-green-700",  bg: "bg-green-50",  border: "border-green-200"  },
-  message_envoye:   { label: "Message laissé",   color: "text-violet-700", bg: "bg-violet-50", border: "border-violet-200" },
-  echange_effectue: { label: "Échange effectué", color: "text-brand-700",  bg: "bg-brand-50",  border: "border-brand-200"  },
-  a_rappeler:       { label: "À rappeler",       color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200" },
-  pas_interesse:    { label: "Pas intéressé",    color: "text-red-600",    bg: "bg-red-50",    border: "border-red-200"    },
-  numero_invalide:  { label: "N° invalide",      color: "text-gray-500",   bg: "bg-gray-100",  border: "border-gray-200"   },
+  pas_decroche:       { label: "Pas décroché",      color: "text-amber-700",  bg: "bg-amber-50",  border: "border-amber-200"  },
+  decroche:           { label: "Décroché",           color: "text-green-700",  bg: "bg-green-50",  border: "border-green-200"  },
+  mail_envoye:        { label: "Mail envoyé",        color: "text-violet-700", bg: "bg-violet-50", border: "border-violet-200" },
+  echange_sans_suite: { label: "Échange sans suite", color: "text-teal-700",   bg: "bg-teal-50",   border: "border-teal-200"   },
+  r1_booke:           { label: "R1 booké",           color: "text-brand-700",  bg: "bg-brand-50",  border: "border-brand-200"  },
+  a_rappeler:         { label: "À rappeler",         color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200" },
 };
 
 const CALL_FILTER_TABS = [
   { id: "all",              label: "Tous les appels" },
   { id: "pas_decroche",     label: "Pas décroché" },
   { id: "decroche",         label: "Décroché" },
-  { id: "message_envoye",   label: "Message laissé" },
-  { id: "echange_effectue", label: "Échange effectué" },
-  { id: "pas_interesse",    label: "Pas intéressé" },
-  { id: "numero_invalide",  label: "N° invalide" },
+  { id: "mail_envoye",      label: "Mail envoyé" },
+  { id: "echange_sans_suite", label: "Échange sans suite" },
+  { id: "r1_booke",         label: "R1 booké" },
   { id: "a_rappeler",       label: "À rappeler" },
 ];
 

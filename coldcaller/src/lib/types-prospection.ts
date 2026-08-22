@@ -52,29 +52,29 @@ export type StatutAppel =
   | "non_appele"
   | "decroche"
   | "pas_decroche"
-  | "numero_invalide"
-  | "echange_effectue"
-  | "message_envoye"
+  | "mail_envoye"
+  | "echange_sans_suite"
+  | "r1_booke"
   | "a_rappeler";
 
 export const STATUT_APPEL_LABELS: Record<StatutAppel, string> = {
-  non_appele:       "Non appelé",
-  decroche:         "A décroché",
-  pas_decroche:     "Pas décroché",
-  numero_invalide:  "N° invalide",
-  echange_effectue: "Échange effectué",
-  message_envoye:   "Message laissé",
-  a_rappeler:       "À rappeler",
+  non_appele:         "Non appelé",
+  decroche:           "Décroché",
+  pas_decroche:       "Pas décroché",
+  mail_envoye:        "Mail envoyé",
+  echange_sans_suite: "Échange sans suite",
+  r1_booke:           "R1 booké",
+  a_rappeler:         "À rappeler",
 };
 
 export const STATUT_APPEL_COLORS: Record<StatutAppel, string> = {
-  non_appele:       "bg-gray-100 text-gray-500 border-gray-200",
-  decroche:         "bg-green-50 text-green-700 border-green-200",
-  pas_decroche:     "bg-amber-50 text-amber-700 border-amber-200",
-  numero_invalide:  "bg-red-50 text-red-600 border-red-200",
-  echange_effectue: "bg-teal-50 text-teal-700 border-teal-200",
-  message_envoye:   "bg-violet-50 text-violet-700 border-violet-200",
-  a_rappeler:       "bg-orange-50 text-orange-700 border-orange-200",
+  non_appele:         "bg-gray-100 text-gray-500 border-gray-200",
+  decroche:           "bg-green-50 text-green-700 border-green-200",
+  pas_decroche:       "bg-amber-50 text-amber-700 border-amber-200",
+  mail_envoye:        "bg-violet-50 text-violet-700 border-violet-200",
+  echange_sans_suite: "bg-teal-50 text-teal-700 border-teal-200",
+  r1_booke:           "bg-brand-50 text-brand-700 border-brand-200",
+  a_rappeler:         "bg-orange-50 text-orange-700 border-orange-200",
 };
 
 // ── Action (historique) ───────────────────────────────────────────────────────
