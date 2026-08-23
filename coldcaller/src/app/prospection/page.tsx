@@ -381,6 +381,17 @@ export default function ProspectionPage() {
   // ── localStorage persistence ──────────────────────────────────────────────
   const [hydrated, setHydrated] = useState(false);
 
+  // ── LinkedIn ──────────────────────────────────────────────────────────────
+  const [linkedinSearching, setLinkedinSearching] = useState(false);
+  const [linkedinResult,    setLinkedinResult]    = useState<{ url: string; headline: string } | null>(null);
+  const [linkedinError,     setLinkedinError]     = useState<string | null>(null);
+
+  // Reset LinkedIn state when selected changes
+  useEffect(() => {
+    setLinkedinResult(null);
+    setLinkedinError(null);
+  }, [selected?.id]);
+
   // Notes locales
   const [editNotes,  setEditNotes]  = useState("");
   const [notesDirty, setNotesDirty] = useState(false);
@@ -568,6 +579,45 @@ export default function ProspectionPage() {
       if (data.prospects.length > 0) enrichAll(data.prospects).catch(() => setEnrichProgress(null));
     } catch (e) { setError(String(e)); } finally { setLoading(false); }
   }, [secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, enrichAll]);
+
+  // ── Recherche LinkedIn ────────────────────────────────────────────────────
+  const searchLinkedIn = useCallback(async (p: Prospect) => {
+    if (!p.dirigeantPrincipal) return;
+    setLinkedinSearching(true);
+    setLinkedinResult(null);
+    setLinkedinError(null);
+    try {
+      const res  = await fetch("/api/prospection/linkedin-search", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          name:     p.dirigeantPrincipal,
+          company:  p.nom,
+          location: p.ville,
+        }),
+      });
+      const data = await res.json() as {
+        profile?: { url: string; firstName: string; lastName: string; headline: string; location: string } | null;
+        searchUrl?: string;
+        warning?: string;
+        error?: string;
+      };
+      if (data.profile?.url) {
+        setLinkedinResult({ url: data.profile.url, headline: data.profile.headline });
+        // Persist LinkedIn URL on the prospect
+        await updateProspect(p.id, { linkedinDirigeant: data.profile.url });
+      } else if (data.searchUrl) {
+        // Fallback: ouvrir la recherche LinkedIn manuellement
+        setLinkedinResult({ url: data.searchUrl, headline: data.warning ?? "Ouvrir la recherche LinkedIn" });
+      } else {
+        setLinkedinError(data.error ?? "Profil non trouvé");
+      }
+    } catch (e) {
+      setLinkedinError(String(e));
+    } finally {
+      setLinkedinSearching(false);
+    }
+  }, [updateProspect]);
 
   // ── Save notes ────────────────────────────────────────────────────────────
   const saveNotes = useCallback(() => {
@@ -996,7 +1046,37 @@ export default function ProspectionPage() {
 
               {/* ── Dirigeant ── */}
               <div className="px-5 py-4 border-b border-gray-100">
-                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-3">Dirigeant principal</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Dirigeant principal</p>
+                  {selected.dirigeantPrincipal && (
+                    <button
+                      onClick={() => searchLinkedIn(selected)}
+                      disabled={linkedinSearching}
+                      className="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-lg border border-[#0077b5]/30 text-[#0077b5] bg-[#0077b5]/5 hover:bg-[#0077b5]/15 transition-all disabled:opacity-50">
+                      {linkedinSearching
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>}
+                      {linkedinSearching ? "Recherche…" : "Chercher sur LinkedIn"}
+                    </button>
+                  )}
+                </div>
+                {/* Résultat LinkedIn */}
+                {linkedinResult && (
+                  <a href={linkedinResult.url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-[#0077b5]/5 border border-[#0077b5]/20 rounded-lg px-3 py-2 mb-2 group hover:bg-[#0077b5]/10 transition-colors">
+                    <svg className="w-4 h-4 fill-[#0077b5] shrink-0" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-[#0077b5]">Profil trouvé — voir sur LinkedIn</p>
+                      {linkedinResult.headline && <p className="text-[10px] text-gray-400 truncate">{linkedinResult.headline}</p>}
+                    </div>
+                    <ExternalLink className="w-3 h-3 text-[#0077b5]/50 group-hover:text-[#0077b5] shrink-0" />
+                  </a>
+                )}
+                {linkedinError && (
+                  <p className="text-[10px] text-red-500 flex items-center gap-1 mb-2">
+                    <AlertCircle className="w-3 h-3 shrink-0" /> {linkedinError}
+                  </p>
+                )}
                 {selected.dirigeantPrincipal ? (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
@@ -1009,7 +1089,7 @@ export default function ProspectionPage() {
                       </div>
                       {selected.linkedinDirigeant && (
                         <a href={selected.linkedinDirigeant} target="_blank" rel="noopener noreferrer"
-                          title="Rechercher sur LinkedIn"
+                          title="Voir profil LinkedIn"
                           className="shrink-0 w-6 h-6 rounded bg-[#0077b5]/20 flex items-center justify-center hover:bg-[#0077b5]/40 transition-colors">
                           <svg className="w-3.5 h-3.5 fill-[#0077b5]" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
                         </a>
