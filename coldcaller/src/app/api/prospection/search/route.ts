@@ -51,12 +51,27 @@ interface SireneResult {
 
 // Tranche codes sorted in ascending order for ≥ comparison
 const TRANCHE_ORDER = ["00","01","02","03","11","12","21","22","31","32","41","42","51","52","53"];
+const TRANCHE_SET   = new Set(TRANCHE_ORDER);
 
 function trancheGte(code: string, min: string): boolean {
   return TRANCHE_ORDER.indexOf(code) >= TRANCHE_ORDER.indexOf(min);
 }
 function trancheLte(code: string, max: string): boolean {
   return TRANCHE_ORDER.indexOf(code) <= TRANCHE_ORDER.indexOf(max);
+}
+
+/**
+ * Retourne le code tranche effectif fiable pour filtrage.
+ * Règle : utilise le siège s'il est dans TRANCHE_ORDER (pas "NN"),
+ * sinon tente le niveau entreprise. Retourne null si aucun code fiable.
+ * "NN" = unité non employeuse ou non renseignée → indexOf = -1 → BUG si naïvement utilisé.
+ */
+function getTrancheCode(r: SireneResult): string | null {
+  const sieteT = r.siege?.tranche_effectif_salarie;
+  const unitT  = r.tranche_effectif_salarie;
+  if (sieteT && TRANCHE_SET.has(sieteT))  return sieteT;
+  if (unitT  && TRANCHE_SET.has(unitT))   return unitT;
+  return null; // "NN", vide, ou code inconnu → on ne peut pas filtrer
 }
 
 function sireneToProspect(r: SireneResult, secteur: string): Prospect {
@@ -89,7 +104,8 @@ function sireneToProspect(r: SireneResult, secteur: string): Prospect {
     ? r.siege.telephone.replace(/^\+33\s?/, "0").replace(/\s+/g, " ").trim()
     : undefined;
 
-  const tranche = r.siege?.tranche_effectif_salarie ?? r.tranche_effectif_salarie;
+  // Utiliser getTrancheCode pour éviter de stocker "NN" comme tranche valide
+  const tranche = getTrancheCode(r) ?? r.siege?.tranche_effectif_salarie ?? r.tranche_effectif_salarie;
   const statut = siteWeb ? "a_enrichir" : "nouveau";
 
   return {
@@ -185,10 +201,13 @@ export async function POST(req: NextRequest) {
       : allRaw;
 
     // ── Post-filtre taille (plage min–max) ───────────────────────────────────
+    // IMPORTANT: utiliser getTrancheCode() qui valide que le code est dans
+    // TRANCHE_ORDER. "NN" (non renseigné) a indexOf = -1 → -1 <= n est toujours
+    // true → causerait des faux positifs massifs avec un filtre max seul.
     const trancheFiltered = (trancheMin || trancheMax)
       ? deptFiltered.filter((r) => {
-          const t = r.siege?.tranche_effectif_salarie ?? r.tranche_effectif_salarie;
-          if (!t) return false; // exclure les entreprises sans donnée effectifs
+          const t = getTrancheCode(r);
+          if (!t) return false; // "NN" ou inconnu → exclure quand un filtre est actif
           if (trancheMin && !trancheGte(t, trancheMin)) return false;
           if (trancheMax && !trancheLte(t, trancheMax)) return false;
           return true;
