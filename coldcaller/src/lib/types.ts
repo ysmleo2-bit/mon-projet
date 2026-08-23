@@ -31,6 +31,12 @@ export interface Lead {
   callStatus?: string;    // StatutAppel from prospection (pas_decroche, decroche, etc.)
   prospectId?: string;    // Original prospect ID for cross-reference
   crmSyncedAt?: string;   // ISO date of last sync from prospection
+  // ── Données enrichies Google Maps ────────────────────────────────────────
+  lat?: number;           // Latitude (WGS84)
+  lng?: number;           // Longitude (WGS84)
+  googleMapsUrl?: string; // Lien direct fiche Google Maps
+  hours?: string[];       // Horaires par jour (["Lundi: 9h00–18h00", …])
+  priceLevel?: string;    // "€" | "€€" | "€€€" | "€€€€"
   // Conformité RGPD / droit d'opposition : si true, ce lead ne doit plus
   // jamais être appelé (voir src/lib/blacklist.ts + /api/leads/:id/optout).
   doNotCall?: boolean;

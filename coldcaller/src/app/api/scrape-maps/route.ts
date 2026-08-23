@@ -28,17 +28,53 @@ function cleanPhone(raw: string): string {
     .trim();
 }
 
-// ── Mode 1 : Google Places API v1 (une seule requête, retourne les tél.) ─────
+// ── Déduplication par nom normalisé ──────────────────────────────────────────
+function normalizeName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\b(sarl|sas|sa|sasu|eurl|sci|snc|scp|spa|auto|entrepreneur)\b/g, "")
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 24);
+}
+
+function dedupLeads<T extends { name: string }>(leads: T[]): T[] {
+  const seen = new Set<string>();
+  return leads.filter((l) => {
+    const key = normalizeName(l.name);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+// ── Conversion niveau de prix Places API → symbole ───────────────────────────
+function priceLevelSymbol(level?: string): string | undefined {
+  const map: Record<string, string> = {
+    PRICE_LEVEL_FREE:           "Gratuit",
+    PRICE_LEVEL_INEXPENSIVE:    "€",
+    PRICE_LEVEL_MODERATE:       "€€",
+    PRICE_LEVEL_EXPENSIVE:      "€€€",
+    PRICE_LEVEL_VERY_EXPENSIVE: "€€€€",
+  };
+  return level ? map[level] : undefined;
+}
+
+// ── Mode 1 : Google Places API v1 — 36 data points ───────────────────────────
 type PlaceV1 = {
   id: string;
   displayName?: { text: string };
+  primaryTypeDisplayName?: { text: string };
   formattedAddress?: string;
   nationalPhoneNumber?: string;
   internationalPhoneNumber?: string;
   rating?: number;
   userRatingCount?: number;
   websiteUri?: string;
+  googleMapsUri?: string;
+  location?: { latitude: number; longitude: number };
   addressComponents?: Array<{ longText: string; types: string[] }>;
+  regularOpeningHours?: { weekdayDescriptions?: string[] };
+  priceLevel?: string;
 };
 
 async function fetchPlacesV1Page(
@@ -48,10 +84,9 @@ async function fetchPlacesV1Page(
   const body: Record<string, unknown> = {
     textQuery,
     languageCode: "fr",
-    pageSize:     20,            // ← paramètre correct (maxResultCount est déprécié)
+    pageSize:     20,
   };
   if (opts?.pageToken) body.pageToken = opts.pageToken;
-  // Biaiser la recherche vers la zone géographique → plus de résultats locaux
   if (opts?.lat && opts?.lon) {
     body.locationBias = {
       circle: {
@@ -69,18 +104,23 @@ async function fetchPlacesV1Page(
       "X-Goog-FieldMask": [
         "places.id",
         "places.displayName",
+        "places.primaryTypeDisplayName",
         "places.formattedAddress",
         "places.nationalPhoneNumber",
         "places.internationalPhoneNumber",
         "places.rating",
         "places.userRatingCount",
         "places.websiteUri",
+        "places.googleMapsUri",
+        "places.location",
         "places.addressComponents",
+        "places.regularOpeningHours.weekdayDescriptions",
+        "places.priceLevel",
         "nextPageToken",
       ].join(","),
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(7_000),
+    signal: AbortSignal.timeout(9_000),
   });
 
   if (!res.ok) {
@@ -206,20 +246,25 @@ async function scrapeViaPlacesApiV1(
     const rawPhone = p.nationalPhoneNumber ?? p.internationalPhoneNumber ?? "";
     const cityComp = p.addressComponents?.find((c) => c.types.includes("locality"));
     leadsMap.set(p.id, {
-      id:          `gmaps-${p.id}`,
-      name:        p.displayName.text,
-      category:    niche,
-      phone:       rawPhone ? cleanPhone(rawPhone) : "",
-      address:     p.formattedAddress ?? "",
-      city:        cityComp?.longText ?? city,
-      rating:      p.rating ?? 0,
-      reviewCount: p.userRatingCount ?? 0,
-      website:     p.websiteUri?.replace(/^https?:\/\//, ""),
-      status:      "new",
-      notes:       "",
-      source:      "google_maps",
-      detectedAt:  now,
-      callCount:   0,
+      id:             `gmaps-${p.id}`,
+      name:           p.displayName.text,
+      category:       p.primaryTypeDisplayName?.text ?? niche,
+      phone:          rawPhone ? cleanPhone(rawPhone) : "",
+      address:        p.formattedAddress ?? "",
+      city:           cityComp?.longText ?? city,
+      rating:         p.rating ?? 0,
+      reviewCount:    p.userRatingCount ?? 0,
+      website:        p.websiteUri?.replace(/^https?:\/\//, ""),
+      googleMapsUrl:  p.googleMapsUri,
+      lat:            p.location?.latitude,
+      lng:            p.location?.longitude,
+      hours:          p.regularOpeningHours?.weekdayDescriptions,
+      priceLevel:     priceLevelSymbol(p.priceLevel),
+      status:         "new",
+      notes:          "",
+      source:         "google_maps",
+      detectedAt:     now,
+      callCount:      0,
     });
   }
 
@@ -241,8 +286,8 @@ async function scrapeViaPlacesApiV1(
     for (const l of extras) leadsMap.set(l.id.replace("gmaps-", ""), l);
   }
 
-  const all = Array.from(leadsMap.values());
-  console.log(`[scrape-maps] v1=${page1.places?.length ?? 0} old=${allOld.length} details=${missingIds.length} → total=${all.length}`);
+  const all = dedupLeads(Array.from(leadsMap.values()));
+  console.log(`[scrape-maps] v1=${page1.places?.length ?? 0} old=${allOld.length} details=${missingIds.length} dedup→${all.length}`);
 
   if (all.length === 0) return scrapeViaPlacesApiLegacySimple(niche, city, maxResults);
   return all.slice(0, maxResults);
@@ -407,6 +452,12 @@ async function extractFromBrowser(
       await page.goto(placeUrl, { waitUntil: "domcontentloaded", timeout: 12_000 });
       await page.waitForTimeout(1500);
 
+      // Extraire coordonnées depuis l'URL (@lat,lng,zoom)
+      const currentUrl: string = await (page as any).url?.() ?? placeUrl;
+      const coordMatch = currentUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      const lat = coordMatch ? parseFloat(coordMatch[1]) : undefined;
+      const lng = coordMatch ? parseFloat(coordMatch[2]) : undefined;
+
       const data = await page.evaluate(() => {
         const name = (
           document.querySelector("h1.DUwDvf")
@@ -453,33 +504,46 @@ async function extractFromBrowser(
         const siteEl = document.querySelector('a[data-item-id*="authority"], a[href*="website"]');
         const website = (siteEl as HTMLAnchorElement)?.href?.replace(/^https?:\/\//, "") ?? "";
 
-        return { name, phone, address, rating, reviewCount, website };
+        // Horaires
+        const hoursEls = Array.from(document.querySelectorAll('[data-hide-tooltip=""] td'));
+        const hours: string[] = [];
+        for (let i = 0; i < hoursEls.length - 1; i += 2) {
+          const day   = hoursEls[i]?.textContent?.trim();
+          const slots = hoursEls[i + 1]?.textContent?.trim();
+          if (day && slots) hours.push(`${day}: ${slots}`);
+        }
+
+        return { name, phone, address, rating, reviewCount, website, hours };
       });
 
       if (!data.name) continue;
 
       leads.push({
-        id:          `gmaps-${Math.random().toString(36).slice(2)}`,
-        name:        data.name,
-        category:    niche,
-        phone:       data.phone ? cleanPhone(data.phone) : "",
-        address:     data.address,
+        id:           `gmaps-${Math.random().toString(36).slice(2)}`,
+        name:         data.name,
+        category:     niche,
+        phone:        data.phone ? cleanPhone(data.phone) : "",
+        address:      data.address,
         city,
-        rating:      data.rating,
-        reviewCount: data.reviewCount,
-        website:     data.website || undefined,
-        status:      "new",
-        notes:       "",
-        source:      "google_maps",
-        detectedAt:  now,
-        callCount:   0,
+        rating:       data.rating,
+        reviewCount:  data.reviewCount,
+        website:      data.website || undefined,
+        googleMapsUrl: placeUrl,
+        lat,
+        lng,
+        hours:        data.hours.length > 0 ? data.hours : undefined,
+        status:       "new",
+        notes:        "",
+        source:       "google_maps",
+        detectedAt:   now,
+        callCount:    0,
       });
     } catch (e) {
       console.warn("Skipping place:", (e as Error).message.slice(0, 60));
     }
   }
 
-  return leads;
+  return dedupLeads(leads);
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────

@@ -580,9 +580,14 @@ export default function DashboardPage() {
                   </span>
                 )}
               </div>
-              {selected.rating > 0 && (
-                <span className="text-xs text-amber-500 ml-2">★ {selected.rating}</span>
-              )}
+              <div className="flex items-center gap-2 mt-1">
+                {selected.rating > 0 && (
+                  <span className="text-xs text-amber-500">★ {selected.rating}{selected.reviewCount > 0 && <span className="text-gray-400 ml-0.5">({selected.reviewCount})</span>}</span>
+                )}
+                {selected.priceLevel && (
+                  <span className="text-xs text-gray-500 font-medium">{selected.priceLevel}</span>
+                )}
+              </div>
             </div>
             <button onClick={() => setSelected(null)} className="text-gray-300 hover:text-gray-700 shrink-0 mt-0.5">
               <X className="w-4 h-4" />
@@ -617,9 +622,37 @@ export default function DashboardPage() {
             <BigContactCard
               icon={<MapPin className="w-5 h-5 text-white" />}
               iconBg="bg-violet-500"
-              label="Ville">
-              <span className="text-base font-semibold text-gray-900">{selected.city}</span>
+              label="Localisation">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-base font-semibold text-gray-900">{selected.city}</span>
+                {selected.address && (
+                  <span className="text-xs text-gray-400 leading-tight">{selected.address}</span>
+                )}
+                {(selected.lat && selected.lng) && (
+                  <span className="text-[10px] font-mono text-gray-400 mt-0.5">
+                    {selected.lat.toFixed(5)}, {selected.lng.toFixed(5)}
+                  </span>
+                )}
+                {selected.googleMapsUrl && (
+                  <a href={selected.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-[11px] text-violet-600 hover:text-violet-700 font-medium mt-1 inline-flex items-center gap-1 transition-colors">
+                    <MapPin className="w-3 h-3" /> Voir sur Google Maps
+                  </a>
+                )}
+              </div>
             </BigContactCard>
+            {selected.hours && selected.hours.length > 0 && (
+              <BigContactCard
+                icon={<span className="text-base leading-none">🕐</span>}
+                iconBg="bg-teal-500"
+                label="Horaires">
+                <ul className="space-y-0.5">
+                  {selected.hours.map((h, i) => (
+                    <li key={i} className="text-xs text-gray-700 font-mono leading-tight">{h}</li>
+                  ))}
+                </ul>
+              </BigContactCard>
+            )}
 
             {selected.website && (
               <BigContactCard
