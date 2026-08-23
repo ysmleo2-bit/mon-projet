@@ -182,11 +182,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "name requis" }, { status: 400 });
   }
 
-  // Construire les mots-clés : nom + entreprise + ville
-  const parts = [name, company, location].filter(Boolean);
+  // Tronquer le nom légal SIRENE à 2 mots max (prénom + nom)
+  // Ex: "LAURENT JEAN JACQUES ALAIN GIRAUD" → "LAURENT JEAN"
+  const nameShort = name.trim().split(/\s+/).slice(0, 2).join(" ");
+
+  // Construire les mots-clés : nom court + entreprise (sans ville pour éviter le bruit)
+  const parts = [nameShort, company].filter(Boolean);
   const keywords = parts.join(" ");
 
   // Construire l'URL de recherche LinkedIn (fallback si API échoue)
+  // Note: s'ouvre dans le navigateur de l'utilisateur — suggérer d'utiliser le compte dédié
   const searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(keywords)}`;
 
   try {
