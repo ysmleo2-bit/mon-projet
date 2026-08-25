@@ -1,37 +1,43 @@
 /**
  * middleware.ts — protection de toutes les routes
+ * Importe uniquement depuis auth-edge.ts (Edge-compatible, pas de bcryptjs)
  *
  * • Vérifie le cookie cc_session (JWT HS256)
  * • Pages non authentifiées → redirect /login
  * • API non authentifiées → 401 JSON
  * • Routes admin → 403 si rôle != admin
- * • Injecte X-User-Id, X-User-Role, X-User-Email dans les headers
+ * • Injecte x-user-id, x-user-role, x-user-email, x-user-name dans les headers
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifyToken, COOKIE_NAME } from "@/lib/auth";
+import { verifyToken, COOKIE_NAME } from "@/lib/auth-edge";
 
-// Routes publiques (pas de session requise)
-const PUBLIC_ROUTES = [
+// ── Routes publiques (aucune session requise) ─────────────────────────────────
+const PUBLIC_PREFIXES = [
+  "/",            // landing page
   "/login",
+  "/pricing",
+  "/app",         // éventuelle page marketing
   "/api/auth/login",
   "/api/auth/logout",
   "/_next",
   "/favicon",
 ];
 
-// Routes admin uniquement
-const ADMIN_ROUTES = [
+// ── Routes admin uniquement ───────────────────────────────────────────────────
+const ADMIN_PREFIXES = [
   "/admin",
   "/api/admin",
 ];
 
 function isPublic(pathname: string): boolean {
-  return PUBLIC_ROUTES.some((p) => pathname.startsWith(p));
+  // La landing page "/" est exactement "/", pas "/dashboard" etc.
+  if (pathname === "/") return true;
+  return PUBLIC_PREFIXES.some((p) => p !== "/" && pathname.startsWith(p));
 }
 
 function isAdminRoute(pathname: string): boolean {
-  return ADMIN_ROUTES.some((p) => pathname.startsWith(p));
+  return ADMIN_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
 function isApiRoute(pathname: string): boolean {
@@ -41,7 +47,7 @@ function isApiRoute(pathname: string): boolean {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Laisser passer les routes publiques et assets
+  // Laisser passer les fichiers statiques et routes publiques
   if (isPublic(pathname) || pathname.includes(".")) {
     return NextResponse.next();
   }
@@ -62,10 +68,6 @@ export async function middleware(req: NextRequest) {
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
-
-  // Compte désactivé
-  // Note: on ne peut pas appeler DB depuis le middleware (Edge Runtime)
-  // La désactivation est vérifiée côté API via X-User-Id
 
   // Route admin — vérifier le rôle
   if (isAdminRoute(pathname) && session.role !== "admin") {
@@ -90,12 +92,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Correspond à toutes les routes sauf :
-     * - _next/static (fichiers statiques)
-     * - _next/image (optimisation images)
-     * - favicon.ico
-     */
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
