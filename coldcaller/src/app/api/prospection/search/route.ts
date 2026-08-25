@@ -229,12 +229,20 @@ export async function POST(req: NextRequest) {
     // Convertir en Prospects (cap à perPage ou 200 max)
     const cap       = Math.min(perPage, 200);
     const label     = secteur || nafCodes.join(", ");
-    const prospects = unique.slice(0, cap).map((r) => sireneToProspect(r, label));
+    const prospects = unique.slice(0, cap).map((r) => {
+      const p = sireneToProspect(r, label);
+      // Auto-assigner le prospect au SDR qui lance la recherche
+      if (user) {
+        p.assignedToId = user.userId;
+        p.assignedTo   = user.name;
+      }
+      return p;
+    });
 
     // Sauvegarder en DB (fire-and-forget si erreur DB)
     try {
       const { dbUpsertProspects } = await import("@/lib/db-prospection");
-      await dbUpsertProspects(prospects, user?.userId);
+      await dbUpsertProspects(prospects);
     } catch (dbErr) {
       console.warn("[prospection/search] DB save skipped:", dbErr);
     }

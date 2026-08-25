@@ -69,7 +69,7 @@ const USE_PG = !!(process.env.POSTGRES_URL || process.env.DATABASE_URL);
 
 // ── API publique ──────────────────────────────────────────────────────────────
 
-export async function dbGetLeads(filter?: { status?: string; category?: string; callStatus?: string; userId?: string }): Promise<Lead[]> {
+export async function dbGetLeads(filter?: { status?: string; category?: string; callStatus?: string; assignedToId?: string }): Promise<Lead[]> {
   if (USE_PG) {
     await ensureTable();
     let sql = "SELECT data FROM leads";
@@ -87,9 +87,9 @@ export async function dbGetLeads(filter?: { status?: string; category?: string; 
       params.push(filter.callStatus);
       conds.push(`data->>'callStatus' = $${params.length}`);
     }
-    if (filter?.userId) {
-      params.push(filter.userId);
-      conds.push(`user_id = $${params.length}`);
+    if (filter?.assignedToId) {
+      params.push(filter.assignedToId);
+      conds.push(`data->>'assignedToId' = $${params.length}`);
     }
     if (conds.length) sql += " WHERE " + conds.join(" AND ");
     sql += " ORDER BY created_at DESC";
@@ -97,9 +97,10 @@ export async function dbGetLeads(filter?: { status?: string; category?: string; 
     return result.rows.map((r) => (r as { data: Lead }).data);
   } else {
     let leads = readJson();
-    if (filter?.status)     leads = leads.filter((l) => l.status === filter.status);
-    if (filter?.category)   leads = leads.filter((l) => l.category === filter.category);
-    if (filter?.callStatus) leads = leads.filter((l) => l.callStatus === filter.callStatus);
+    if (filter?.status)       leads = leads.filter((l) => l.status === filter.status);
+    if (filter?.category)     leads = leads.filter((l) => l.category === filter.category);
+    if (filter?.callStatus)   leads = leads.filter((l) => l.callStatus === filter.callStatus);
+    if (filter?.assignedToId) leads = leads.filter((l) => l.assignedToId === filter.assignedToId);
     return leads;
   }
 }
@@ -118,19 +119,12 @@ export async function dbUpsertLeads(incoming: Lead[], userId?: string): Promise<
   if (USE_PG) {
     await ensureTable();
     for (const lead of incoming) {
-      if (userId) {
-        await pgQuery(
-          `INSERT INTO leads (id, data, user_id) VALUES ($1, $2, $3)
-           ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
-          [lead.id, JSON.stringify(lead), userId]
-        );
-      } else {
-        await pgQuery(
-          `INSERT INTO leads (id, data) VALUES ($1, $2)
-           ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
-          [lead.id, JSON.stringify(lead)]
-        );
-      }
+      // Conserver assignedToId dans le JSONB (CRM partagé — pas de filtre par user_id)
+      await pgQuery(
+        `INSERT INTO leads (id, data) VALUES ($1, $2)
+         ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
+        [lead.id, JSON.stringify(lead)]
+      );
     }
     return incoming;
   } else {

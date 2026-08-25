@@ -37,6 +37,9 @@ export interface Lead {
   googleMapsUrl?: string; // Lien direct fiche Google Maps
   hours?: string[];       // Horaires par jour (["Lundi: 9h00–18h00", …])
   priceLevel?: string;    // "€" | "€€" | "€€€" | "€€€€"
+  // ── Attribution SDR ──────────────────────────────────────────────────────
+  assignedToId?:   string;  // userId du SDR assigné
+  assignedTo?:     string;  // nom du SDR assigné (dénormalisé pour affichage)
   // Conformité RGPD / droit d'opposition : si true, ce lead ne doit plus
   // jamais être appelé (voir src/lib/blacklist.ts + /api/leads/:id/optout).
   doNotCall?: boolean;

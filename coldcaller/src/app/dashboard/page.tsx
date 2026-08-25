@@ -463,6 +463,11 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-2 text-xs text-gray-400">
                       <span>{lead.city}</span>
                       <span className="font-mono text-brand-500">{lead.phone}</span>
+                      {lead.assignedTo && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200 font-medium truncate max-w-[90px]">
+                          {lead.assignedTo.split(" ")[0]}
+                        </span>
+                      )}
                     </div>
                   </div>
 

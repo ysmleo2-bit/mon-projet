@@ -165,6 +165,10 @@ export interface Prospect {
   danscrm?:           boolean;
   dateCrm?:           string;
 
+  // ─ Attribution SDR
+  assignedToId?: string;  // userId du SDR assigné
+  assignedTo?:   string;  // nom du SDR assigné (dénormalisé pour affichage)
+
   // ─ Métadonnées
   createdAt:  string;
   updatedAt:  string;

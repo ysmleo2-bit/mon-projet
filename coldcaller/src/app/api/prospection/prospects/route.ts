@@ -31,10 +31,11 @@ export async function GET(req: NextRequest) {
   const statut      = searchParams.get("statut")      as any ?? undefined;
   const secteur     = searchParams.get("secteur")     ?? undefined;
   const departement = searchParams.get("departement") ?? undefined;
+  // ?mine=true → filtrer uniquement ses propres prospects
+  const mine         = searchParams.get("mine") === "true";
+  const assignedToId = mine ? user!.userId : undefined;
 
-  // Admin voit tout, SDR uniquement ses prospects
-  const userId  = user!.role === "admin" ? undefined : user!.userId;
-  const prospects = await dbGetProspects({ statut, secteur, departement, userId });
+  const prospects = await dbGetProspects({ statut, secteur, departement, assignedToId });
   return NextResponse.json({ prospects, total: prospects.length });
 }
 

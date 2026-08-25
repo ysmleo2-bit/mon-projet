@@ -854,6 +854,7 @@ export default function ProspectionPage() {
                     <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Pipeline</th>
                     <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Score</th>
                     <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">CRM</th>
+                    <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">SDR</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -918,6 +919,11 @@ export default function ProspectionPage() {
                         <td className="px-4 py-2.5 whitespace-nowrap">
                           {p.danscrm
                             ? <span className="inline-flex items-center gap-1 text-[10px] text-green-600 font-medium"><CheckCircle className="w-3 h-3" /> CRM</span>
+                            : <span className="text-gray-200">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5 whitespace-nowrap">
+                          {p.assignedTo
+                            ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200 font-medium">{p.assignedTo.split(" ")[0]}</span>
                             : <span className="text-gray-200">—</span>}
                         </td>
                       </tr>
