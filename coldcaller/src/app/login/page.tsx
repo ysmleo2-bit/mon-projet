@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Eye, EyeOff, Zap } from "lucide-react";
 
-export default function LoginPage() {
+// useSearchParams doit être dans un composant wrappé par Suspense
+function LoginForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
-  const redirect     = searchParams.get("redirect") ?? "/dashboard";
+  const redirectTo   = searchParams.get("redirect") ?? "/dashboard";
 
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
@@ -18,9 +19,9 @@ export default function LoginPage() {
   // Si déjà connecté → redirect
   useEffect(() => {
     fetch("/api/auth/me").then((r) => {
-      if (r.ok) router.replace(redirect);
+      if (r.ok) router.replace(redirectTo);
     });
-  }, [redirect, router]);
+  }, [redirectTo, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,12 +41,7 @@ export default function LoginPage() {
         return;
       }
 
-      // Premier lancement : informer l'admin
-      if (data.firstLogin) {
-        router.replace("/admin");
-      } else {
-        router.replace(redirect);
-      }
+      router.replace(data.firstLogin ? "/admin" : redirectTo);
     } catch {
       setError("Erreur réseau — réessaye");
     } finally {
@@ -133,5 +129,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
