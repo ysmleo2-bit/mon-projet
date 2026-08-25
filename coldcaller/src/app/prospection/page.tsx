@@ -386,10 +386,17 @@ export default function ProspectionPage() {
   const [linkedinResult,    setLinkedinResult]    = useState<{ url: string; headline: string } | null>(null);
   const [linkedinError,     setLinkedinError]     = useState<string | null>(null);
 
-  // Reset LinkedIn state when selected changes
+  // ── Enrichissement contact (email/tél via Apify) ─────────────────────────
+  const [contactEnriching,  setContactEnriching]  = useState(false);
+  const [contactResult,     setContactResult]     = useState<{ email?: string; phone?: string; socials?: Record<string, string> } | null>(null);
+  const [contactError,      setContactError]      = useState<string | null>(null);
+
+  // Reset LinkedIn + contact state when selected changes
   useEffect(() => {
     setLinkedinResult(null);
     setLinkedinError(null);
+    setContactResult(null);
+    setContactError(null);
   }, [selected?.id]);
 
   // Notes locales
@@ -617,6 +624,36 @@ export default function ProspectionPage() {
     } finally {
       setLinkedinSearching(false);
     }
+  }, [updateProspect]);
+
+  // ── Enrichissement contact Apify (email / téléphone via site web) ─────────
+  const enrichContact = useCallback(async (p: Prospect) => {
+    if (!p.siteWeb) return;
+    setContactEnriching(true);
+    setContactResult(null);
+    setContactError(null);
+    try {
+      const res  = await fetch("/api/apify/contact", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ siteWeb: p.siteWeb, name: p.nom }),
+      });
+      const data = await res.json() as {
+        email?:   string | null;
+        phone?:   string | null;
+        socials?: Record<string, string>;
+        error?:   string;
+      };
+      if (data.error) { setContactError(data.error); return; }
+      setContactResult({ email: data.email ?? undefined, phone: data.phone ?? undefined, socials: data.socials });
+      // Persister les données enrichies
+      const updates: Partial<Prospect> = {};
+      if (data.email && !p.emailDirigeant)  updates.emailDirigeant  = data.email;
+      if (data.phone && !p.telephonePro)   updates.telephonePro   = data.phone;
+      if (data.socials?.linkedin && !p.linkedinDirigeant) updates.linkedinDirigeant = data.socials.linkedin;
+      if (Object.keys(updates).length > 0) await updateProspect(p.id, updates);
+    } catch (e) { setContactError(String(e)); }
+    finally { setContactEnriching(false); }
   }, [updateProspect]);
 
   // ── Save notes ────────────────────────────────────────────────────────────
@@ -1166,16 +1203,47 @@ export default function ProspectionPage() {
                       <span className="text-gray-400 text-xs italic">Téléphone non trouvé</span>
                     </div>
                   )}
-                  {/* Site */}
+                  {/* Site + bouton enrichissement Apify */}
                   {selected.siteWeb ? (
-                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                      <Globe className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                      <a href={`https://${selected.siteWeb}`} target="_blank" rel="noopener noreferrer"
-                        className="text-sky-600 hover:text-sky-700 text-xs flex-1 truncate transition-colors">
-                        {selected.siteWeb}
-                      </a>
-                      <ExternalLink className="w-3 h-3 text-gray-300" />
-                    </div>
+                    <>
+                      <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                        <Globe className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                        <a href={`https://${selected.siteWeb}`} target="_blank" rel="noopener noreferrer"
+                          className="text-sky-600 hover:text-sky-700 text-xs flex-1 truncate transition-colors">
+                          {selected.siteWeb}
+                        </a>
+                        <ExternalLink className="w-3 h-3 text-gray-300" />
+                      </div>
+                      {/* Bouton enrichissement email/tél via Apify */}
+                      <button
+                        onClick={() => enrichContact(selected)}
+                        disabled={contactEnriching}
+                        className="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-lg border border-orange-300/50 text-orange-600 bg-orange-50 hover:bg-orange-100 transition-all disabled:opacity-50 w-full justify-center mt-1">
+                        {contactEnriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                        {contactEnriching ? "Enrichissement…" : "Trouver email & téléphone"}
+                      </button>
+                      {/* Résultat enrichissement */}
+                      {contactResult && (
+                        <div className="bg-orange-50 border border-orange-200/50 rounded-lg px-3 py-2 space-y-1">
+                          {contactResult.email && (
+                            <div className="flex items-center gap-1.5">
+                              <Mail className="w-3 h-3 text-orange-400 shrink-0" />
+                              <span className="text-xs text-orange-700 font-medium truncate">{contactResult.email}</span>
+                            </div>
+                          )}
+                          {contactResult.phone && (
+                            <div className="flex items-center gap-1.5">
+                              <Phone className="w-3 h-3 text-orange-400 shrink-0" />
+                              <span className="text-xs text-orange-700 font-medium">{contactResult.phone}</span>
+                            </div>
+                          )}
+                          {!contactResult.email && !contactResult.phone && (
+                            <span className="text-[10px] text-orange-400 italic">Aucun contact trouvé sur le site</span>
+                          )}
+                        </div>
+                      )}
+                      {contactError && <p className="text-[10px] text-red-500 mt-1">{contactError}</p>}
+                    </>
                   ) : (
                     <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-dashed border-gray-200">
                       <Globe className="w-3.5 h-3.5 text-gray-300 shrink-0" />

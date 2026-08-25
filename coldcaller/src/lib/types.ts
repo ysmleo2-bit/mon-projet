@@ -24,7 +24,7 @@ export interface Lead {
   lastContact?: string;   // ISO date
   rdvDate?: string;       // ISO date
   siret?: string;            // for SIRENE leads (used to cross-ref with OSM)
-  source: "google_maps" | "manual" | "import" | "openstreetmap" | "sirene" | "foursquare";
+  source: "google_maps" | "manual" | "import" | "openstreetmap" | "sirene" | "foursquare" | "apify-maps";
   detectedAt: string;
   callCount: number;
   callHistory?: CallRecord[];

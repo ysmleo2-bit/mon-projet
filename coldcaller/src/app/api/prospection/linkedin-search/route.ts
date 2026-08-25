@@ -195,17 +195,34 @@ export async function POST(req: NextRequest) {
   const searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(keywords)}`;
 
   try {
-    // Étape 1 : CSRF
-    const csrf = await getCsrfToken(liAt);
-    if (!csrf) {
-      // Retourner l'URL de recherche si auth échoue
-      return NextResponse.json({ profile: null, searchUrl, warning: "CSRF introuvable — cookie expiré ?" });
+    // ── Stratégie 1 : Apify (si APIFY_TOKEN configuré) ───────────────────────
+    if (process.env.APIFY_TOKEN) {
+      try {
+        const apifyRes = await fetch(new URL("/api/apify/linkedin", process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"), {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ name, company, location }),
+          signal:  AbortSignal.timeout(55_000),
+        });
+        if (apifyRes.ok) {
+          const apifyData = await apifyRes.json() as { profile?: unknown; searchUrl?: string; source?: string };
+          if (apifyData.profile) {
+            return NextResponse.json({ ...apifyData, source: "apify" });
+          }
+        }
+      } catch {
+        console.warn("[linkedin-search] Apify fallback to Voyager");
+      }
     }
 
-    // Étape 2 : recherche
-    const profile = await voyagerSearch(liAt, csrf, keywords);
+    // ── Stratégie 2 : Voyager API (fallback) ─────────────────────────────────
+    const csrf = await getCsrfToken(liAt);
+    if (!csrf) {
+      return NextResponse.json({ profile: null, searchUrl, warning: "CSRF introuvable — cookie expiré ?", source: "voyager" });
+    }
 
-    return NextResponse.json({ profile, searchUrl });
+    const profile = await voyagerSearch(liAt, csrf, keywords);
+    return NextResponse.json({ profile, searchUrl, source: "voyager" });
   } catch (err) {
     console.error("[linkedin-search]", err);
     return NextResponse.json({ profile: null, searchUrl, error: String(err) });
