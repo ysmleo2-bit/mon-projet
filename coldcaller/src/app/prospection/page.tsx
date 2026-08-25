@@ -73,6 +73,7 @@ const STATUT_APPEL_ICONS: Record<StatutAppel, typeof PhoneCall> = {
   non_appele:         Clock,
   decroche:           PhoneCall,
   pas_decroche:       PhoneMissed,
+  numero_invalide:    PhoneOff,
   mail_envoye:        Mail,
   echange_sans_suite: MessageSquare,
   r1_booke:           Calendar,
