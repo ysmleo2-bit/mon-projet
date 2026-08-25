@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Phone, BarChart2, ChevronRight, Target, FileText } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Phone, BarChart2, ChevronRight, Target, FileText, Shield, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface CurrentUser { id: string; email: string; name: string; role: string }
 
 const NAV = [
   { href: "/prospection", label: "Prospection B2B", icon: Target },
@@ -52,7 +54,22 @@ function CallWindowBadge() {
 }
 
 export default function Navbar({ variant = "app" }: { variant?: "landing" | "app" }) {
-  const path = usePathname();
+  const path   = usePathname();
+  const router = useRouter();
+  const [me, setMe] = useState<CurrentUser | null>(null);
+
+  useEffect(() => {
+    if (variant !== "app") return;
+    fetch("/api/auth/me")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d: { user: CurrentUser } | null) => { if (d?.user) setMe(d.user); })
+      .catch(() => {});
+  }, [variant]);
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+  }
 
   if (variant === "landing") {
     return (
@@ -125,20 +142,34 @@ export default function Navbar({ variant = "app" }: { variant?: "landing" | "app
         })}
       </nav>
 
-      {/* Credits */}
-      <div className="p-4 border-t border-white/[0.06]">
-        <div className="bg-white/[0.06] border border-white/[0.10] rounded-xl p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-white/60 font-medium">Leads restants</span>
-            <span className="text-xs font-bold text-brand-400">143 / 300</span>
-          </div>
-          <div className="h-1.5 bg-white/[0.08] rounded-full overflow-hidden">
-            <div className="h-full bg-brand-500 rounded-full shadow-glow-sm" style={{ width: "48%" }} />
-          </div>
-          <Link href="/pricing" className="mt-3 text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors font-medium">
-            Passer au Pro <ChevronRight className="w-3 h-3" />
+      {/* Utilisateur connecté + déconnexion */}
+      <div className="p-3 border-t border-white/[0.06] space-y-1">
+        {/* Lien Admin (visible uniquement pour les admins) */}
+        {me?.role === "admin" && (
+          <Link href="/admin"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-brand-300 hover:bg-white/[0.07] transition-all">
+            <Shield className="w-3.5 h-3.5" />
+            Administration
           </Link>
-        </div>
+        )}
+        {/* Profil */}
+        {me && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.04]">
+            <div className="w-6 h-6 rounded-full bg-brand-500/20 flex items-center justify-center shrink-0">
+              <User className="w-3.5 h-3.5 text-brand-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-white/80 truncate">{me.name}</p>
+              <p className="text-[10px] text-white/40 truncate">{me.email}</p>
+            </div>
+          </div>
+        )}
+        {/* Déconnexion */}
+        <button onClick={logout}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all">
+          <LogOut className="w-3.5 h-3.5" />
+          Déconnexion
+        </button>
       </div>
     </aside>
   );

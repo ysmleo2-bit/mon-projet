@@ -65,6 +65,7 @@ export async function dbGetProspects(filter?: {
   statut?: ProspectStatut;
   secteur?: string;
   departement?: string;
+  userId?: string;
 }): Promise<Prospect[]> {
   if (USE_PG) {
     await ensureTable();
@@ -78,6 +79,10 @@ export async function dbGetProspects(filter?: {
     if (filter?.secteur) {
       params.push(`%${filter.secteur}%`);
       conds.push(`data->>'secteur' ILIKE $${params.length}`);
+    }
+    if (filter?.userId) {
+      params.push(filter.userId);
+      conds.push(`user_id = $${params.length}`);
     }
     if (conds.length) sql += " WHERE " + conds.join(" AND ");
     sql += " ORDER BY updated_at DESC LIMIT 500";
@@ -102,15 +107,23 @@ export async function dbGetProspect(id: string): Promise<Prospect | undefined> {
   }
 }
 
-export async function dbUpsertProspects(incoming: Prospect[]): Promise<void> {
+export async function dbUpsertProspects(incoming: Prospect[], userId?: string): Promise<void> {
   if (USE_PG) {
     await ensureTable();
     for (const p of incoming) {
-      await pgQuery(
-        `INSERT INTO prospects (id, data) VALUES ($1, $2)
-         ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
-        [p.id, JSON.stringify(p)]
-      );
+      if (userId) {
+        await pgQuery(
+          `INSERT INTO prospects (id, data, user_id) VALUES ($1, $2, $3)
+           ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
+          [p.id, JSON.stringify(p), userId]
+        );
+      } else {
+        await pgQuery(
+          `INSERT INTO prospects (id, data) VALUES ($1, $2)
+           ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
+          [p.id, JSON.stringify(p)]
+        );
+      }
     }
   } else {
     const existing = readJson();

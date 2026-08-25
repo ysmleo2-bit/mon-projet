@@ -10,6 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth-server";
 import type { Prospect, Dirigeant, SearchParams } from "@/lib/types-prospection";
 
 export const dynamic     = "force-dynamic";
@@ -151,6 +152,9 @@ async function fetchSirenePage(qs: string): Promise<SireneResult[]> {
 }
 
 export async function POST(req: NextRequest) {
+  const { error: authError, user } = requireAuth(req);
+  if (authError) return authError;
+
   const body = await req.json() as SearchParams & { secteur?: string };
   const {
     nafCodes    = [],
@@ -230,7 +234,7 @@ export async function POST(req: NextRequest) {
     // Sauvegarder en DB (fire-and-forget si erreur DB)
     try {
       const { dbUpsertProspects } = await import("@/lib/db-prospection");
-      await dbUpsertProspects(prospects);
+      await dbUpsertProspects(prospects, user?.userId);
     } catch (dbErr) {
       console.warn("[prospection/search] DB save skipped:", dbErr);
     }

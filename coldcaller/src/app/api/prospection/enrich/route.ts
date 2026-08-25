@@ -10,6 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth-server";
 import type { Prospect, DataSource, ProspectAction } from "@/lib/types-prospection";
 
 export const dynamic     = "force-dynamic";

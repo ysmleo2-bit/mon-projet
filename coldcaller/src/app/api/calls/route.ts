@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth-server";
 import { dbGetLead, dbUpdateLead } from "@/lib/db";
 import type { LeadStatus, CallOutcome, CallRecord } from "@/lib/types";
 

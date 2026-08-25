@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetProspects, dbUpdateProspect, dbDeleteProspect } from "@/lib/db-prospection";
+import { requireAuth } from "@/lib/auth-server";
 import type { StatutAppel, ProspectStatut } from "@/lib/types-prospection";
 
 export const dynamic = "force-dynamic";
@@ -23,12 +24,17 @@ const CRM_TRIGGER_APPELS: StatutAppel[] = [
 ];
 
 export async function GET(req: NextRequest) {
+  const { user, error } = requireAuth(req);
+  if (error) return error;
+
   const { searchParams } = new URL(req.url);
   const statut      = searchParams.get("statut")      as any ?? undefined;
   const secteur     = searchParams.get("secteur")     ?? undefined;
   const departement = searchParams.get("departement") ?? undefined;
 
-  const prospects = await dbGetProspects({ statut, secteur, departement });
+  // Admin voit tout, SDR uniquement ses prospects
+  const userId  = user!.role === "admin" ? undefined : user!.userId;
+  const prospects = await dbGetProspects({ statut, secteur, departement, userId });
   return NextResponse.json({ prospects, total: prospects.length });
 }
 

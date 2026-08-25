@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth-server";
 import { dbCreateTicket, dbGetTickets, dbUpdateTicketStatus } from "@/lib/db-tickets";
 import type { SupportTicket } from "@/lib/db-tickets";
 

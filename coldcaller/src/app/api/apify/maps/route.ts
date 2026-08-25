@@ -12,6 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth-server";
 import { runApifyActor, ApifyError } from "@/lib/apify";
 import type { Lead } from "@/lib/types";
 

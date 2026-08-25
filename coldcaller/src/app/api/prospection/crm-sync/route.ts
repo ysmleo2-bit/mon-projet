@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth-server";
 import type { Prospect } from "@/lib/types-prospection";
 import { prospectToLead } from "@/lib/crm-utils";
 

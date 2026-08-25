@@ -69,7 +69,7 @@ const USE_PG = !!(process.env.POSTGRES_URL || process.env.DATABASE_URL);
 
 // ── API publique ──────────────────────────────────────────────────────────────
 
-export async function dbGetLeads(filter?: { status?: string; category?: string; callStatus?: string }): Promise<Lead[]> {
+export async function dbGetLeads(filter?: { status?: string; category?: string; callStatus?: string; userId?: string }): Promise<Lead[]> {
   if (USE_PG) {
     await ensureTable();
     let sql = "SELECT data FROM leads";
@@ -86,6 +86,10 @@ export async function dbGetLeads(filter?: { status?: string; category?: string; 
     if (filter?.callStatus) {
       params.push(filter.callStatus);
       conds.push(`data->>'callStatus' = $${params.length}`);
+    }
+    if (filter?.userId) {
+      params.push(filter.userId);
+      conds.push(`user_id = $${params.length}`);
     }
     if (conds.length) sql += " WHERE " + conds.join(" AND ");
     sql += " ORDER BY created_at DESC";
@@ -110,15 +114,23 @@ export async function dbGetLead(id: string): Promise<Lead | undefined> {
   }
 }
 
-export async function dbUpsertLeads(incoming: Lead[]): Promise<Lead[]> {
+export async function dbUpsertLeads(incoming: Lead[], userId?: string): Promise<Lead[]> {
   if (USE_PG) {
     await ensureTable();
     for (const lead of incoming) {
-      await pgQuery(
-        `INSERT INTO leads (id, data) VALUES ($1, $2)
-         ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
-        [lead.id, JSON.stringify(lead)]
-      );
+      if (userId) {
+        await pgQuery(
+          `INSERT INTO leads (id, data, user_id) VALUES ($1, $2, $3)
+           ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
+          [lead.id, JSON.stringify(lead), userId]
+        );
+      } else {
+        await pgQuery(
+          `INSERT INTO leads (id, data) VALUES ($1, $2)
+           ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
+          [lead.id, JSON.stringify(lead)]
+        );
+      }
     }
     return incoming;
   } else {
