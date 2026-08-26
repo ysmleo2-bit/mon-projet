@@ -17,6 +17,8 @@ const PUBLIC: string[] = [
   "/pricing",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/auth/register",
+  "/api/auth/me",
 ];
 
 function isPublic(pathname: string): boolean {
