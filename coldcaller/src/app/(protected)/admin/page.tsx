@@ -4,10 +4,43 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users, Plus, Pencil, Trash2, ToggleLeft, ToggleRight,
-  Loader2, Check, X, Shield, User, BarChart2, Zap,
-  LogOut, ChevronLeft,
+  Loader2, Check, X, Shield, User, BarChart2,
+  LogOut, ChevronLeft, Receipt, Download, ChevronDown,
+  Clock, AlertCircle, Filter,
 } from "lucide-react";
 import type { PublicUser } from "@/lib/db-users";
+import type { InvoiceStatus } from "@/lib/db-invoices";
+
+const INVOICE_STATUS_CFG: Record<InvoiceStatus, { label: string; color: string; bg: string }> = {
+  deposee:         { label: "Déposée",        color: "text-blue-700",    bg: "bg-blue-50"    },
+  en_verification: { label: "En vérification", color: "text-amber-700",   bg: "bg-amber-50"   },
+  validee:         { label: "Validée",         color: "text-emerald-700", bg: "bg-emerald-50" },
+  refusee:         { label: "Refusée",         color: "text-red-700",     bg: "bg-red-50"     },
+};
+
+interface AdminInvoice {
+  id: string; user_id: string; user_name: string;
+  month: string; invoice_number: string; amount: number;
+  invoice_date: string; file_name: string; file_type: string;
+  status: InvoiceStatus; rejection_reason: string; created_at: string;
+}
+
+const MONTHS_LABELS: Record<string, string> = {
+  "01":"Janvier","02":"Février","03":"Mars","04":"Avril","05":"Mai","06":"Juin",
+  "07":"Juillet","08":"Août","09":"Septembre","10":"Octobre","11":"Novembre","12":"Décembre",
+};
+function monthLabel(m: string) {
+  const [year, mon] = m.split("-");
+  return `${MONTHS_LABELS[mon] ?? mon} ${year}`;
+}
+function prevMonths(n = 6) {
+  const months: string[] = []; const now = new Date();
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
+  }
+  return months;
+}
 
 interface UserWithStats extends PublicUser {
   stats?: { leads: number; prospects: number };
@@ -179,6 +212,60 @@ export default function AdminPage() {
 
   const sdrs   = users.filter((u) => u.role === "sdr");
   const admins = users.filter((u) => u.role === "admin");
+  void admins;
+
+  // ── Factures ──────────────────────────────────────────────────────────────────
+  const [invoices,       setInvoices]       = useState<AdminInvoice[]>([]);
+  const [invLoading,     setInvLoading]     = useState(false);
+  const [invFilterMonth, setInvFilterMonth] = useState("");
+  const [invFilterStatus, setInvFilterStatus] = useState("");
+  const [invFilterSdr,   setInvFilterSdr]   = useState("");
+  const [updatingInv,    setUpdatingInv]    = useState<string | null>(null);
+
+  const loadInvoices = useCallback(async () => {
+    setInvLoading(true);
+    try {
+      const p = new URLSearchParams();
+      if (invFilterMonth)  p.set("month",  invFilterMonth);
+      if (invFilterStatus) p.set("status", invFilterStatus);
+      const res  = await fetch(`/api/invoices?${p}`);
+      const data = await res.json() as { invoices: AdminInvoice[] };
+      let invs = data.invoices ?? [];
+      if (invFilterSdr) invs = invs.filter((i) => i.user_id === invFilterSdr);
+      setInvoices(invs);
+    } finally { setInvLoading(false); }
+  }, [invFilterMonth, invFilterStatus, invFilterSdr]);
+
+  useEffect(() => { loadInvoices(); }, [loadInvoices]);
+
+  async function updateInvoiceStatus(id: string, status: InvoiceStatus, reason?: string) {
+    setUpdatingInv(id);
+    await fetch(`/api/invoices/${id}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ status, rejection_reason: reason ?? "" }),
+    });
+    setUpdatingInv(null);
+    loadInvoices();
+  }
+
+  async function downloadInvoice(id: string, fileName: string) {
+    const res  = await fetch(`/api/invoices/${id}`);
+    const data = await res.json() as { invoice: AdminInvoice & { file_data: string } };
+    if (!data.invoice?.file_data) return;
+    const byteString = atob(data.invoice.file_data);
+    const bytes = new Uint8Array(byteString.length);
+    for (let i = 0; i < byteString.length; i++) bytes[i] = byteString.charCodeAt(i);
+    const blob = new Blob([bytes], { type: data.invoice.file_type });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a"); a.href = url; a.download = fileName; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Récapitulatif : qui a déposé pour le mois courant
+  const currentMonth = prevMonths(1)[0];
+  const depositedIds = new Set(invoices.filter((i) => i.month === currentMonth).map((i) => i.user_id));
+  const missingUsers = users.filter((u) => u.active && !depositedIds.has(u.id));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -322,6 +409,147 @@ export default function AdminPage() {
                   Aucun utilisateur — crée le premier compte SDR
                 </div>
               )}
+            </div>
+          )}
+        </div>
+        {/* ── Section Factures ──────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-200">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-brand-600" />
+                Factures équipe
+              </h2>
+              <p className="text-xs text-gray-400 mt-0.5">{invoices.length} facture{invoices.length > 1 ? "s" : ""} · {monthLabel(currentMonth)}</p>
+            </div>
+          </div>
+
+          {/* Récap mois courant */}
+          {users.length > 0 && (
+            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+              <p className="text-xs font-semibold text-gray-500 mb-3">Récapitulatif {monthLabel(currentMonth)}</p>
+              <div className="flex flex-wrap gap-2">
+                {users.filter((u) => u.active).map((u) => (
+                  <div key={u.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
+                    depositedIds.has(u.id)
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                      : "bg-red-50 border-red-200 text-red-600"
+                  }`}>
+                    {depositedIds.has(u.id) ? <Check className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                    {u.name.split(" ")[0]}
+                    {depositedIds.has(u.id) ? " ✓" : " — À déposer"}
+                  </div>
+                ))}
+              </div>
+              {missingUsers.length > 0 && (
+                <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {missingUsers.map((u) => u.name.split(" ")[0]).join(", ")} n&apos;{missingUsers.length > 1 ? "ont" : "a"} pas encore déposé
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Filtres */}
+          <div className="px-6 py-3 border-b border-gray-100 flex flex-wrap items-center gap-3">
+            <Filter className="w-3.5 h-3.5 text-gray-400" />
+            {/* SDR */}
+            <div className="relative">
+              <select value={invFilterSdr} onChange={(e) => setInvFilterSdr(e.target.value)}
+                className="appearance-none pl-3 pr-7 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="">Tous les SDR</option>
+                {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            </div>
+            {/* Mois */}
+            <div className="relative">
+              <select value={invFilterMonth} onChange={(e) => setInvFilterMonth(e.target.value)}
+                className="appearance-none pl-3 pr-7 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="">Tous les mois</option>
+                {prevMonths(6).map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            </div>
+            {/* Statut */}
+            <div className="relative">
+              <select value={invFilterStatus} onChange={(e) => setInvFilterStatus(e.target.value)}
+                className="appearance-none pl-3 pr-7 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="">Tous les statuts</option>
+                <option value="deposee">Déposée</option>
+                <option value="en_verification">En vérification</option>
+                <option value="validee">Validée</option>
+                <option value="refusee">Refusée</option>
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Liste factures */}
+          {invLoading ? (
+            <div className="flex items-center justify-center py-12 text-gray-400">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" /> Chargement…
+            </div>
+          ) : invoices.length === 0 ? (
+            <div className="py-12 text-center text-gray-400 text-sm">
+              Aucune facture trouvée
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">SDR</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Mois</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">N° Facture</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Montant</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {invoices.map((inv) => {
+                    const cfg = INVOICE_STATUS_CFG[inv.status] ?? INVOICE_STATUS_CFG.deposee;
+                    return (
+                      <tr key={inv.id} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-xs shrink-0">
+                              {inv.user_name[0]?.toUpperCase()}
+                            </div>
+                            <span className="text-sm text-gray-800 font-medium">{inv.user_name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-sm text-gray-700">{monthLabel(inv.month)}</td>
+                        <td className="px-4 py-3.5 text-sm text-gray-500">{inv.invoice_number || "—"}</td>
+                        <td className="px-4 py-3.5 text-sm font-medium text-gray-900 text-right">
+                          {inv.amount ? `${Number(inv.amount).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €` : "—"}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="relative">
+                            <select
+                              value={inv.status}
+                              disabled={updatingInv === inv.id}
+                              onChange={(e) => updateInvoiceStatus(inv.id, e.target.value as InvoiceStatus)}
+                              className={`appearance-none pl-2 pr-6 py-1 rounded-full text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500 ${cfg.color} ${cfg.bg}`}>
+                              {Object.entries(INVOICE_STATUS_CFG).map(([k, v]) => (
+                                <option key={k} value={k}>{v.label}</option>
+                              ))}
+                            </select>
+                            {updatingInv === inv.id && <Loader2 className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 animate-spin text-gray-400" />}
+                          </div>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <button onClick={() => downloadInvoice(inv.id, inv.file_name)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-all" title="Télécharger">
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

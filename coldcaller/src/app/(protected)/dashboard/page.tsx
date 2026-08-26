@@ -82,6 +82,8 @@ export default function DashboardPage() {
   const [noteInput,    setNoteInput]    = useState("");
   const [saving,       setSaving]       = useState(false);
   const [showAddForm,  setShowAddForm]  = useState(false);
+  const [filterSdr,    setFilterSdr]    = useState<string>("all");
+  const [users,        setUsers]        = useState<Array<{ id: string; name: string; active: boolean }>>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Panneaux redimensionnables ───────────────────────────────────────────────
@@ -113,14 +115,25 @@ export default function DashboardPage() {
     document.addEventListener("mouseup",   upHandler.current);
   }
 
+  // ── Chargement utilisateurs (pour filtre SDR et attribution) ─────────────────
+  useEffect(() => {
+    fetch("/api/admin/users")
+      .then((r) => r.ok ? r.json() : { users: [] })
+      .then((d: { users: Array<{ id: string; name: string; active: boolean }> }) =>
+        setUsers(d.users?.filter((u) => u.active) ?? []))
+      .catch(() => {});
+  }, []);
+
   // ── Chargement ──────────────────────────────────────────────────────────────
-  const loadLeads = useCallback(async (mode?: "pipeline" | "appels", csFilter?: string) => {
+  const loadLeads = useCallback(async (mode?: "pipeline" | "appels", csFilter?: string, sdrId?: string) => {
     try {
       const currentMode = mode ?? "pipeline";
       const currentCs   = csFilter ?? "all";
-      const url = currentMode === "appels" && currentCs !== "all"
-        ? `/api/leads?callStatus=${currentCs}`
-        : "/api/leads";
+      const currentSdr  = sdrId ?? "all";
+      const p           = new URLSearchParams();
+      if (currentMode === "appels" && currentCs !== "all") p.set("callStatus", currentCs);
+      if (currentSdr !== "all") p.set("assignedToId", currentSdr);
+      const url  = `/api/leads?${p}`;
       const res  = await fetch(url);
       const json = await res.json();
       setLeads(json.leads ?? []);
@@ -129,7 +142,7 @@ export default function DashboardPage() {
     }
   }, []);
 
-  useEffect(() => { loadLeads(viewMode, callStatusFilter); }, [loadLeads, viewMode, callStatusFilter]);
+  useEffect(() => { loadLeads(viewMode, callStatusFilter, filterSdr); }, [loadLeads, viewMode, callStatusFilter, filterSdr]);
 
   // ── Filtrage + pagination ────────────────────────────────────────────────────
   const filtered = leads.filter((l) => {
@@ -193,6 +206,17 @@ export default function DashboardPage() {
     await fetch(`/api/leads/${id}`, { method: "DELETE" });
     setLeads((prev) => prev.filter((l) => l.id !== id));
     if (selected?.id === id) setSelected(null);
+  }
+
+  async function assignLead(id: string, userId: string, userName: string) {
+    const res  = await fetch(`/api/leads/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ assignedToId: userId || null, assignedTo: userName || null }),
+    });
+    const json = await res.json();
+    setLeads((prev) => prev.map((l) => l.id === id ? json.lead : l));
+    setSelected((prev) => prev?.id === id ? json.lead : prev);
   }
 
   // ── Export CSV ───────────────────────────────────────────────────────────────
@@ -363,6 +387,42 @@ export default function DashboardPage() {
                   </button>
                 ))}
               </div>
+            </>
+          )}
+
+          {/* Filtre SDR */}
+          {users.length > 0 && (
+            <>
+              <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wider mb-2 px-2 pt-3">SDR attribué</p>
+              <button
+                onClick={() => setFilterSdr("all")}
+                className={cn(
+                  "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all",
+                  filterSdr === "all"
+                    ? "bg-brand-50 text-brand-700 font-semibold border border-brand-200"
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                )}>
+                <span>Tous les SDR</span>
+                <span className={cn("text-[10px] font-mono", filterSdr === "all" ? "text-brand-500" : "text-gray-300")}>{leads.length}</span>
+              </button>
+              {users.map((u) => (
+                <button
+                  key={u.id}
+                  onClick={() => setFilterSdr(u.id)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all",
+                    filterSdr === u.id
+                      ? "bg-violet-50 text-violet-700 font-semibold border border-violet-200"
+                      : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                  )}>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-violet-200 text-violet-700 text-[9px] font-bold flex items-center justify-center shrink-0">
+                      {u.name[0]?.toUpperCase()}
+                    </span>
+                    {u.name.split(" ")[0]}
+                  </span>
+                </button>
+              ))}
             </>
           )}
         </div>
@@ -669,6 +729,29 @@ export default function DashboardPage() {
                   {selected.website}
                 </a>
               </BigContactCard>
+            )}
+
+            {/* ── Attribution SDR ── */}
+            {users.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">SDR attribué</p>
+                <div className="relative">
+                  <select
+                    value={selected.assignedToId ?? ""}
+                    onChange={(e) => {
+                      const uid   = e.target.value;
+                      const uname = users.find((u) => u.id === uid)?.name ?? "";
+                      assignLead(selected.id, uid, uname);
+                    }}
+                    className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all">
+                    <option value="">— Non attribué —</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                  <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none rotate-90" />
+                </div>
+              </div>
             )}
 
             {/* ── Notes ── */}

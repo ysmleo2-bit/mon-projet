@@ -3,15 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Phone, BarChart2, ChevronRight, Target, FileText, Shield, LogOut, User } from "lucide-react";
+import { Phone, BarChart2, ChevronRight, Target, FileText, Shield, LogOut, User, TrendingUp, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CurrentUser { id: string; email: string; name: string; role: string }
 
 const NAV = [
-  { href: "/prospection", label: "Prospection B2B", icon: Target },
-  { href: "/dashboard",   label: "CRM",             icon: BarChart2 },
-  { href: "/scripts",     label: "Scripts",          icon: FileText },
+  { href: "/prospection",  label: "Prospection B2B", icon: Target     },
+  { href: "/dashboard",    label: "CRM",              icon: BarChart2  },
+  { href: "/performance",  label: "Performance",      icon: TrendingUp },
+  { href: "/factures",     label: "Mes factures",     icon: Receipt    },
+  { href: "/scripts",      label: "Scripts",          icon: FileText   },
 ];
 
 // Bandeau de conformité : indique si on est dans le créneau légal d'appel
