@@ -1,12 +1,13 @@
 /**
- * Layout protégé — s'exécute côté serveur (Node.js, pas Edge)
- * Vérifie le cookie cc_session et redirige vers /login si invalide.
- * Aucune dépendance Edge — fonctionne même si le middleware est inactif.
+ * Layout protégé — Server Component, vérifie le cookie directement.
+ * Force-dynamic : jamais mis en cache, toujours re-vérifié à chaque requête.
  */
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifyToken } from "@/lib/auth-edge";
+
+export const dynamic = "force-dynamic";
 
 export default async function ProtectedLayout({
   children,
