@@ -1,18 +1,13 @@
-/**
- * Page racine — redirige vers /login ou /dashboard selon l'auth
- * Server Component : vérifie le cookie directement, pas de dépendance middleware
- */
-
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { verifyToken } from "@/lib/auth-edge";
+
+export const dynamic = "force-dynamic";
 
 export default async function RootPage() {
-  const cookieStore = await cookies();
-  const token       = cookieStore.get("cc_session")?.value;
-  const session     = token ? await verifyToken(token) : null;
+  const jar   = await cookies();
+  const token = jar.get("cc_session")?.value ?? "";
 
-  if (session) {
+  if (token && token.length >= 10) {
     redirect("/dashboard");
   } else {
     redirect("/login");

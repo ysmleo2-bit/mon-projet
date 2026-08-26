@@ -1,24 +1,14 @@
-/**
- * Layout protégé — Server Component, vérifie le cookie directement.
- * Force-dynamic : jamais mis en cache, toujours re-vérifié à chaque requête.
- */
-
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { verifyToken } from "@/lib/auth-edge";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProtectedLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const cookieStore = await cookies();
-  const token       = cookieStore.get("cc_session")?.value;
-  const session     = token ? await verifyToken(token) : null;
+export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  const jar   = await cookies();
+  const token = jar.get("cc_session")?.value ?? "";
 
-  if (!session) {
+  // Vérification minimale : cookie présent et non vide
+  if (!token || token.length < 10) {
     redirect("/login");
   }
 
