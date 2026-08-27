@@ -107,21 +107,89 @@ export async function dbGetProspect(id: string): Promise<Prospect | undefined> {
   }
 }
 
+/** Récupère plusieurs prospects par leurs IDs en une seule requête. */
+export async function dbGetProspectsByIds(ids: string[]): Promise<Map<string, Prospect>> {
+  const map = new Map<string, Prospect>();
+  if (!ids.length) return map;
+  if (USE_PG) {
+    await ensureTable();
+    // Utilise l'opérateur = ANY() sur la clé primaire (indexed)
+    const result = await pgQuery(
+      `SELECT data FROM prospects WHERE id = ANY($1::text[])`,
+      [ids]
+    );
+    for (const row of result.rows) {
+      const p = (row as { data: Prospect }).data;
+      map.set(p.id, p);
+    }
+  } else {
+    for (const p of readJson()) {
+      if (ids.includes(p.id)) map.set(p.id, p);
+    }
+  }
+  return map;
+}
+
 export async function dbUpsertProspects(incoming: Prospect[], _userId?: string): Promise<void> {
   if (USE_PG) {
     await ensureTable();
     for (const p of incoming) {
-      // CRM partagé — assignedToId est dans le JSONB, pas de filtre user_id sur la table
+      // MERGE intelligent : on insère les données SIRENE fraîches MAIS on préserve
+      // tous les champs commerciaux déjà saisis (notes, statut appel, SDR, actions…).
+      // jsonb_strip_nulls retire les clés null pour ne pas écraser avec null.
       await pgQuery(
-        `INSERT INTO prospects (id, data) VALUES ($1, $2)
-         ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
+        `INSERT INTO prospects (id, data) VALUES ($1, $2::jsonb)
+         ON CONFLICT (id) DO UPDATE SET
+           data = $2::jsonb || jsonb_strip_nulls(jsonb_build_object(
+             'notesCommercial',   NULLIF(prospects.data->>'notesCommercial', ''),
+             'problematique',     NULLIF(prospects.data->>'problematique', ''),
+             'statutAppel',       NULLIF(NULLIF(prospects.data->>'statutAppel', 'non_appele'), ''),
+             'statut',            NULLIF(NULLIF(prospects.data->>'statut', 'nouveau'), ''),
+             'dateAppel',         prospects.data->>'dateAppel',
+             'actions',           prospects.data->'actions',
+             'assignedToId',      prospects.data->>'assignedToId',
+             'assignedTo',        prospects.data->>'assignedTo',
+             'danscrm',           NULLIF(prospects.data->>'danscrm', 'false')::boolean,
+             'dateCrm',           prospects.data->>'dateCrm',
+             'emailDirigeant',    NULLIF(prospects.data->>'emailDirigeant', ''),
+             'emailSource',       NULLIF(prospects.data->>'emailSource', ''),
+             'linkedinDirigeant', NULLIF(prospects.data->>'linkedinDirigeant', ''),
+             'fonctionDirigeant', NULLIF(prospects.data->>'fonctionDirigeant', ''),
+             'emailObjet',        NULLIF(prospects.data->>'emailObjet', ''),
+             'emailCorps',        NULLIF(prospects.data->>'emailCorps', ''),
+             'scoreQualif',       NULLIF(prospects.data->>'scoreQualif', ''),
+             'lastEmailSentAt',   prospects.data->>'lastEmailSentAt',
+             'telephonePro',      NULLIF(prospects.data->>'telephonePro', '')
+           )),
+           updated_at = NOW()`,
         [p.id, JSON.stringify(p)]
       );
     }
   } else {
+    // JSON local : merge field-by-field, commercial fields win over SIRENE
     const existing = readJson();
     const map      = new Map(existing.map((p) => [p.id, p]));
-    incoming.forEach((p) => map.set(p.id, { ...map.get(p.id), ...p }));
+    incoming.forEach((p) => {
+      const ex = map.get(p.id);
+      if (!ex) { map.set(p.id, p); return; }
+      // Preserve commercial fields from existing, take SIRENE data for company info
+      map.set(p.id, {
+        ...p,
+        notesCommercial:   ex.notesCommercial  || p.notesCommercial,
+        problematique:     ex.problematique    || p.problematique,
+        statutAppel:       (ex.statutAppel && ex.statutAppel !== "non_appele") ? ex.statutAppel : p.statutAppel,
+        statut:            (ex.statut && ex.statut !== "nouveau") ? ex.statut : p.statut,
+        dateAppel:         ex.dateAppel        || p.dateAppel,
+        actions:           ex.actions?.length  ? ex.actions : p.actions,
+        assignedToId:      ex.assignedToId     || p.assignedToId,
+        assignedTo:        ex.assignedTo       || p.assignedTo,
+        danscrm:           ex.danscrm          ?? p.danscrm,
+        dateCrm:           ex.dateCrm          || p.dateCrm,
+        emailDirigeant:    ex.emailDirigeant   || p.emailDirigeant,
+        linkedinDirigeant: ex.linkedinDirigeant || p.linkedinDirigeant,
+        telephonePro:      ex.telephonePro     || p.telephonePro,
+      });
+    });
     writeJson(Array.from(map.values()));
   }
 }

@@ -859,16 +859,31 @@ export default function ProspectionPage() {
                 </thead>
                 <tbody>
                   {prospects.map((p) => {
-                    const isEnriching = enriching.has(p.id);
+                    const isEnriching  = enriching.has(p.id);
+                    const isDoNotCall  = p.statut === "pas_interesse";
+                    const hasNotes     = !!(p.notesCommercial?.trim());
+                    const selectRow    = () => {
+                      // Sauvegarder les notes en cours avant de changer de prospect
+                      if (selected && notesDirty) saveNotes();
+                      setSelected(p);
+                    };
                     return (
-                      <tr key={p.id} onClick={() => setSelected(p)}
+                      <tr key={p.id} onClick={selectRow}
                         className={cn(
                           "border-b border-gray-100 hover:bg-blue-50/40 cursor-pointer transition-colors bg-white",
-                          selected?.id === p.id && "bg-brand-50 border-l-2 border-l-brand-500"
+                          selected?.id === p.id && "bg-brand-50 border-l-2 border-l-brand-500",
+                          isDoNotCall && "opacity-60"
                         )}>
                         <td className="px-4 py-2.5">
-                          <div className="font-semibold text-gray-900 truncate max-w-[160px]">{p.nom}</div>
-                          <div className="text-gray-400 text-[10px] mt-0.5">{p.ville} · {p.codeNaf}</div>
+                          <div className={cn("font-semibold truncate max-w-[160px] flex items-center gap-1",
+                            isDoNotCall ? "text-red-400 line-through" : "text-gray-900")}>
+                            {isDoNotCall && <span title="Ne plus contacter" className="text-red-400 shrink-0">🚫</span>}
+                            {p.nom}
+                          </div>
+                          <div className="text-gray-400 text-[10px] mt-0.5 flex items-center gap-1.5">
+                            {p.ville} · {p.codeNaf}
+                            {hasNotes && <span className="text-amber-500" title={p.notesCommercial}>📝</span>}
+                          </div>
                         </td>
                         <td className="px-4 py-2.5 whitespace-nowrap">
                           {p.dirigeantPrincipal
@@ -953,6 +968,17 @@ export default function ProspectionPage() {
         {/* ── Panneau détail ── */}
         {selected && (
           <div className="w-[460px] shrink-0 border-l border-gray-200 flex flex-col bg-white overflow-hidden">
+
+            {/* Bannière "Ne plus contacter" */}
+            {selected.statut === "pas_interesse" && (
+              <div className="shrink-0 px-4 py-2 bg-red-50 border-b border-red-200 flex items-center gap-2">
+                <span className="text-base">🚫</span>
+                <div>
+                  <p className="text-xs font-semibold text-red-700">Ne plus contacter</p>
+                  <p className="text-[10px] text-red-500">Ce prospect a indiqué ne pas être intéressé.</p>
+                </div>
+              </div>
+            )}
 
             {/* Header sticky */}
             <div className="shrink-0 px-5 py-4 border-b border-gray-200 bg-white">

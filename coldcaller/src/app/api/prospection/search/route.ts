@@ -239,17 +239,22 @@ export async function POST(req: NextRequest) {
       return p;
     });
 
-    // Sauvegarder en DB (fire-and-forget si erreur DB)
+    // Sauvegarder en DB ET récupérer les données fusionnées (avec notes/statuts existants)
+    let mergedProspects = prospects;
     try {
-      const { dbUpsertProspects } = await import("@/lib/db-prospection");
+      const { dbUpsertProspects, dbGetProspectsByIds } = await import("@/lib/db-prospection");
       await dbUpsertProspects(prospects);
+      // Re-lire depuis DB pour inclure les notes, statuts d'appel, SDR, etc.
+      // conservés via le merge intelligent de dbUpsertProspects
+      const dbMap = await dbGetProspectsByIds(prospects.map((p) => p.id));
+      mergedProspects = prospects.map((p) => dbMap.get(p.id) ?? p);
     } catch (dbErr) {
       console.warn("[prospection/search] DB save skipped:", dbErr);
     }
 
     return NextResponse.json({
-      prospects,
-      total: prospects.length,
+      prospects: mergedProspects,
+      total: mergedProspects.length,
       raw:   unique.length,
     });
   } catch (err) {
