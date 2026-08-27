@@ -5,6 +5,7 @@
 <div class="page-center">
   <div class="card results-card">
 
+    <!-- ── En-tête compact ───────────────────────────────── -->
     <div class="results-header">
       <div class="results-score-circle" style="--score-color: {{ result.scores.global | score_color }}">
         <span class="score-number">{{ result.scores.global }}</span>
@@ -12,7 +13,7 @@
       </div>
       <div class="results-meta">
         <h2>{{ result.scores.global | score_label }}</h2>
-        {% set traffic_map = {'b2c': '👤 B2C', 'b2b': '🏢 B2B'} %}
+        {% set traffic_map  = {'b2c': '👤 B2C', 'b2b': '🏢 B2B'} %}
         {% set awareness_map = {'chaud': '🔥 Chaud', 'tiede': '🌡️ Tiède', 'froid': '❄️ Froid'} %}
         <p>{{ result.eleve_nom }} · {{ result.niche|capitalize }} · {{ niv_info.emoji }} {{ niv_info.label }} · {{ awareness_map.get(result.awareness, '🔥 Chaud') }} · {{ traffic_map.get(result.traffic, '👤 B2C') }}</p>
         <div class="results-rdv-row">
@@ -20,85 +21,209 @@
             {% if result.rdv_pose %}✅ RDV posé{% else %}❌ Pas de RDV posé{% endif %}
           </p>
           <p class="results-rdv {% if result.prospect_qualifie %}rdv-ok{% else %}rdv-ko{% endif %}">
-            {% if result.prospect_qualifie %}✅ Prospect qualifié{% else %}❌ Prospect non qualifié{% endif %}
+            {% if result.prospect_qualifie %}✅ Prospect qualifié{% else %}❌ Non qualifié{% endif %}
+          </p>
+          <p class="results-rdv stat-neutral">
+            🕐 {{ result.duree_minutes }} min · {{ result.nb_messages_eleve }} messages
           </p>
         </div>
       </div>
     </div>
 
-    <!-- Barres de scores détaillés -->
-    <div class="scores-grid">
-      {% set criteres = [
-        ('accroche',           'Accroche',           '🎣'),
-        ('gestion_objections', 'Gestion objections', '🛡️'),
-        ('qualification',      'Qualification',      '🔍'),
-        ('rdv',                'Prise de RDV',       '📅'),
-        ('naturel',            'Naturel / Flow',     '💬'),
-      ] %}
-      {% for key, label, icon in criteres %}
-      {% set val = result.scores[key] %}
-      <div class="score-row">
-        <div class="score-row-label">{{ icon }} {{ label }}</div>
-        <div class="score-bar-wrap">
-          <div class="score-bar-fill" style="width:{{ val * 10 }}%; background:{{ val | score_color }}"></div>
-        </div>
-        <div class="score-row-val">{{ val }}/10</div>
-      </div>
-      {% endfor %}
-    </div>
-
-    <!-- Feedback -->
-    <div class="feedback-cols">
-      {% if result.points_forts %}
-      <div class="feedback-block feedback-good">
-        <div class="feedback-title">✅ Points forts</div>
-        <ul>
-          {% for p in result.points_forts %}
-          <li>{{ p }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-      {% endif %}
-
-      {% if result.points_ameliorer %}
-      <div class="feedback-block feedback-improve">
-        <div class="feedback-title">📈 À améliorer</div>
-        <ul>
-          {% for p in result.points_ameliorer %}
-          <li>{{ p }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-      {% endif %}
-    </div>
-
-    {% if result.conseil_principal %}
-    <div class="conseil-box">
-      <div class="conseil-title">💡 Conseil principal</div>
-      <p>{{ result.conseil_principal }}</p>
+    <!-- ── Verdict final ─────────────────────────────────── -->
+    {% if result.verdict_final %}
+    <div class="verdict-banner">
+      <span class="verdict-icon">💬</span>
+      <span class="verdict-text">{{ result.verdict_final }}</span>
     </div>
     {% endif %}
 
-    <!-- Statistiques de session -->
-    <div class="session-stats">
-      <div class="stat-item">
-        <div class="stat-val">{{ result.duree_minutes }} min</div>
-        <div class="stat-key">Durée</div>
+    <!-- ── Analyse du coach ──────────────────────────────── -->
+    {% if result.analyse_globale %}
+    <div class="analyse-globale-box">
+      <div class="analyse-globale-label">🧠 Ce qui s'est passé</div>
+      <p class="analyse-globale-text">{{ result.analyse_globale }}</p>
+      {% set ds = result.diagnostic_style %}
+      {% if ds %}
+      <div class="diag-chips">
+        {% set longueur_map = {'adaptes': ('✅ Messages adaptés', 'chip-ok'), 'trop_longs': ('⚠️ Messages trop longs', 'chip-warn'), 'trop_courts': ('⚠️ Messages trop courts', 'chip-warn')} %}
+        {% set posture_map  = {'equilibre': ('✅ Posture équilibrée', 'chip-ok'), 'trop_commercial': ('⚠️ Trop commercial', 'chip-warn'), 'trop_passif': ('⚠️ Trop passif', 'chip-warn')} %}
+        {% set rythme_map   = {'bon': ('✅ Bon rythme', 'chip-ok'), 'trop_rapide': ('⚠️ Rythme trop rapide', 'chip-warn'), 'trop_lent': ('⚠️ Rythme trop lent', 'chip-warn')} %}
+        {% set lbl, cls = longueur_map.get(ds.longueur_messages, ('—', 'chip-ok')) %}
+        <span class="diag-chip {{ cls }}">{{ lbl }}</span>
+        {% set lbl, cls = posture_map.get(ds.posture, ('—', 'chip-ok')) %}
+        <span class="diag-chip {{ cls }}">{{ lbl }}</span>
+        {% set lbl, cls = rythme_map.get(ds.rythme, ('—', 'chip-ok')) %}
+        <span class="diag-chip {{ cls }}">{{ lbl }}</span>
       </div>
-      <div class="stat-item">
-        <div class="stat-val">{{ result.nb_messages_eleve }}</div>
-        <div class="stat-key">Tes messages</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ── Analyse par phase ─────────────────────────────── -->
+    {% if result.analyse_par_phase %}
+    <div class="phases-section">
+      <div class="phases-title">🗂️ Analyse phase par phase</div>
+      <div class="phases-list">
+        {% for ph in result.analyse_par_phase %}
+        <div class="phase-card phase-{{ ph.statut }}">
+          <div class="phase-header">
+            <span class="phase-emoji">{{ ph.emoji }}</span>
+            <span class="phase-name">{{ ph.phase }}</span>
+            <span class="phase-badge phase-badge-{{ ph.statut }}">
+              {% if ph.statut == 'bon' %}✅ Bon{% elif ph.statut == 'moyen' %}⚠️ Moyen{% else %}❌ À revoir{% endif %}
+            </span>
+          </div>
+          <p class="phase-observation">{{ ph.observation }}</p>
+          {% if ph.citation %}
+          <div class="phase-citation">"{{ ph.citation }}"</div>
+          {% endif %}
+          {% if ph.alternative %}
+          <div class="phase-alternative">
+            <span class="phase-alt-label">Tu aurais pu dire :</span>
+            <span class="phase-alt-text">{{ ph.alternative }}</span>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
       </div>
-      <div class="stat-item">
-        <div class="stat-val">{{ result.niveau_difficulte or '—' }}/4</div>
-        <div class="stat-key">Difficulté</div>
+    </div>
+    {% endif %}
+
+    <!-- ── Plan d'amélioration (section principale) ──────── -->
+    {% if result.conseils_detailles %}
+    <div class="plan-section">
+      <div class="plan-section-title">📋 Ce que tu dois travailler</div>
+      <div class="plan-items">
+        {% for c in result.conseils_detailles %}
+        <div class="plan-item">
+          <div class="plan-num">{{ loop.index }}</div>
+          <div class="plan-body">
+            <div class="plan-critere">{{ c.critere }}</div>
+            <p class="plan-conseil">{{ c.conseil }}</p>
+            <div class="plan-exemple-box">
+              <span class="plan-exemple-label">💬 Tu aurais pu écrire :</span>
+              <div class="plan-exemple-msg">{{ c.exemple }}</div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
       </div>
+    </div>
+    {% elif result.points_ameliorer %}
+    <div class="plan-section">
+      <div class="plan-section-title">📋 Ce que tu dois travailler</div>
+      <ul class="plan-simple-list">
+        {% for p in result.points_ameliorer %}<li>{{ p }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <!-- ── Moments clés ──────────────────────────────────── -->
+    {% if result.moments_cles %}
+    <div class="moments-cles-section">
+      <div class="moments-cles-title">⚡ Moments clés</div>
+      {% for m in result.moments_cles %}
+      <div class="moment-card moment-{{ m.type }}">
+        <div class="moment-icon">{% if m.type == 'positif' %}✅{% else %}⚠️{% endif %}</div>
+        <div class="moment-content">
+          <p class="moment-description">{{ m.description }}</p>
+          {% if m.citation %}
+          <div class="moment-citation">"{{ m.citation }}"</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ── Points forts + Scores côte à côte ────────────── -->
+    <div class="results-bottom-grid">
+
+      {% if result.points_forts %}
+      <div class="feedback-block feedback-good">
+        <div class="feedback-title">✅ Ce qui a bien marché</div>
+        <ul>
+          {% for p in result.points_forts %}<li>{{ p }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <div class="scores-detail-block">
+        <div class="feedback-title">📊 Scores par critère</div>
+        {% set criteres = [
+          ('accroche',           'Accroche',           '🎣'),
+          ('gestion_objections', 'Gestion objections', '🛡️'),
+          ('qualification',      'Qualification',      '🔍'),
+          ('rdv',                'Prise de RDV',       '📅'),
+          ('naturel',            'Naturel / Flow',     '💬'),
+        ] %}
+        {% set sc = result.score_commentaire or {} %}
+        {% for key, label, icon in criteres %}
+        {% set val = result.scores[key] %}
+        <div class="score-row score-row-sm">
+          <div class="score-row-label">{{ icon }} {{ label }}</div>
+          <div class="score-bar-wrap">
+            <div class="score-bar-fill" style="width:{{ val * 10 }}%; background:{{ (val * 10) | score_color }}"></div>
+          </div>
+          <div class="score-row-val">{{ val }}/10</div>
+        </div>
+        {% if sc.get(key) %}
+        <div class="score-comment">{{ sc[key] }}</div>
+        {% endif %}
+        {% endfor %}
+      </div>
+
     </div>
 
+    <!-- ── Replay annoté ────────────────────────────────── -->
+    {% if result.conversation %}
+    <div class="replay-section">
+      <div class="replay-section-title">🎬 Replay annoté de ta conversation</div>
+      {% set annotations = {} %}
+      {% if result.annotations_messages %}
+        {% set setter_idx = namespace(val=0) %}
+        {% for ann in result.annotations_messages %}
+          {% set _ = annotations.update({ann.index: ann}) %}
+        {% endfor %}
+      {% endif %}
+      {% set setter_counter = namespace(val=0) %}
+      <div class="replay-conv">
+        {% for msg in result.conversation %}
+          {% if msg.role == 'eleve' %}
+            {% set setter_counter.val = setter_counter.val + 1 %}
+            {% set ann = annotations.get(setter_counter.val) %}
+            <div class="replay-row replay-setter">
+              <div class="replay-bubble-wrap">
+                <div class="replay-bubble replay-bubble-setter">{{ msg.message }}</div>
+                <div class="replay-time-label">Toi · {{ msg.heure }}</div>
+              </div>
+              {% if ann %}
+              <div class="replay-annotation replay-ann-{{ ann.note_type }}">
+                <span class="replay-ann-badge">
+                  {% if ann.note_type == 'bon' %}✅{% elif ann.note_type == 'moyen' %}⚠️{% else %}❌{% endif %}
+                </span>
+                <span class="replay-ann-text">{{ ann.commentaire }}</span>
+              </div>
+              {% endif %}
+            </div>
+          {% else %}
+            <div class="replay-row replay-prospect">
+              <div class="replay-bubble replay-bubble-prospect">{{ msg.message }}</div>
+              <div class="replay-time-label">Prospect · {{ msg.heure }}</div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Actions ───────────────────────────────────────── -->
     <div class="results-actions">
       <a href="{{ url_for('index') }}" class="btn btn-primary">Nouvelle session →</a>
-      <a href="{{ url_for('coach') }}" class="btn btn-ghost">Tableau de bord coach</a>
+      <a href="{{ url_for('student_dashboard') }}" class="btn btn-ghost">Mon tableau de bord</a>
     </div>
+
   </div>
 </div>
 {% endblock %}

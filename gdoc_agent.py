@@ -207,8 +207,12 @@ def run_once():
 
 def run_loop():
     log.info(f"Agent GDoc démarré — ronde toutes les {CHECK_INTERVAL//60} min")
-    run_once()  # premier passage immédiat au démarrage
+    time.sleep(60)  # délai initial pour laisser gunicorn démarrer proprement
     while True:
+        try:
+            run_once()
+        except Exception as e:
+            log.error(f"Agent loop error: {e}")
         time.sleep(CHECK_INTERVAL)
         try:
             run_once()

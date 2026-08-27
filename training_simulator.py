@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import sys
+import threading
 from datetime import datetime, date
 from dotenv import load_dotenv
 
@@ -25,6 +26,9 @@ DATA_DIR       = "/data" if os.path.isdir("/data") else BASE_DIR
 
 STUDENTS_FILE  = os.path.join(BASE_DIR, "students_config.json")
 SIM_FILE       = os.path.join(DATA_DIR, "sim_sessions.json")
+
+# Verrou global pour éviter les corruptions d'écriture concurrente
+_SIM_LOCK = threading.Lock()
 
 SEP  = "=" * 68
 SEP2 = "-" * 68
@@ -479,10 +483,26 @@ def load_sim_sessions() -> list[dict]:
 
 
 def save_sim_session(session: dict) -> None:
-    sessions = load_sim_sessions()
-    sessions.append(session)
-    with open(SIM_FILE, "w", encoding="utf-8") as f:
-        json.dump(sessions, f, ensure_ascii=False, indent=2)
+    with _SIM_LOCK:
+        sessions = load_sim_sessions()
+        sessions.append(session)
+        with open(SIM_FILE, "w", encoding="utf-8") as f:
+            json.dump(sessions, f, ensure_ascii=False, indent=2)
+
+
+def update_sim_session(session_id: str, updated: dict) -> None:
+    with _SIM_LOCK:
+        sessions = load_sim_sessions()
+        found = False
+        for i, s in enumerate(sessions):
+            if s["id"] == session_id:
+                sessions[i] = updated
+                found = True
+                break
+        if not found:
+            sessions.append(updated)
+        with open(SIM_FILE, "w", encoding="utf-8") as f:
+            json.dump(sessions, f, ensure_ascii=False, indent=2)
 
 
 def sim_stats_eleve(sim_sessions: list[dict], eleve_id: str) -> dict:
@@ -601,6 +621,24 @@ RÈGLE DU PIVOT — C'EST LE CŒUR DE LA SIMULATION :
 - S'il repart de TA situation, de CE QUE TU AS DIT → tu restes
 {pivot_rules[niveau]}
 
+⛔ RÈGLE N°1 — INTERDICTION ABSOLUE DE RÉPÉTER :
+Avant CHAQUE réponse, relis l'historique de la conversation.
+- Si tu as déjà posé une question et que la personne a répondu → cette question est DÉFINITIVEMENT FERMÉE. Tu ne la poses PLUS, sous aucune forme, même reformulée.
+- Si tu as demandé le prix / si c'est payant → et qu'on t'a répondu → sujet CLOS. Avance.
+- Si tu as demandé les dispo ou le créneau → et qu'on t'a répondu → sujet CLOS.
+- Si tu as posé une question sur ta situation (objectif, blocage, etc.) et qu'on t'a posé cette même question → ne dis pas que tu l'as déjà dit, réponds juste autrement ou avance.
+
+EXEMPLES INTERDITS (fautes graves) :
+❌ "c'est payant ?" alors qu'on t'a déjà dit le prix
+❌ "tu fais quoi exactement ?" alors que la personne vient de l'expliquer
+❌ "t'as quel objectif ?" alors que tu l'as déjà dit toi-même
+❌ Reposer une objection déjà traitée
+
+COMPORTEMENT CORRECT :
+✅ Si une question est traitée → tu l'abandonnes et tu sors ta prochaine objection OU tu avances vers le RDV
+✅ Tes objections sortent UNE PAR UNE dans l'ordre logique. Jamais deux à la fois.
+✅ Une vraie personne écoute et retient. Tu fais pareil.
+
 TU ES UN ENTREPRENEUR OCCUPÉ :
 - Messages très courts (1-2 phrases max). Parfois juste 2-3 mots.
 - Si on t'envoie un message de 4+ lignes → tu réponds "ok" ou tu ignores
@@ -708,10 +746,10 @@ def _build_b2c_prompt(persona: dict, niche: str, niveau: int, awareness: str = "
     }
 
     rdv_rules = {
-        1: "Si la personne propose un appel ou un RDV de façon naturelle, tu demandes les dispo et le prix. Si elle répond bien (lien de résa, prix en appel), tu prends le RDV.",
-        2: "Tu poses d'abord la question du prix. Si on te répond que ça se discute en appel et que la proposition est concrète (ex: 45 min pour un plan personnalisé), tu peux accepter — mais t'hésites un peu avant.",
-        3: "Tu poses beaucoup de questions avant d'accepter quoi que ce soit. Tu veux comprendre exactement ce que tu vas obtenir avant de t'engager sur un appel. T'acceptes seulement si la personne a vraiment bien géré tes doutes.",
-        4: "Tu esquives ou tu dis non à la première proposition de RDV. Tu peux accepter seulement si la conversation a été vraiment excellente depuis le début et que ton scepticisme a été traité avec précision.",
+        1: "Si la personne propose un appel, tu demandes les dispo et le prix. Si elle répond bien, tu prends le RDV. MAIS si la personne ne t'a JAMAIS demandé si tu cherchais à régler ça maintenant ou plus tard → tu acceptes en disant 'oui pourquoi pas, c'est plutôt un projet que j'ai en tête pour dans quelques mois' — signal naturel que le timing n'a pas été vérifié.",
+        2: "Tu poses d'abord la question du prix. Tu peux accepter si la proposition est concrète. MAIS si le timing n'a jamais été abordé → avant d'accepter, tu glisses 'je cherchais juste des infos pour l'instant, c'est pas super urgent pour moi'.",
+        3: "Tu poses beaucoup de questions avant d'accepter. Tu veux comprendre exactement ce que tu obtiens. Si timing et décision n'ont jamais été vérifiés → tu dis spontanément 'faut que j'en parle à [quelqu'un] avant de m'engager sur quoi que ce soit' ou 'j'ai pas d'urgence là'. T'acceptes seulement si le setter a vraiment bien géré tous tes doutes.",
+        4: "Tu esquives ou tu dis non à la première proposition. Tu acceptes seulement si la conversation était vraiment excellente. Si timing jamais vérifié → 'c'est quoi l'objectif exactement de ce call, moi j'ai pas de besoin urgent là'. Si décision jamais vérifiée → 'de toute façon faudrait que je vois ça avec ma femme/mon associé avant'.",
     }
 
     awareness_notes = {
@@ -741,12 +779,23 @@ RÉACTION À L'ACCROCHE (NIVEAU {niv['label'].upper()}) :
 CHALEUR ET TONALITÉ (NIVEAU {niv['label'].upper()}) :
 {warmth_rules[niveau]}
 
-RÈGLE ABSOLUE — UNE OBJECTION TRAITÉE EST PASSÉE :
-- Quand tu as posé une question et qu'on t'a répondu, tu considères cette question FERMÉE. Tu ne la poses PLUS.
-- En particulier : si tu as demandé si c'est payant/gratuit et qu'on t'a répondu → tu n'y reviens PAS, même pour confirmer.
-- Si tu as demandé le prix et qu'on t'a dit que ça se voit à l'appel → tu l'acceptes et tu avances.
-- Répéter une question à laquelle on vient de répondre est irréaliste. Une vraie personne écoute.
-- Tes objections sortent dans l'ordre logique de la conversation, une par une. Dès qu'une est traitée correctement, tu passes à la suivante ou tu acceptes le RDV.
+⛔ RÈGLE N°1 — INTERDICTION ABSOLUE DE RÉPÉTER :
+Avant CHAQUE réponse, relis l'historique de la conversation.
+- Si tu as déjà posé une question et que la personne a répondu → cette question est DÉFINITIVEMENT FERMÉE. Tu ne la poses PLUS, sous aucune forme, même reformulée.
+- Si tu as demandé le prix / si c'est payant → et qu'on t'a répondu → sujet CLOS. Avance.
+- Si tu as demandé les dispo ou le créneau → et qu'on t'a répondu → sujet CLOS.
+- Si tu as posé une question sur ta situation (objectif, blocage, etc.) et qu'on t'a posé cette même question → ne dis pas que tu l'as déjà dit, réponds juste autrement ou avance.
+
+EXEMPLES INTERDITS (fautes graves) :
+❌ "c'est payant ?" alors qu'on t'a déjà dit le prix
+❌ "tu fais quoi exactement ?" alors que la personne vient de l'expliquer
+❌ "t'as quel objectif ?" alors que tu l'as déjà dit toi-même
+❌ Reposer une objection déjà traitée
+
+COMPORTEMENT CORRECT :
+✅ Si une question est traitée → tu l'abandonnes et tu sors ta prochaine objection OU tu avances vers le RDV
+✅ Tes objections sortent UNE PAR UNE dans l'ordre logique. Jamais deux à la fois.
+✅ Une vraie personne écoute et retient. Tu fais pareil.
 
 COMMENT TU DONNES TES INFOS :
 - Si on te demande si tu t'entraînes → tu réponds avec TA situation (quelques mots)
@@ -793,17 +842,17 @@ def build_eval_prompt(conversation: list[dict], eleve_nom: str, niche: str, nive
 Note : si la conversation s'est arrêtée avant le pivot, mettre 5.
 
 """
-        plafond_note   = "  ✅ 4 étapes BrandScale + RDV + 3 critères → score peut atteindre 100\n  ✅ 3 étapes sur 4 + RDV + qualification → plafonné à 85\n  ⚠️  RDV sans consulting approach ou pivot maladroit → plafonné à 70\n  ❌ Ni RDV ni qualification → plafonné à 35"
+        plafond_note   = "  ✅ 4 étapes BrandScale + RDV + 4 critères qualif → score peut atteindre 100\n  ✅ 3 étapes sur 4 + RDV + qualification → plafonné à 85\n  ⚠️  RDV sans consulting approach ou pivot maladroit → plafonné à 70\n  ❌ Ni RDV ni qualification → plafonné à 35"
     elif traffic == "b2b":
         msg_limit_note = "B2B FROID : limite = 3-4 messages setter APRÈS le pivot (l'opener décorrélé ne compte pas)"
         accroche_note  = "ACCROCHE B2B : Le premier message DOIT être décorrélé de l'offre (localisation, contenu, activité...). Pénaliser si le premier message parle de l'offre ou du setter directement."
         extra_critere  = "━━━ CRITÈRE BONUS — pivot_qualite /10 (B2B uniquement) ━━━\nÉvalue la qualité du pivot (transition du message décorrélé vers le vrai sujet).\n• 9-10 : Le setter repart de CE QUE LE PROSPECT A DIT pour amener naturellement son sujet. Jamais question sur soi.\n• 7-8 : Pivot présent et acceptable, légèrement maladroit.\n• 5-6 : Pivot visible mais le setter parle un peu de lui.\n• 3-4 : Pivot classique 'au fait je t'ai DM parce que...' ou 'pour être honnête je suis setter pour X'.\n• 1-2 : Aucun pivot — le setter a parlé de son offre dès le début.\nNote : si la conversation n'a pas atteint le pivot, mettre 5.\n\n"
-        plafond_note   = "  ✅ RDV + 3 critères + pivot naturel + ≤ 4 msgs après pivot → score peut atteindre 100\n  ✅ RDV + 3 critères + pivot correct + 5-6 msgs après pivot → plafonné à 80\n  ⚠️  RDV sans qualification OU pivot maladroit → plafonné à 70\n  ❌ Ni RDV ni qualification → plafonné à 35"
+        plafond_note   = "  ✅ RDV + 4 critères qualif + pivot naturel + ≤ 4 msgs après pivot → score peut atteindre 100\n  ✅ RDV + 4 critères qualif + pivot correct + 5-6 msgs → plafonné à 80\n  ⚠️  RDV sans qualification complète OU pivot maladroit → plafonné à 70\n  ❌ Ni RDV ni qualification → plafonné à 35"
     else:
-        msg_limit_note = "B2C CHAUD : limite = 6-8 messages setter total"
-        accroche_note  = "ACCROCHE B2C : Le premier message doit être personnalisé au contenu/situation du prospect. Pénaliser si générique."
+        msg_limit_note = f"B2C {awareness.upper()} : limite = 6-8 messages setter total"
+        accroche_note  = "ACCROCHE B2C — Structure attendue en 3 parties : ① référence spécifique (story/post précis) ② connexion au problème en question ouverte ③ invitation simple (1 question, 0 pitch). Pénaliser sévèrement si le message peut être envoyé à 100 personnes sans changement."
         extra_critere  = ""
-        plafond_note   = "  ✅ RDV obtenu + 3 critères qualifiés + ≤ 8 messages setter → score peut atteindre 100\n  ✅ RDV obtenu + 3 critères qualifiés + 9-12 messages setter → plafonné à 80\n  ✅ RDV obtenu + 3 critères qualifiés + > 12 messages setter → plafonné à 65 (trop long)\n  ⚠️  RDV obtenu SANS les 3 critères qualifiés              → plafonné à 70 (prospect non qualifié)"
+        plafond_note   = "  ✅ RDV obtenu + 4 critères qualifiés (problème+timing+décision+budget) + ≤ 8 msgs → score peut atteindre 100\n  ✅ RDV obtenu + 4 critères qualifiés + 9-12 messages setter → plafonné à 80\n  ✅ RDV obtenu + 4 critères qualifiés + > 12 messages setter → plafonné à 65 (trop long)\n  ⚠️  RDV obtenu SANS les 4 critères qualifiés               → plafonné à 70 (prospect non qualifié)"
     return f"""Tu es un expert en Setting (appointment setting). Évalue la performance de {eleve_nom}.
 
 CONTEXTE :
@@ -813,8 +862,9 @@ CONTEXTE :
 - {msg_limit_note}
 
 ━━━ PHILOSOPHIE DU SETTING (LIS AVANT TOUT) ━━━
-Un bon setter est RAPIDE et EFFICACE.
-L'objectif est de booker un RDV/appel tout en récoltant 3 infos : OBJECTIF · SITUATION · DOULEUR.
+Le setter FILTRE — il ne convainc pas. Plus il disqualifie vite, meilleures sont ses conversations.
+L'objectif est de booker un RDV uniquement avec des prospects qualifiés sur 4 critères : PROBLÈME · TIMING · DÉCISION · BUDGET.
+Pénaliser si le setter tente de "convaincre" un prospect non qualifié. Valoriser si le setter filtre naturellement.
 {accroche_note}
 
 GRILLE DE RÉUSSITE (détermine le plafond du score_global) :
@@ -831,12 +881,18 @@ CONVERSATION :
 {conv_txt}
 
 ━━━ CRITÈRE 1 — accroche /10 ━━━
-Premier message du setter uniquement.
-• 9-10 : Personnalisé + précis (contenu vu, situation spécifique) + ton naturel
-• 7-8 : Personnalisé mais un peu vague sur "pourquoi je t'écris"
-• 5-6 : Correct mais générique ou trop orienté offre
-• 3-4 : Très générique, aucun détail ("j'ai vu ton contenu", "ça m'a parlé")
-• 1-2 : Juste "bonjour/salut/hello" OU copier-coller commercial évident
+Premier message du setter uniquement. Structure attendue en 3 parties :
+  ① Accroche contextuelle : référence SPÉCIFIQUE (story, post, commentaire précis — pas "j'ai vu ton profil")
+  ② Connexion au problème : articule leur situation en question ouverte — jamais une affirmation directe
+  ③ Invitation simple     : UNE seule question ouverte, zéro pitch, zéro lien externe
+RÈGLE ABSOLUE : si le message peut être envoyé à 100 personnes sans changer un mot → note max 3.
+BON EX. : "Salut, j'ai vu ta story de cette semaine sur ta galère avec X — tu es en train de chercher quelque chose dans cette direction ?"
+MAUVAIS EX. : "Bonjour, je travaille avec des coachs et on aide les gens à X. Tu serais intéressé ?"
+• 9-10 : Les 3 parties + ton naturel + référence réellement spécifique et non copiable
+• 7-8 : 2 parties sur 3, message personnalisé mais structurellement incomplet
+• 5-6 : Personnalisé mais structure manquante (ex : question absente ou trop orientée offre)
+• 3-4 : Générique ("j'ai vu ton contenu") ou trop long avec pitch inclus
+• 1-2 : "Bonjour/Salut/Hello" seul OU copier-coller commercial évident
 
 ━━━ CRITÈRE 2 — gestion_objections /10 ━━━
 → Aucune objection apparue dans la conversation = OBLIGATOIREMENT 5 (neutre, jamais 0)
@@ -848,21 +904,22 @@ Premier message du setter uniquement.
 • 1-2 : Ignore les objections ou répond à côté
 
 ━━━ CRITÈRE 3 — qualification /10 ━━━
-Vérifie si ces 3 éléments sont présents dans la conversation (obtenus ou donnés spontanément) :
-  ① OBJECTIF  : ce que le prospect veut atteindre
-  ② SITUATION : où il en est aujourd'hui
-  ③ DOULEUR   : ce qui le bloque / frustre / fait souffrir
+Vérifie si ces 4 critères sont couverts (obtenus ou donnés spontanément par le prospect) :
+  ① PROBLÈME RÉEL  : vraie douleur/blocage identifié (pas de la curiosité vague)
+  ② TIMING         : il veut résoudre ça MAINTENANT — pas "dans 6 mois" (ex: "tu cherches à régler ça en ce moment ?")
+  ③ DÉCISION       : c'est lui qui décide, il peut s'engager sans demander à quelqu'un d'autre
+  ④ BUDGET/SIGNAL  : aucun signal bloquant évident sur la capacité à investir (inutile de demander directement)
 
-• 9-10 : Les 3 obtenus, questions naturelles et fluides
-• 7-8 : 2 sur 3 clairement obtenus
-• 5-6 : 1 sur 3 obtenu
-• 3-4 : Aucun des 3 mais au moins une question posée sur le prospect
+• 9-10 : Les 4 critères couverts, questions naturelles et fluides
+• 7-8 : 3 sur 4 clairement couverts
+• 5-6 : 2 sur 4 couverts (dont le problème réel)
+• 3-4 : 1 sur 4 uniquement — au moins une question posée sur le prospect
 • 1-2 : Aucune question sur le prospect — le setter parle de lui ou de son offre
 
 ━━━ CRITÈRE 4 — rdv /10 ━━━
 → Conversation trop courte pour que le RDV ait pu être tenté = 5 neutre (jamais 0)
 → Si tentative de RDV :
-• 9-10 : Proposition naturelle APRÈS avoir obtenu les 3 infos, formulée avec un ancrage concret ("appel de 30 min pour voir si je peux t'aider sur [douleur]"). RDV accepté.
+• 9-10 : Proposition naturelle APRÈS avoir obtenu les 4 critères de qualification (problème + timing + décision), formulée avec un ancrage concret ("appel de 30 min pour voir si je peux t'aider sur [douleur]"). RDV accepté.
 • 7-8 : Proposition acceptée, bien timée, même si formulation légèrement perfectible
 • 5-6 : Proposition faite mais trop tôt/tard ou maladroite. Tentative présente.
 • 3-4 : Proposition très commerciale ou générique, ou RDV refusé à cause du timing
@@ -877,6 +934,60 @@ Vérifie si ces 3 éléments sont présents dans la conversation (obtenus ou don
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {extra_critere}
+━━━ ANALYSE GLOBALE ━━━
+Rédige 2-3 phrases comme un coach qui vient de regarder la conversation en direct.
+Ton direct et bienveillant, jamais vague. Mentionne le tournant ou la décision clé qui a fait la différence.
+Exemple de ton attendu : "Tu as bien ouvert mais tu as perdu le prospect au 4e message en devenant défensif sur le prix.
+Le RDV était accessible si tu avais reformulé son objection en question."
+
+━━━ MOMENTS CLÉS ━━━
+Identifie 2-3 instants précis de la conversation (positifs ou à améliorer).
+- Cite un extrait EXACT du message concerné (quelques mots, pas inventé)
+- Explique pourquoi ce moment était crucial
+- type : "positif" si bien exécuté, "a_ameliorer" si raté ou manqué
+
+━━━ DIAGNOSTIC STYLE ━━━
+- longueur_messages : "trop_longs" si le setter envoie régulièrement des messages de 3+ lignes, "trop_courts" si réponses sèches de 1-2 mots, "adaptes" sinon
+- posture : "trop_commercial" si langage vendeur perceptible, "trop_passif" si le setter ne guide jamais la conversation, "equilibre" sinon
+- rythme : "trop_rapide" si le RDV est proposé trop tôt (< 4 échanges), "trop_lent" si la conversation s'étire sans avancer, "bon" sinon
+
+━━━ CONSEILS DÉTAILLÉS AVEC EXEMPLES ━━━
+Pour le champ "conseils_detailles", génère 2 à 3 conseils sur les points les plus importants à améliorer.
+Chaque conseil DOIT contenir un exemple de message CONCRET et RÉALISTE que le setter aurait pu envoyer,
+basé sur la vraie conversation ci-dessus (reprends le contexte exact : ce que le prospect a dit, la niche, la situation).
+L'exemple doit être prêt à copier-coller, écrit en langage DM naturel (pas en bullet point, pas de guillemets multiples).
+Si le setter a bien performé sur un critère, ne crée pas de conseil inutile — 2 conseils précis valent mieux que 3 génériques.
+
+━━━ VERDICT FINAL ━━━
+Une phrase percutante qui résume le résultat de la session. Directe, honnête, pas condescendante.
+Basée sur le fait réel le plus saillant : ce qui a fait la différence (en bien ou en mal).
+Ex : "Tu as bien accroché mais tu as sauté sur le RDV sans vérifier le timing — le prospect a décroché."
+Ex : "Session solide : qualification complète, RDV obtenu naturellement, ton excellent tout au long."
+
+━━━ SCORE COMMENTÉ PAR CRITÈRE ━━━
+Pour chaque critère, rédige UNE phrase qui justifie la note avec un fait précis de la conversation.
+Cite un mot ou une formulation réelle si possible. Jamais de généralité type "bonne performance".
+
+━━━ ANALYSE PAR PHASE ━━━
+Découpe la conversation en 2 à 4 phases clés (selon ce qui s'est vraiment passé).
+Phases possibles : Accroche, Découverte, Gestion des objections, Proposition RDV, Conclusion.
+Pour chaque phase :
+- "phase" : nom de la phase
+- "emoji" : emoji représentatif (🎣 Accroche, 🔍 Découverte, 🛡️ Objections, 📅 RDV, ✅ Conclusion)
+- "statut" : "bon" | "moyen" | "rate"
+- "observation" : 1-2 phrases précises sur ce qui s'est passé dans cette phase
+- "citation" : extrait EXACT d'un message de cette phase (4-10 mots, pas inventé)
+- "alternative" : SI statut "moyen" ou "rate", propose une reformulation concrète que le setter aurait pu envoyer, sinon null
+
+━━━ ANNOTATIONS MESSAGE PAR MESSAGE (SETTER UNIQUEMENT) ━━━
+Pour CHAQUE message envoyé par le SETTER (pas le prospect), donne une annotation courte.
+Numérotation : compte uniquement les messages du SETTER dans l'ordre (1 = son 1er message).
+- "index" : numéro du message setter (1-based)
+- "note_type" : "bon" si bien exécuté, "moyen" si perfectible, "mauvais" si erreur claire
+- "commentaire" : UNE phrase max, précise, avec le fait exact du message concerné
+- "extrait" : 3-6 mots exacts du message setter concerné
+RÈGLE : ne dis JAMAIS "c'est bien" de façon vague — cite toujours un fait précis.
+
 Calcule le score_global ainsi :
 1. Base = round((accroche*10 + gestion_objections*15 + qualification*30 + rdv*35 + naturel*10) / 10)
 2. Applique le plafond de la grille de réussite ci-dessus (ne jamais dépasser ce plafond)
@@ -890,12 +1001,58 @@ Retourne UNIQUEMENT un JSON valide (sans markdown) :
   "naturel": <1-10>,
   "score_global": <0-100 après application du plafond>,
   "rdv_pose": <true si prospect a explicitement accepté un RDV/appel, sinon false>,
-  "prospect_qualifie": <true si les 3 critères objectif+situation+douleur sont présents, sinon false>,
+  "prospect_qualifie": <true si problème réel + timing (veut résoudre maintenant) + décision (il peut s'engager seul) sont tous présents, sinon false>,
   "coordonnees_demandees": <true si setter a demandé téléphone ou email après RDV accepté, sinon false>,
   "pivot_qualite": <1-10 si B2B uniquement, sinon null>,
+  "verdict_final": "Une phrase percutante qui résume le résultat — fait précis, pas de généralité",
+  "score_commentaire": {{
+    "accroche": "justification en 1 phrase avec fait précis de la conversation",
+    "gestion_objections": "justification en 1 phrase avec fait précis",
+    "qualification": "justification en 1 phrase avec fait précis",
+    "rdv": "justification en 1 phrase avec fait précis",
+    "naturel": "justification en 1 phrase avec fait précis"
+  }},
+  "analyse_par_phase": [
+    {{
+      "phase": "nom de la phase",
+      "emoji": "emoji",
+      "statut": "bon | moyen | rate",
+      "observation": "1-2 phrases précises sur ce qui s'est passé",
+      "citation": "extrait exact du message (4-10 mots)",
+      "alternative": "reformulation concrète si statut moyen/rate, sinon null"
+    }}
+  ],
+  "analyse_globale": "narration coach 2-3 phrases — ce qui s'est passé, le tournant, l'impression globale",
+  "moments_cles": [
+    {{
+      "type": "positif" | "a_ameliorer",
+      "description": "ce qui s'est passé à ce moment précis et pourquoi c'est important",
+      "citation": "extrait exact court du message concerné"
+    }}
+  ],
+  "diagnostic_style": {{
+    "longueur_messages": "adaptes | trop_longs | trop_courts",
+    "posture": "equilibre | trop_commercial | trop_passif",
+    "rythme": "bon | trop_rapide | trop_lent"
+  }},
   "points_forts": ["point concret basé sur ce qui s'est passé"],
   "points_ameliorer": ["point actionnable prioritaire — pas ce qui manquait faute de temps"],
-  "conseil_principal": "1 conseil précis et actionnable pour la prochaine session"
+  "conseil_principal": "1 conseil précis et actionnable pour la prochaine session",
+  "conseils_detailles": [
+    {{
+      "critere": "nom du critère (ex: Accroche, Qualification, Gestion des objections...)",
+      "conseil": "explication courte et précise de ce qui n'allait pas ou pouvait être mieux",
+      "exemple": "Message concret mot pour mot que le setter aurait pu envoyer, basé sur la vraie conversation"
+    }}
+  ],
+  "annotations_messages": [
+    {{
+      "index": <numéro du message setter, 1-based>,
+      "note_type": "bon | moyen | mauvais",
+      "commentaire": "UNE phrase précise avec fait exact",
+      "extrait": "3-6 mots exacts du message"
+    }}
+  ]
 }}"""
 
 
@@ -917,28 +1074,37 @@ def get_prospect_reply(client, messages: list[dict], system_prompt: str) -> str:
 def evaluate_session(client, conversation: list[dict], eleve_nom: str,
                      niche: str, niveau: int, persona: dict, traffic: str = "b2c", awareness: str = "chaud") -> dict:
     import anthropic
+    import re
+    import logging
+    log = logging.getLogger("evaluate_session")
     prompt = build_eval_prompt(conversation, eleve_nom, niche, niveau, persona, traffic, awareness)
     response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=800,
+        model="claude-sonnet-4-6",
+        max_tokens=5000,
         messages=[{"role": "user", "content": prompt}],
     )
     raw = response.content[0].text.strip()
-    # Extraire le JSON même s'il est entouré de markdown ou de texte
-    import re
+    log.info(f"eval raw length={len(raw)} stop_reason={response.stop_reason}")
+    if response.stop_reason == "max_tokens":
+        log.warning("Réponse tronquée — tentative d'extraction partielle")
     json_match = re.search(r'\{[\s\S]*\}', raw)
     if json_match:
         raw = json_match.group(0)
     try:
         return json.loads(raw)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        log.error(f"JSON parse error: {e} — raw[:300]={raw[:300]}")
         return {
             "accroche": 5, "gestion_objections": 5, "qualification": 5,
             "rdv": 5, "naturel": 5, "score_global": 50,
             "rdv_pose": False, "prospect_qualifie": False,
             "coordonnees_demandees": False, "pivot_qualite": None,
+            "analyse_globale": "",
+            "moments_cles": [],
+            "diagnostic_style": {"longueur_messages": "adaptes", "posture": "equilibre", "rythme": "bon"},
             "points_forts": [], "points_ameliorer": [],
             "conseil_principal": "Évaluation indisponible (réponse mal formatée).",
+            "conseils_detailles": [],
         }
 
 

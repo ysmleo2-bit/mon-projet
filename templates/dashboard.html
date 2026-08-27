@@ -66,7 +66,7 @@
       <div class="score-row">
         <div class="score-row-label">{{ icon }} {{ label }}</div>
         <div class="score-bar-wrap">
-          <div class="score-bar-fill" style="width:{{ (val * 10)|int }}%; background:{{ val | score_color }}"></div>
+          <div class="score-bar-fill" style="width:{{ (val * 10)|int }}%; background:{{ (val * 10) | score_color }}"></div>
         </div>
         <div class="score-row-val">{{ val }}/10</div>
       </div>

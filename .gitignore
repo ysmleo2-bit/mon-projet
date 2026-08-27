@@ -10,6 +10,9 @@ __pycache__/
 app.pid
 monitor.log
 active_sessions.json
+active_convs/
+gdoc_processed.json
+conversations_reelles.json
 .prod_config.json
 accounts.json
 sim_sessions.json
