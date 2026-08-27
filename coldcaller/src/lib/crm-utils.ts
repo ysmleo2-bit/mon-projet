@@ -89,5 +89,8 @@ export function prospectToLead(prospect: Prospect): Lead {
     callStatus:  prospect.statutAppel ?? "non_appele",
     prospectId:  prospect.id,
     crmSyncedAt: new Date().toISOString(),
+    // ── Attribution SDR : recopier du prospect vers le lead CRM ──────────────
+    assignedToId: prospect.assignedToId,
+    assignedTo:   prospect.assignedTo,
   };
 }
