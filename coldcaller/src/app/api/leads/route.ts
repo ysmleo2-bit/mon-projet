@@ -15,8 +15,10 @@ export async function GET(req: NextRequest) {
   const category   = searchParams.get("category")   ?? undefined;
   const callStatus = searchParams.get("callStatus") ?? undefined;
   // ?mine=true → filtrer uniquement ses propres leads
-  const mine       = searchParams.get("mine") === "true";
-  const assignedToId = mine ? user!.userId : undefined;
+  // ?assignedToId=xxx → filtrer par un SDR précis (dashboard)
+  const mine            = searchParams.get("mine") === "true";
+  const explicitSdrId   = searchParams.get("assignedToId") ?? undefined;
+  const assignedToId    = mine ? user!.userId : explicitSdrId;
 
   const leads = await dbGetLeads({ status, category, callStatus, assignedToId });
   return NextResponse.json({ leads, total: leads.length });
