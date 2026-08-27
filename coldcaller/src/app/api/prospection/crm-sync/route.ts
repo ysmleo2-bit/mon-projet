@@ -13,9 +13,16 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const { user } = requireAuth(req);   // peut être null si pas de session (cas rare)
     const { prospect } = await req.json() as { prospect: Prospect };
     if (!prospect?.siren) {
       return NextResponse.json({ error: "prospect.siren requis" }, { status: 400 });
+    }
+
+    // Si le prospect n'a pas de SDR attribué, l'attribuer au SDR qui déclenche la sync
+    if (!prospect.assignedToId && user) {
+      prospect.assignedToId = user.userId;
+      prospect.assignedTo   = user.name;
     }
 
     const { dbUpsertLeads } = await import("@/lib/db");

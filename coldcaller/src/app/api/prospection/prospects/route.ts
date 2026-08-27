@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbGetProspects, dbUpdateProspect, dbDeleteProspect } from "@/lib/db-prospection";
+import { dbGetProspects, dbGetProspect, dbUpdateProspect, dbDeleteProspect } from "@/lib/db-prospection";
 import { requireAuth } from "@/lib/auth-server";
 import type { StatutAppel, ProspectStatut } from "@/lib/types-prospection";
 
@@ -40,8 +40,21 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const { user, error } = requireAuth(req);
+  if (error) return error;
+
   const body = await req.json() as { id: string; patch: Record<string, unknown> };
   const { id, patch } = body;
+
+  // Auto-attribution SDR : si le prospect n'a pas encore de SDR assigné,
+  // l'attribuer automatiquement au SDR qui prend l'action (appel, statut, etc.)
+  if (patch.assignedToId === undefined) {
+    const existing = await dbGetProspect(id);
+    if (existing && !existing.assignedToId) {
+      patch.assignedToId = user!.userId;
+      patch.assignedTo   = user!.name;
+    }
+  }
 
   // 1. Persister le patch en base
   const updated = await dbUpdateProspect(id, patch as any);
