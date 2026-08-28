@@ -2,11 +2,12 @@
  * POST /api/prospection/enrich
  * Enrichit un prospect avec téléphone, site web et email.
  *
- * Architecture rapide (< 8s) pour rester sous la limite Vercel Hobby :
- *  1. Google Places (multiple requêtes intelligentes) → site + tél
- *  2. SIRENE extra (dirigeants, site, tél)
- *  Les deux en parallèle, max 5s chacun.
- *  3. Scraping site web → email (3s, 1 seule page)
+ * Architecture (< 25s) :
+ *  1. Google Places API + SIRENE extra → site + tél (parallèle, max 5s)
+ *  2. Apify Maps scraper (fallback si pas de tél) + scraping site → email (parallèle, max 20s)
+ *
+ * Apify crawler-google-places est utilisé en fallback quand Google Places API
+ * ne trouve pas de téléphone — couverture ~85 % vs ~40 % pour l'API seule.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,7 +15,7 @@ import { requireAuth } from "@/lib/auth-server";
 import type { Prospect, DataSource, ProspectAction } from "@/lib/types-prospection";
 
 export const dynamic     = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 // ── Normalisation numéro FR ───────────────────────────────────────────────────
 function normalizePhone(raw: string): string {
@@ -211,6 +212,89 @@ function diceSimilarity(a: string, b: string): number {
   return (2 * intersection) / (sa.length + sb.length) || 0;
 }
 
+// ── Apify Google Maps (fallback quand Google Places API ne trouve pas de tél) ──
+// Utilise compass/crawler-google-places — 85 % de couverture téléphonique
+// Timeout court (20s) car on cherche 1 seul résultat
+interface ApifyPlace {
+  title?: string; name?: string;
+  phone?: string; phoneUnformatted?: string;
+  website?: string;
+  totalScore?: number; reviewsCount?: number;
+  openingHours?: Array<{ day: string; hours: string }>;
+  placeId?: string; googleMapsUrl?: string; url?: string;
+  permanentlyClosed?: boolean;
+}
+
+async function findViaApifyMaps(nom: string, ville?: string, codePostal?: string): Promise<{
+  phone?:    string;
+  siteWeb?:  string;
+  placeId?:  string;
+  mapsUrl?:  string;
+  rating?:   number;
+} | null> {
+  if (!process.env.APIFY_TOKEN) return null;
+
+  const location = codePostal ?? ville ?? "France";
+  const query    = `${nom} ${location}`;
+
+  try {
+    const { runApifyActor } = await import("@/lib/apify");
+    const results = await runApifyActor<ApifyPlace>(
+      "compass/crawler-google-places",
+      {
+        searchStringsArray:        [query],
+        maxCrawledPlacesPerSearch: 3,          // 1 seul résultat suffit
+        language:                  "fr",
+        countryCode:               "fr",
+        includeOpeningHours:       false,
+        includeHistogram:          false,
+        includePeopleAlsoSearch:   false,
+        additionalInfo:            false,
+        exportPlaceUrls:           false,
+        scrapeDirectories:         false,
+        deeperCityScrape:          false,
+      },
+      20,   // wait 20s max
+    );
+
+    // Filtrer les fermés définitifs, prendre le 1er avec le plus de similarité
+    const active = results.filter((r) => !r.permanentlyClosed);
+    if (!active.length) return null;
+
+    // Garder celui dont le nom est le plus proche du prospect
+    const best = active
+      .map((r) => ({ r, score: diceSimilarity(nom, r.title ?? r.name ?? "") }))
+      .filter(({ score }) => score >= 0.15)
+      .sort((a, b) => b.score - a.score)[0]?.r;
+
+    if (!best) return null;
+
+    const rawPhone = best.phone ?? best.phoneUnformatted;
+    const phone    = rawPhone ? normalizePhone(rawPhone) : undefined;
+    const validPhone = phone && isValidFrPhone(phone) ? phone : undefined;
+
+    let siteWeb: string | undefined;
+    if (best.website) {
+      const raw = best.website.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      if (!isWebsiteBlacklisted(raw)) siteWeb = raw;
+    }
+
+    if (!validPhone && !siteWeb) return null;
+
+    return {
+      phone:   validPhone,
+      siteWeb,
+      placeId: best.placeId,
+      mapsUrl: best.googleMapsUrl ?? best.url,
+      rating:  best.totalScore,
+    };
+  } catch (err) {
+    // Silencieux — Apify est un fallback, pas bloquant
+    console.warn("[enrich/apify-maps] fallback failed:", err);
+    return null;
+  }
+}
+
 // ── Scraping site web (rapide, 1 page principale + contact) ──────────────────
 async function scrapeWebsiteContacts(rawUrl: string): Promise<{
   emails: string[];
@@ -380,16 +464,24 @@ export async function POST(req: NextRequest) {
       actions.push({ date: now, type: "enrichissement", detail: `LinkedIn: ${dirName}` });
     }
 
-    // ── Phase 2 : Scraping site → email + tél (seulement si site trouvé) ──────
+    // ── Phase 2 : Scraping site web + Apify Maps fallback (en parallèle) ───────
     let emailTrouve: string | undefined;
     let emailPatterns: string[] = [];
 
-    if (siteWeb) {
-      // Nettoyer le domaine : retirer "www." pour éviter "contact@www.example.com"
-      const domaine = siteWeb.split("/")[0].replace(/^www\./, "");
-      const { emails, phones } = await scrapeWebsiteContacts(siteWeb);
+    // Apify Maps : lancé uniquement si on n'a pas encore de téléphone
+    const needsApify = !telephonePro && !patch.telephonePro;
 
-      // Filtrer les emails blacklistés récupérés depuis le site
+    const [scrapeResult, apifyResult] = await Promise.all([
+      siteWeb ? scrapeWebsiteContacts(siteWeb) : Promise.resolve({ emails: [], phones: [] }),
+      needsApify
+        ? findViaApifyMaps(nom, ville, codePostal)
+        : Promise.resolve(null),
+    ]);
+
+    // Résultats scraping site
+    if (siteWeb) {
+      const { emails, phones } = scrapeResult;
+      const domaine = siteWeb.split("/")[0].replace(/^www\./, "");
       const validEmails = emails.filter((e) => !isEmailBlacklisted(e));
 
       if (validEmails.length > 0) {
@@ -399,7 +491,6 @@ export async function POST(req: NextRequest) {
         emailTrouve = validEmails.find((e) => dirParts.some((p) => e.includes(p))) ?? validEmails[0];
         actions.push({ date: now, type: "enrichissement", detail: `Email : ${emailTrouve}` });
       } else if (!isWebsiteBlacklisted(domaine)) {
-        // Ne générer des patterns que si le domaine est légitime
         emailPatterns = generateEmailPatterns(dirigeantPrincipal, domaine).filter(
           (e) => !isEmailBlacklisted(e)
         );
@@ -413,6 +504,25 @@ export async function POST(req: NextRequest) {
         patch.telephonePro = phones[0];
         actions.push({ date: now, type: "enrichissement", detail: `Tél site : ${phones[0]}` });
       }
+    }
+
+    // Résultats Apify Google Maps
+    if (apifyResult) {
+      if (apifyResult.phone && !patch.telephonePro) {
+        patch.telephonePro = apifyResult.phone;
+        sources.push("google_places");
+        actions.push({ date: now, type: "enrichissement", detail: `Tél Google Maps (Apify) : ${apifyResult.phone}` });
+      }
+      if (apifyResult.siteWeb && !siteWeb && !patch.siteWeb) {
+        patch.siteWeb = apifyResult.siteWeb;
+        siteWeb = apifyResult.siteWeb;
+        sources.push("google_places");
+        actions.push({ date: now, type: "enrichissement", detail: `Site Maps : ${apifyResult.siteWeb}` });
+      }
+      // Stocker les métadonnées Maps (note, placeId, lien Maps) sans changer l'interface
+      if (apifyResult.placeId) patch.placeId = apifyResult.placeId;
+      if (apifyResult.mapsUrl) patch.googleMapsUrl = apifyResult.mapsUrl;
+      if (apifyResult.rating)  patch.rating = apifyResult.rating;
     }
 
     // ── Patch final ───────────────────────────────────────────────────────────
@@ -495,6 +605,11 @@ export async function POST(req: NextRequest) {
         sirenePhone:       (sireneExtra?.siege as Record<string,unknown>)?.telephone,
         sireneSite:        (sireneExtra?.siege as Record<string,unknown>)?.site_internet,
         websiteBlacklist:  siteWeb ? isWebsiteBlacklisted(siteWeb) : false,
+        apifyUsed:         needsApify,
+        apifyFound:        !!apifyResult,
+        apifyPhone:        apifyResult?.phone,
+        apifySite:         apifyResult?.siteWeb,
+        apifyRating:       apifyResult?.rating,
       },
     });
   } catch (err) {
