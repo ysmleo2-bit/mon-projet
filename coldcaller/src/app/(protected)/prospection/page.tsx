@@ -366,11 +366,6 @@ export default function ProspectionPage() {
   const [trancheMax,    setTrancheMax]    = useState("");
   const [perPage,       setPerPage]       = useState(50);
   const [showSearch,    setShowSearch]    = useState(true);
-  const [searchSource,  setSearchSource]  = useState<"sirene" | "google_maps">("google_maps");
-  const [mapsStats,     setMapsStats]     = useState<{
-    raw: number; permenantlyClosedDropped: number; converted: number;
-    withPhone: number; withSite: number; open: number; closed: number; unknownStatus: number;
-  } | null>(null);
 
   // ── État ─────────────────────────────────────────────────────────────────
   const [prospects,      setProspects]      = useState<Prospect[]>([]);
@@ -572,7 +567,7 @@ export default function ProspectionPage() {
   // ── Recherche SIRENE ─────────────────────────────────────────────────────
   const handleSearch = useCallback(async () => {
     setLoading(true); setSearched(true); setError(null);
-    setSelected(null); setEnrichProgress(null); setMapsStats(null);
+    setSelected(null); setEnrichProgress(null);
 
     const secteur  = SECTEURS[secteurIdx];
     const nafCodes = nafCustom
@@ -593,43 +588,6 @@ export default function ProspectionPage() {
     } catch (e) { setError(String(e)); } finally { setLoading(false); }
   }, [secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, enrichAll]);
 
-  // ── Recherche Google Maps ─────────────────────────────────────────────────
-  const handleSearchMaps = useCallback(async () => {
-    setLoading(true); setSearched(true); setError(null);
-    setSelected(null); setEnrichProgress(null); setMapsStats(null);
-
-    const secteur    = SECTEURS[secteurIdx];
-    const deptLabel  = DEPT_LABELS[departement] ?? departement;
-    // Utiliser la mapsQuery du secteur si disponible, sinon son label
-    const baseQuery  = secteur.mapsQuery ?? secteur.label;
-    const searchQuery = `${baseQuery} ${deptLabel.split(" (")[0]}`;
-
-    try {
-      const res  = await fetch("/api/prospection/search-maps", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          searchQuery,
-          departement,
-          maxResults: perPage,
-          requirePhone: false,
-        }),
-      });
-      const data = await res.json() as {
-        prospects: Prospect[];
-        total: number;
-        stats?: {
-          raw: number; permenantlyClosedDropped: number; converted: number;
-          withPhone: number; withSite: number; open: number; closed: number; unknownStatus: number;
-        };
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
-      setProspects(data.prospects);
-      if (data.stats) setMapsStats(data.stats);
-      setShowSearch(false);
-    } catch (e) { setError(String(e)); } finally { setLoading(false); }
-  }, [secteurIdx, departement, perPage]);
 
   // ── Recherche LinkedIn ────────────────────────────────────────────────────
   const searchLinkedIn = useCallback(async (p: Prospect) => {
@@ -784,88 +742,47 @@ export default function ProspectionPage() {
 
             {showSearch && (
               <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-sm">
-                {/* Source toggle */}
-                <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg w-fit">
-                  <button
-                    onClick={() => setSearchSource("google_maps")}
-                    className={cn("flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all",
-                      searchSource === "google_maps" ? "bg-white text-green-700 shadow-sm border border-green-200" : "text-gray-500 hover:text-gray-700"
-                    )}>
-                    <span>🗺️</span> Google Maps <span className="text-[9px] bg-green-100 text-green-700 px-1 py-0.5 rounded ml-1">+85% tél.</span>
-                  </button>
-                  <button
-                    onClick={() => setSearchSource("sirene")}
-                    className={cn("flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all",
-                      searchSource === "sirene" ? "bg-white text-brand-700 shadow-sm border border-brand-200" : "text-gray-500 hover:text-gray-700"
-                    )}>
-                    <span>🏛️</span> Registre SIRENE
-                  </button>
-                </div>
-
-                <div className={cn("grid gap-3", searchSource === "sirene" ? "grid-cols-5" : "grid-cols-3")}>
+                <div className="grid grid-cols-5 gap-3">
                   <div>
                     <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Secteur d'activité</label>
                     <select value={secteurIdx} onChange={(e) => setSecteurIdx(Number(e.target.value))} className="select w-full text-xs">
                       {SECTEURS.map((s, i) => <option key={s.label} value={i}>{s.label}</option>)}
                     </select>
                   </div>
-                  {searchSource === "sirene" && (
-                    <div>
-                      <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Codes NAF (optionnel)</label>
-                      <input value={nafCustom} onChange={(e) => setNafCustom(e.target.value)}
-                        placeholder="ex: 62.01Z, 70.22Z" className="input w-full text-xs" />
-                    </div>
-                  )}
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Codes NAF (optionnel)</label>
+                    <input value={nafCustom} onChange={(e) => setNafCustom(e.target.value)}
+                      placeholder="ex: 62.01Z, 70.22Z" className="input w-full text-xs" />
+                  </div>
                   <div>
                     <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Département</label>
                     <select value={departement} onChange={(e) => setDepartement(e.target.value)} className="select w-full text-xs">
                       {DEPARTEMENTS.map((d) => <option key={d} value={d}>{DEPT_LABELS[d] ?? d}</option>)}
                     </select>
                   </div>
-                  {searchSource === "sirene" && (
-                    <>
-                      <div>
-                        <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Effectifs min.</label>
-                        <select value={tranche} onChange={(e) => setTranche(e.target.value)} className="select w-full text-xs">
-                          <option value="">Aucun</option>
-                          {(["00","01","02","03","11","12","21","22","31","32","41","42","51","52","53"] as const).map((k) => (
-                            <option key={k} value={k}>{TRANCHES_EFFECTIFS[k]}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Effectifs max.</label>
-                        <select value={trancheMax} onChange={(e) => setTrancheMax(e.target.value)} className="select w-full text-xs">
-                          <option value="">Aucun</option>
-                          {(["00","01","02","03","11","12","21","22","31","32","41","42","51","52","53"] as const).map((k) => (
-                            <option key={k} value={k}>{TRANCHES_EFFECTIFS[k]}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </>
-                  )}
-                  {searchSource === "google_maps" && (
-                    <div className="flex flex-col justify-end">
-                      <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Info</label>
-                      <div className="text-[10px] text-gray-400 bg-green-50 border border-green-100 rounded-lg px-3 py-2 leading-relaxed">
-                        Requête : <span className="font-mono text-green-700 font-semibold">
-                          {(SECTEURS[secteurIdx].mapsQuery ?? SECTEURS[secteurIdx].label)} {(DEPT_LABELS[departement] ?? departement).split(" (")[0]}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Effectifs min.</label>
+                    <select value={tranche} onChange={(e) => setTranche(e.target.value)} className="select w-full text-xs">
+                      <option value="">Aucun</option>
+                      {(["00","01","02","03","11","12","21","22","31","32","41","42","51","52","53"] as const).map((k) => (
+                        <option key={k} value={k}>{TRANCHES_EFFECTIFS[k]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Effectifs max.</label>
+                    <select value={trancheMax} onChange={(e) => setTrancheMax(e.target.value)} className="select w-full text-xs">
+                      <option value="">Aucun</option>
+                      {(["00","01","02","03","11","12","21","22","31","32","41","42","51","52","53"] as const).map((k) => (
+                        <option key={k} value={k}>{TRANCHES_EFFECTIFS[k]}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={searchSource === "google_maps" ? handleSearchMaps : handleSearch}
-                    disabled={loading}
+                  <button onClick={handleSearch} disabled={loading}
                     className={cn("btn-primary flex items-center gap-2 text-sm px-6 py-2.5", loading && "opacity-70 cursor-not-allowed")}>
-                    {loading
-                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Recherche…</>
-                      : searchSource === "google_maps"
-                        ? <><span>🗺️</span> Chercher sur Google Maps</>
-                        : <><Zap className="w-4 h-4" /> Trouver des prospects</>
-                    }
+                    {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Recherche…</> : <><Zap className="w-4 h-4" /> Trouver des prospects</>}
                   </button>
                   <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="bg-white border border-gray-200 rounded-lg px-2 py-2 text-gray-500 text-xs focus:outline-none focus:border-brand-400">
                     <option value={25}>25 résultats</option>
@@ -904,19 +821,6 @@ export default function ProspectionPage() {
                   </div>
                 ))}
               </div>
-              {/* Pipeline stats Google Maps */}
-              {mapsStats && (
-                <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-green-700">
-                  <span className="font-semibold">🗺️ Pipeline Maps :</span>
-                  <span>Bruts : <strong>{mapsStats.raw}</strong></span>
-                  <span>Définitivement fermés exclus : <strong>{mapsStats.permenantlyClosedDropped}</strong></span>
-                  <span>Convertis : <strong>{mapsStats.converted}</strong></span>
-                  <span>Avec tél. : <strong className="text-green-800">{mapsStats.withPhone}</strong></span>
-                  <span>Avec site : <strong>{mapsStats.withSite}</strong></span>
-                  <span>🟢 Ouverts : <strong>{mapsStats.open}</strong></span>
-                  <span>🔴 Fermés : <strong>{mapsStats.closed}</strong></span>
-                </div>
-              )}
               {enrichProgress && (
                 <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">
                   <Loader2 className="w-3.5 h-3.5 text-brand-500 animate-spin shrink-0" />
@@ -977,18 +881,9 @@ export default function ProspectionPage() {
                             {isDoNotCall && <span title="Ne plus contacter" className="text-red-400 shrink-0">🚫</span>}
                             {p.nom}
                           </div>
-                          <div className="text-gray-400 text-[10px] mt-0.5 flex items-center gap-1.5 flex-wrap">
-                            {p.ville} · {p.codeNaf || p.libelleNaf}
+                          <div className="text-gray-400 text-[10px] mt-0.5 flex items-center gap-1.5">
+                            {p.ville} · {p.codeNaf}
                             {hasNotes && <span className="text-amber-500" title={p.notesCommercial}>📝</span>}
-                            {p.isCurrentlyOpen === true && (
-                              <span className="text-green-600 font-medium" title={p.currentHoursLabel}>🟢 {p.currentHoursLabel ?? "Ouvert"}</span>
-                            )}
-                            {p.isCurrentlyOpen === false && (
-                              <span className="text-red-400" title={p.currentHoursLabel}>🔴 {p.currentHoursLabel ?? "Fermé"}</span>
-                            )}
-                            {p.rating && (
-                              <span className="text-amber-500">⭐ {p.rating.toFixed(1)}</span>
-                            )}
                           </div>
                         </td>
                         <td className="px-4 py-2.5 whitespace-nowrap">
@@ -1110,27 +1005,6 @@ export default function ProspectionPage() {
                   <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-gray-100 text-gray-600 border-gray-200">
                     <TrendingUp className="w-2.5 h-2.5 text-green-500" /> Score {selected.scoreQualif}/100
                   </span>
-                )}
-                {selected.isCurrentlyOpen === true && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200">
-                    🟢 {selected.currentHoursLabel ?? "Ouvert maintenant"}
-                  </span>
-                )}
-                {selected.isCurrentlyOpen === false && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-red-50 text-red-600 border-red-200">
-                    🔴 {selected.currentHoursLabel ?? "Fermé"}
-                  </span>
-                )}
-                {selected.rating != null && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
-                    ⭐ {selected.rating.toFixed(1)} ({selected.reviewCount ?? 0} avis)
-                  </span>
-                )}
-                {selected.googleMapsUrl && (
-                  <a href={selected.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-sky-50 text-sky-600 border-sky-200 hover:bg-sky-100 transition-colors">
-                    <ExternalLink className="w-2.5 h-2.5" /> Google Maps
-                  </a>
                 )}
               </div>
             </div>
