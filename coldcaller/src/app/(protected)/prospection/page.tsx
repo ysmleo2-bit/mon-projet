@@ -20,30 +20,30 @@ import {
 } from "@/lib/types-prospection";
 
 // ── Secteurs → codes NAF ──────────────────────────────────────────────────────
-const SECTEURS: Array<{ label: string; nafCodes: string[] }> = [
-  { label: "Plomberie / Chauffage",     nafCodes: ["43.22A", "43.22C"] },
-  { label: "Électricité",               nafCodes: ["43.21A", "43.21B"] },
-  { label: "Maçonnerie / BTP",          nafCodes: ["43.99C", "41.20A", "43.12A"] },
-  { label: "Peinture / Décoration",     nafCodes: ["43.34Z"] },
-  { label: "Couverture / Toiture",      nafCodes: ["43.91A", "43.91B"] },
-  { label: "Menuiserie",                nafCodes: ["43.32A", "43.32B"] },
-  { label: "Paysagisme / Jardinage",    nafCodes: ["81.30Z"] },
-  { label: "Nettoyage / Propreté",      nafCodes: ["81.21Z", "81.22Z"] },
-  { label: "Immobilier / Agences",      nafCodes: ["68.31Z", "68.10Z"] },
-  { label: "Conseil / Marketing",       nafCodes: ["70.22Z", "73.11Z", "73.12Z"] },
-  { label: "Informatique / IT",         nafCodes: ["62.01Z", "62.02Z", "62.09Z"] },
-  { label: "Comptabilité / Finance",    nafCodes: ["69.20Z"] },
-  { label: "Avocat / Juridique",        nafCodes: ["69.10Z"] },
-  { label: "Architecture",              nafCodes: ["71.11Z"] },
-  { label: "Restaurant / Restauration", nafCodes: ["56.10A", "56.10B"] },
-  { label: "Coiffure / Beauté",         nafCodes: ["96.02A", "96.02B"] },
-  { label: "Auto / Garage",             nafCodes: ["45.20A", "45.20B"] },
-  { label: "Médecin / Santé",           nafCodes: ["86.21Z", "86.22A"] },
-  { label: "Kiné / Para-médical",       nafCodes: ["86.90A", "86.90B"] },
-  { label: "Assurance / Courtage",      nafCodes: ["65.12Z", "66.22Z"] },
-  { label: "Transport / Logistique",    nafCodes: ["49.41A", "49.41B", "49.41C", "49.42Z", "52.10A", "52.10B", "52.21Z"] },
-  { label: "Transport de personnes",    nafCodes: ["49.32Z", "49.39A", "49.39B", "49.31Z"] },
-  { label: "Livraison / Coursiers",     nafCodes: ["53.20Z", "49.41B", "52.29A"] },
+const SECTEURS: Array<{ label: string; nafCodes: string[]; mapsQuery?: string }> = [
+  { label: "Plomberie / Chauffage",     nafCodes: ["43.22A", "43.22C"],                       mapsQuery: "plombier chauffagiste" },
+  { label: "Électricité",               nafCodes: ["43.21A", "43.21B"],                       mapsQuery: "électricien" },
+  { label: "Maçonnerie / BTP",          nafCodes: ["43.99C", "41.20A", "43.12A", "43.99B"],   mapsQuery: "maçon entreprise btp" },
+  { label: "Peinture / Décoration",     nafCodes: ["43.34Z", "43.39Z"],                       mapsQuery: "peintre décorateur" },
+  { label: "Couverture / Toiture",      nafCodes: ["43.91A", "43.91B"],                       mapsQuery: "couvreur toiture" },
+  { label: "Menuiserie",                nafCodes: ["43.32A", "43.32B", "16.23Z"],             mapsQuery: "menuisier charpentier" },
+  { label: "Paysagisme / Jardinage",    nafCodes: ["81.30Z"],                                 mapsQuery: "paysagiste jardinier" },
+  { label: "Nettoyage / Propreté",      nafCodes: ["81.21Z", "81.22Z", "81.29A", "81.29B"],  mapsQuery: "entreprise nettoyage propreté" },
+  { label: "Immobilier / Agences",      nafCodes: ["68.31Z", "68.10Z"],                       mapsQuery: "agence immobilière" },
+  { label: "Conseil / Marketing",       nafCodes: ["70.22Z", "73.11Z", "73.12Z"],             mapsQuery: "agence marketing conseil" },
+  { label: "Informatique / IT",         nafCodes: ["62.01Z", "62.02Z", "62.09Z"],             mapsQuery: "entreprise informatique développement" },
+  { label: "Comptabilité / Finance",    nafCodes: ["69.20Z"],                                 mapsQuery: "cabinet comptable expert comptable" },
+  { label: "Avocat / Juridique",        nafCodes: ["69.10Z"],                                 mapsQuery: "cabinet avocat" },
+  { label: "Architecture",              nafCodes: ["71.11Z"],                                 mapsQuery: "cabinet architecte" },
+  { label: "Restaurant / Restauration", nafCodes: ["56.10A", "56.10B", "56.21Z", "56.29A"],  mapsQuery: "restaurant" },
+  { label: "Coiffure / Beauté",         nafCodes: ["96.02A", "96.02B"],                       mapsQuery: "salon coiffure beauté" },
+  { label: "Auto / Garage",             nafCodes: ["45.20A", "45.20B", "45.11Z", "45.19Z"],  mapsQuery: "garage automobile réparation" },
+  { label: "Médecin / Santé",           nafCodes: ["86.21Z", "86.22A", "86.22B", "86.22C"],  mapsQuery: "cabinet médical docteur" },
+  { label: "Kiné / Para-médical",       nafCodes: ["86.90A", "86.90B", "86.90C", "86.90D"],  mapsQuery: "kinésithérapeute cabinet paramédical" },
+  { label: "Assurance / Courtage",      nafCodes: ["65.12Z", "66.22Z"],                       mapsQuery: "courtier assurance" },
+  { label: "Transport / Logistique",    nafCodes: ["49.41A", "49.41B", "49.41C", "49.42Z", "52.10A", "52.10B", "52.21Z"], mapsQuery: "transport logistique déménagement" },
+  { label: "Transport de personnes",    nafCodes: ["49.32Z", "49.39A", "49.39B", "49.31Z"],  mapsQuery: "taxi vtc transport personnes" },
+  { label: "Livraison / Coursiers",     nafCodes: ["53.20Z", "49.41B", "52.29A"],             mapsQuery: "livraison coursier messagerie" },
 ];
 
 const DEPARTEMENTS = [
@@ -359,13 +359,18 @@ function EmailComposerModal({
 // ── Page principale ───────────────────────────────────────────────────────────
 export default function ProspectionPage() {
   // ── Formulaire ───────────────────────────────────────────────────────────
-  const [secteurIdx,  setSecteurIdx]  = useState(0);
-  const [nafCustom,   setNafCustom]   = useState("");
-  const [departement, setDepartement] = useState("69");
-  const [tranche,     setTranche]     = useState("");
-  const [trancheMax,  setTrancheMax]  = useState("");
-  const [perPage,     setPerPage]     = useState(50);
-  const [showSearch,  setShowSearch]  = useState(true);
+  const [secteurIdx,    setSecteurIdx]    = useState(0);
+  const [nafCustom,     setNafCustom]     = useState("");
+  const [departement,   setDepartement]   = useState("69");
+  const [tranche,       setTranche]       = useState("");
+  const [trancheMax,    setTrancheMax]    = useState("");
+  const [perPage,       setPerPage]       = useState(50);
+  const [showSearch,    setShowSearch]    = useState(true);
+  const [searchSource,  setSearchSource]  = useState<"sirene" | "google_maps">("google_maps");
+  const [mapsStats,     setMapsStats]     = useState<{
+    raw: number; permenantlyClosedDropped: number; converted: number;
+    withPhone: number; withSite: number; open: number; closed: number; unknownStatus: number;
+  } | null>(null);
 
   // ── État ─────────────────────────────────────────────────────────────────
   const [prospects,      setProspects]      = useState<Prospect[]>([]);
@@ -567,7 +572,7 @@ export default function ProspectionPage() {
   // ── Recherche SIRENE ─────────────────────────────────────────────────────
   const handleSearch = useCallback(async () => {
     setLoading(true); setSearched(true); setError(null);
-    setSelected(null); setEnrichProgress(null);
+    setSelected(null); setEnrichProgress(null); setMapsStats(null);
 
     const secteur  = SECTEURS[secteurIdx];
     const nafCodes = nafCustom
@@ -587,6 +592,44 @@ export default function ProspectionPage() {
       if (data.prospects.length > 0) enrichAll(data.prospects).catch(() => setEnrichProgress(null));
     } catch (e) { setError(String(e)); } finally { setLoading(false); }
   }, [secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, enrichAll]);
+
+  // ── Recherche Google Maps ─────────────────────────────────────────────────
+  const handleSearchMaps = useCallback(async () => {
+    setLoading(true); setSearched(true); setError(null);
+    setSelected(null); setEnrichProgress(null); setMapsStats(null);
+
+    const secteur    = SECTEURS[secteurIdx];
+    const deptLabel  = DEPT_LABELS[departement] ?? departement;
+    // Utiliser la mapsQuery du secteur si disponible, sinon son label
+    const baseQuery  = secteur.mapsQuery ?? secteur.label;
+    const searchQuery = `${baseQuery} ${deptLabel.split(" (")[0]}`;
+
+    try {
+      const res  = await fetch("/api/prospection/search-maps", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          searchQuery,
+          departement,
+          maxResults: perPage,
+          requirePhone: false,
+        }),
+      });
+      const data = await res.json() as {
+        prospects: Prospect[];
+        total: number;
+        stats?: {
+          raw: number; permenantlyClosedDropped: number; converted: number;
+          withPhone: number; withSite: number; open: number; closed: number; unknownStatus: number;
+        };
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
+      setProspects(data.prospects);
+      if (data.stats) setMapsStats(data.stats);
+      setShowSearch(false);
+    } catch (e) { setError(String(e)); } finally { setLoading(false); }
+  }, [secteurIdx, departement, perPage]);
 
   // ── Recherche LinkedIn ────────────────────────────────────────────────────
   const searchLinkedIn = useCallback(async (p: Prospect) => {
@@ -741,47 +784,88 @@ export default function ProspectionPage() {
 
             {showSearch && (
               <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-sm">
-                <div className="grid grid-cols-5 gap-3">
+                {/* Source toggle */}
+                <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg w-fit">
+                  <button
+                    onClick={() => setSearchSource("google_maps")}
+                    className={cn("flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all",
+                      searchSource === "google_maps" ? "bg-white text-green-700 shadow-sm border border-green-200" : "text-gray-500 hover:text-gray-700"
+                    )}>
+                    <span>🗺️</span> Google Maps <span className="text-[9px] bg-green-100 text-green-700 px-1 py-0.5 rounded ml-1">+85% tél.</span>
+                  </button>
+                  <button
+                    onClick={() => setSearchSource("sirene")}
+                    className={cn("flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all",
+                      searchSource === "sirene" ? "bg-white text-brand-700 shadow-sm border border-brand-200" : "text-gray-500 hover:text-gray-700"
+                    )}>
+                    <span>🏛️</span> Registre SIRENE
+                  </button>
+                </div>
+
+                <div className={cn("grid gap-3", searchSource === "sirene" ? "grid-cols-5" : "grid-cols-3")}>
                   <div>
                     <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Secteur d'activité</label>
                     <select value={secteurIdx} onChange={(e) => setSecteurIdx(Number(e.target.value))} className="select w-full text-xs">
                       {SECTEURS.map((s, i) => <option key={s.label} value={i}>{s.label}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Codes NAF (optionnel)</label>
-                    <input value={nafCustom} onChange={(e) => setNafCustom(e.target.value)}
-                      placeholder="ex: 62.01Z, 70.22Z" className="input w-full text-xs" />
-                  </div>
+                  {searchSource === "sirene" && (
+                    <div>
+                      <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Codes NAF (optionnel)</label>
+                      <input value={nafCustom} onChange={(e) => setNafCustom(e.target.value)}
+                        placeholder="ex: 62.01Z, 70.22Z" className="input w-full text-xs" />
+                    </div>
+                  )}
                   <div>
                     <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Département</label>
                     <select value={departement} onChange={(e) => setDepartement(e.target.value)} className="select w-full text-xs">
                       {DEPARTEMENTS.map((d) => <option key={d} value={d}>{DEPT_LABELS[d] ?? d}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Effectifs min.</label>
-                    <select value={tranche} onChange={(e) => setTranche(e.target.value)} className="select w-full text-xs">
-                      <option value="">Aucun</option>
-                      {(["00","01","02","03","11","12","21","22","31","32","41","42","51","52","53"] as const).map((k) => (
-                        <option key={k} value={k}>{TRANCHES_EFFECTIFS[k]}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Effectifs max.</label>
-                    <select value={trancheMax} onChange={(e) => setTrancheMax(e.target.value)} className="select w-full text-xs">
-                      <option value="">Aucun</option>
-                      {(["00","01","02","03","11","12","21","22","31","32","41","42","51","52","53"] as const).map((k) => (
-                        <option key={k} value={k}>{TRANCHES_EFFECTIFS[k]}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {searchSource === "sirene" && (
+                    <>
+                      <div>
+                        <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Effectifs min.</label>
+                        <select value={tranche} onChange={(e) => setTranche(e.target.value)} className="select w-full text-xs">
+                          <option value="">Aucun</option>
+                          {(["00","01","02","03","11","12","21","22","31","32","41","42","51","52","53"] as const).map((k) => (
+                            <option key={k} value={k}>{TRANCHES_EFFECTIFS[k]}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Effectifs max.</label>
+                        <select value={trancheMax} onChange={(e) => setTrancheMax(e.target.value)} className="select w-full text-xs">
+                          <option value="">Aucun</option>
+                          {(["00","01","02","03","11","12","21","22","31","32","41","42","51","52","53"] as const).map((k) => (
+                            <option key={k} value={k}>{TRANCHES_EFFECTIFS[k]}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
+                  {searchSource === "google_maps" && (
+                    <div className="flex flex-col justify-end">
+                      <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Info</label>
+                      <div className="text-[10px] text-gray-400 bg-green-50 border border-green-100 rounded-lg px-3 py-2 leading-relaxed">
+                        Requête : <span className="font-mono text-green-700 font-semibold">
+                          {(SECTEURS[secteurIdx].mapsQuery ?? SECTEURS[secteurIdx].label)} {(DEPT_LABELS[departement] ?? departement).split(" (")[0]}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={handleSearch} disabled={loading}
+                  <button
+                    onClick={searchSource === "google_maps" ? handleSearchMaps : handleSearch}
+                    disabled={loading}
                     className={cn("btn-primary flex items-center gap-2 text-sm px-6 py-2.5", loading && "opacity-70 cursor-not-allowed")}>
-                    {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Recherche…</> : <><Zap className="w-4 h-4" /> Trouver des prospects</>}
+                    {loading
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Recherche…</>
+                      : searchSource === "google_maps"
+                        ? <><span>🗺️</span> Chercher sur Google Maps</>
+                        : <><Zap className="w-4 h-4" /> Trouver des prospects</>
+                    }
                   </button>
                   <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="bg-white border border-gray-200 rounded-lg px-2 py-2 text-gray-500 text-xs focus:outline-none focus:border-brand-400">
                     <option value={25}>25 résultats</option>
@@ -820,6 +904,19 @@ export default function ProspectionPage() {
                   </div>
                 ))}
               </div>
+              {/* Pipeline stats Google Maps */}
+              {mapsStats && (
+                <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-green-700">
+                  <span className="font-semibold">🗺️ Pipeline Maps :</span>
+                  <span>Bruts : <strong>{mapsStats.raw}</strong></span>
+                  <span>Définitivement fermés exclus : <strong>{mapsStats.permenantlyClosedDropped}</strong></span>
+                  <span>Convertis : <strong>{mapsStats.converted}</strong></span>
+                  <span>Avec tél. : <strong className="text-green-800">{mapsStats.withPhone}</strong></span>
+                  <span>Avec site : <strong>{mapsStats.withSite}</strong></span>
+                  <span>🟢 Ouverts : <strong>{mapsStats.open}</strong></span>
+                  <span>🔴 Fermés : <strong>{mapsStats.closed}</strong></span>
+                </div>
+              )}
               {enrichProgress && (
                 <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">
                   <Loader2 className="w-3.5 h-3.5 text-brand-500 animate-spin shrink-0" />
@@ -880,9 +977,18 @@ export default function ProspectionPage() {
                             {isDoNotCall && <span title="Ne plus contacter" className="text-red-400 shrink-0">🚫</span>}
                             {p.nom}
                           </div>
-                          <div className="text-gray-400 text-[10px] mt-0.5 flex items-center gap-1.5">
-                            {p.ville} · {p.codeNaf}
+                          <div className="text-gray-400 text-[10px] mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            {p.ville} · {p.codeNaf || p.libelleNaf}
                             {hasNotes && <span className="text-amber-500" title={p.notesCommercial}>📝</span>}
+                            {p.isCurrentlyOpen === true && (
+                              <span className="text-green-600 font-medium" title={p.currentHoursLabel}>🟢 {p.currentHoursLabel ?? "Ouvert"}</span>
+                            )}
+                            {p.isCurrentlyOpen === false && (
+                              <span className="text-red-400" title={p.currentHoursLabel}>🔴 {p.currentHoursLabel ?? "Fermé"}</span>
+                            )}
+                            {p.rating && (
+                              <span className="text-amber-500">⭐ {p.rating.toFixed(1)}</span>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-2.5 whitespace-nowrap">
@@ -1004,6 +1110,27 @@ export default function ProspectionPage() {
                   <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-gray-100 text-gray-600 border-gray-200">
                     <TrendingUp className="w-2.5 h-2.5 text-green-500" /> Score {selected.scoreQualif}/100
                   </span>
+                )}
+                {selected.isCurrentlyOpen === true && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200">
+                    🟢 {selected.currentHoursLabel ?? "Ouvert maintenant"}
+                  </span>
+                )}
+                {selected.isCurrentlyOpen === false && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-red-50 text-red-600 border-red-200">
+                    🔴 {selected.currentHoursLabel ?? "Fermé"}
+                  </span>
+                )}
+                {selected.rating != null && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
+                    ⭐ {selected.rating.toFixed(1)} ({selected.reviewCount ?? 0} avis)
+                  </span>
+                )}
+                {selected.googleMapsUrl && (
+                  <a href={selected.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border bg-sky-50 text-sky-600 border-sky-200 hover:bg-sky-100 transition-colors">
+                    <ExternalLink className="w-2.5 h-2.5" /> Google Maps
+                  </a>
                 )}
               </div>
             </div>

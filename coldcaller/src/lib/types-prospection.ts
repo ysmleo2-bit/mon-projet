@@ -133,6 +133,16 @@ export interface Prospect {
   linkedinEntreprise?: string;
   googlePresence?:     boolean;
 
+  // ─ Google Maps / Google Business (source: google_maps)
+  placeId?:       string;
+  googleMapsUrl?: string;
+  rating?:        number;
+  reviewCount?:   number;
+  openingHours?:  string[];   // ["Lundi: 08:00–18:00", "Mardi: 08:00–18:00", …]
+  isCurrentlyOpen?: boolean | null;  // null = inconnu
+  currentHoursLabel?: string;        // "Ouvert jusqu'à 18:00" | "Ouvre à 08:30"
+  searchSource?:  "sirene" | "google_maps";  // source de la recherche initiale
+
   // ─ Dirigeant(s)
   dirigeants:          Dirigeant[];
   dirigeantPrincipal?: string;    // nom complet formaté
