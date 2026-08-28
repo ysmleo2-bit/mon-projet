@@ -8,10 +8,12 @@ import type { Prospect, StatutAppel, ProspectStatut } from "@/lib/types-prospect
 // ── Mapping statuts prospection → CRM ────────────────────────────────────────
 
 export function toLeadStatus(statut: ProspectStatut, statutAppel?: StatutAppel): Lead["status"] {
-  if (statut === "pas_interesse") return "lost";
-  if (statut === "interesse")     return "interested";
-  if (statut === "repondu")       return "interested";
-  if (statutAppel === "r1_booke")          return "rdv";
+  // statutAppel a la priorité absolue — un R1 booké reste "rdv"
+  // même si le statut pipeline vaut "interesse" ou "repondu"
+  if (statutAppel === "r1_booke")                  return "rdv";
+  if (statut === "pas_interesse")                  return "lost";
+  if (statut === "interesse")                      return "interested";
+  if (statut === "repondu")                        return "interested";
   if (statutAppel && statutAppel !== "non_appele") return "contacted";
   return "new";
 }
@@ -68,7 +70,9 @@ export function prospectToLead(prospect: Prospect): Lead {
   }
 
   return {
-    id:          prospect.siren ? `crm-${prospect.siren}` : `crm-${prospect.id}`,
+    // ID stable basé sur prospect.id (jamais modifié), évite les doublons
+    // si le SIREN est enrichi après la première sync.
+    id:          `crm-${prospect.id}`,
     name:        prospect.nom,
     category:    prospect.libelleNaf || prospect.secteur || "B2B",
     phone:       prospect.telephonePro ?? "",

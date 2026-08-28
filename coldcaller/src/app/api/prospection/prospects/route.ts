@@ -59,6 +59,8 @@ export async function PATCH(req: NextRequest) {
     (patch.notesCommercial !== undefined && String(patch.notesCommercial).trim().length > 0);
 
   let crmSynced = false;
+  let crmError: string | undefined;
+
   if (triggerCrm && updated) {
     try {
       const { dbUpsertLeads } = await import("@/lib/db");
@@ -68,19 +70,22 @@ export async function PATCH(req: NextRequest) {
       crmSynced = true;
     } catch (crmErr) {
       console.error("[prospects/patch] CRM upsert failed:", crmErr);
+      crmError = String(crmErr);
     }
 
-    // Marquer danscrm:true indépendamment de l'upsert
-    // (évite de re-déclencher le sync à chaque action)
-    const now = new Date().toISOString();
-    try {
-      await dbUpdateProspect(id, { danscrm: true, dateCrm: now });
-    } catch { /* non-bloquant */ }
-    updated.danscrm = true;
-    updated.dateCrm = now;
+    // Marquer danscrm:true UNIQUEMENT si la sync a vraiment réussi
+    // (évitait un faux positif : badge vert "Dans le CRM" alors que le lead n'était pas en base)
+    if (crmSynced) {
+      const now = new Date().toISOString();
+      try {
+        await dbUpdateProspect(id, { danscrm: true, dateCrm: now });
+      } catch { /* non-bloquant */ }
+      updated.danscrm = true;
+      updated.dateCrm = now;
+    }
   }
 
-  return NextResponse.json({ ok: true, prospect: updated, crmSynced });
+  return NextResponse.json({ ok: true, prospect: updated, crmSynced, ...(crmError ? { crmError } : {}) });
 }
 
 export async function DELETE(req: NextRequest) {
