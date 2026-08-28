@@ -1,11 +1,16 @@
 /**
  * GET /api/performance
- * Statistiques de performance par SDR — liées au CRM (table leads).
+ * Statistiques de performance par SDR — lues directement depuis la table prospects.
  *
- * "Appels passés"  = leads où callStatus != 'non_appele' (au moins 1 appel)
- *                    + callCount si supérieur (en cas de multi-appels enregistrés)
- * "Leads attribués" = leads avec activité sur la période (tous, même non attribués)
- * "Détail par SDR"  = groupé par assignedToId + ligne "Non attribué" si applicable
+ * Lisait auparavant depuis `leads` (table CRM), ce qui créait un décalage
+ * car la sync Prospection → CRM était conditionnelle. Désormais on lit depuis
+ * `prospects` directement : chaque action dans Prospection remonte immédiatement.
+ *
+ * Champs clés utilisés depuis prospects.data :
+ *   assignedToId / assignedTo  → identité du SDR
+ *   statutAppel                → statut du dernier appel (non_appele | decroche | …)
+ *   dateAppel                  → date du dernier appel (pour filtrage alternatif)
+ *   notesCommercial            → présence de notes
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -53,12 +58,21 @@ function prevPeriodDates(period: string, from?: string, to?: string): { start: D
   return { start: new Date(start.getTime() - duration - 86400000), end: new Date(start.getTime() - 1) };
 }
 
-/** Nombre d'appels réels : au moins 1 si callStatus != non_appele, sinon callCount */
+// Un appel est comptabilisé si statutAppel est positionné et != non_appele
 const CALL_COUNT_EXPR = `
-  GREATEST(
-    COALESCE((data->>'callCount')::int, 0),
-    CASE WHEN data->>'callStatus' IS NOT NULL
-              AND data->>'callStatus' != 'non_appele' THEN 1 ELSE 0 END
+  CASE WHEN data->>'statutAppel' IS NOT NULL
+            AND data->>'statutAppel' != 'non_appele'
+       THEN 1 ELSE 0 END
+`;
+
+// Condition : prospect actif dans la période = mis à jour dans la période ET attribué ou appelé
+const ACTIVE_COND = `
+  (
+    updated_at BETWEEN $1 AND $2
+    OR (
+      data->>'dateAppel' IS NOT NULL
+      AND (data->>'dateAppel')::timestamptz BETWEEN $1 AND $2
+    )
   )
 `;
 
@@ -72,36 +86,26 @@ export async function GET(req: NextRequest) {
   const to     = sp.get("to")     ?? undefined;
   const userId = sp.get("userId") ?? undefined;
 
-  const { start, end }           = periodDates(period, from, to);
-  const { start: ps, end: pe }   = prevPeriodDates(period, from, to);
+  const { start, end }         = periodDates(period, from, to);
+  const { start: ps, end: pe } = prevPeriodDates(period, from, to);
 
   try {
-    // ── Condition d'activité : lead mis à jour OU callStatus positionné ────────
-    const activityCond = `
-      (
-        updated_at BETWEEN $1 AND $2
-        OR (
-          data->>'callStatus' IS NOT NULL
-          AND data->>'callStatus' != 'non_appele'
-          AND created_at BETWEEN $1 AND $2
-        )
-      )
-    `;
-
-    // ── Stats par SDR (inclut "Non attribué") ──────────────────────────────────
+    // ── Stats par SDR depuis prospects ────────────────────────────────────────
     let statsSql = `
       SELECT
-        COALESCE(data->>'assignedToId', '__unassigned__')       AS sdr_id,
-        COALESCE(data->>'assignedTo',   '— Non attribué —')     AS sdr_name,
-        COUNT(*)::int                                            AS leads_count,
-        COALESCE(SUM(${CALL_COUNT_EXPR}), 0)::int               AS calls_total,
-        SUM(CASE WHEN data->>'callStatus' IN ('r1_booke')
-                   OR data->>'status'     IN ('rdv','client') THEN 1 ELSE 0 END)::int AS r1_count,
-        SUM(CASE WHEN data->>'callStatus' = 'a_rappeler'    THEN 1 ELSE 0 END)::int AS relances_count,
-        SUM(CASE WHEN data->>'callStatus' = 'decroche'      THEN 1 ELSE 0 END)::int AS decroches_count,
-        SUM(CASE WHEN data->>'callStatus' = 'pas_decroche'  THEN 1 ELSE 0 END)::int AS pas_decroches_count
-      FROM leads
-      WHERE updated_at BETWEEN $1 AND $2
+        COALESCE(data->>'assignedToId', '__unassigned__')      AS sdr_id,
+        COALESCE(data->>'assignedTo',   '— Non attribué —')    AS sdr_name,
+        COUNT(*)::int                                           AS leads_count,
+        COALESCE(SUM(${CALL_COUNT_EXPR}), 0)::int              AS calls_total,
+        SUM(CASE WHEN data->>'statutAppel' = 'r1_booke'        THEN 1 ELSE 0 END)::int AS r1_count,
+        SUM(CASE WHEN data->>'statutAppel' = 'a_rappeler'      THEN 1 ELSE 0 END)::int AS relances_count,
+        SUM(CASE WHEN data->>'statutAppel' = 'decroche'        THEN 1 ELSE 0 END)::int AS decroches_count,
+        SUM(CASE WHEN data->>'statutAppel' = 'pas_decroche'    THEN 1 ELSE 0 END)::int AS pas_decroches_count,
+        SUM(CASE WHEN data->>'statutAppel' = 'numero_invalide' THEN 1 ELSE 0 END)::int AS invalides_count,
+        SUM(CASE WHEN data->>'notesCommercial' IS NOT NULL
+                      AND data->>'notesCommercial' != ''       THEN 1 ELSE 0 END)::int AS with_notes_count
+      FROM prospects
+      WHERE ${ACTIVE_COND}
     `;
     const statsParams: unknown[] = [start.toISOString(), end.toISOString()];
     if (userId) {
@@ -120,9 +124,8 @@ export async function GET(req: NextRequest) {
         COALESCE(data->>'assignedToId', '__unassigned__') AS sdr_id,
         COUNT(*)::int                                      AS leads_count,
         COALESCE(SUM(${CALL_COUNT_EXPR}), 0)::int         AS calls_total,
-        SUM(CASE WHEN data->>'callStatus' IN ('r1_booke')
-                   OR data->>'status'     IN ('rdv','client') THEN 1 ELSE 0 END)::int AS r1_count
-      FROM leads
+        SUM(CASE WHEN data->>'statutAppel' = 'r1_booke'   THEN 1 ELSE 0 END)::int AS r1_count
+      FROM prospects
       WHERE updated_at BETWEEN $1 AND $2
     `;
     const prevParams: unknown[] = [ps.toISOString(), pe.toISOString()];
@@ -132,30 +135,30 @@ export async function GET(req: NextRequest) {
     // ── Graphique par jour ─────────────────────────────────────────────────────
     let chartSql = `
       SELECT
-        DATE(updated_at)                                     AS day,
-        COUNT(*)::int                                        AS lead_updates,
-        COALESCE(SUM(${CALL_COUNT_EXPR}), 0)::int           AS calls_sum,
-        SUM(CASE WHEN data->>'callStatus' IN ('r1_booke')
-                   OR data->>'status'     IN ('rdv','client') THEN 1 ELSE 0 END)::int AS r1_sum
-      FROM leads
-      WHERE updated_at BETWEEN $1 AND $2
+        DATE(updated_at)                                   AS day,
+        COUNT(*)::int                                      AS lead_updates,
+        COALESCE(SUM(${CALL_COUNT_EXPR}), 0)::int         AS calls_sum,
+        SUM(CASE WHEN data->>'statutAppel' = 'r1_booke'   THEN 1 ELSE 0 END)::int AS r1_sum
+      FROM prospects
+      WHERE ${ACTIVE_COND}
     `;
     const chartParams: unknown[] = [start.toISOString(), end.toISOString()];
     if (userId) { chartParams.push(userId); chartSql += ` AND data->>'assignedToId' = $${chartParams.length}`; }
     chartSql += " GROUP BY DATE(updated_at) ORDER BY day ASC";
 
-    // ── Totaux globaux (TOUS les leads actifs, attribués ou non) ──────────────
+    // ── Totaux globaux ─────────────────────────────────────────────────────────
     let totalSql = `
       SELECT
-        COUNT(*)::int                                       AS total_leads,
-        COALESCE(SUM(${CALL_COUNT_EXPR}), 0)::int          AS total_calls,
-        SUM(CASE WHEN data->>'callStatus' IN ('r1_booke')
-                   OR data->>'status'     IN ('rdv','client') THEN 1 ELSE 0 END)::int AS total_r1,
-        SUM(CASE WHEN data->>'callStatus' = 'a_rappeler'   THEN 1 ELSE 0 END)::int AS total_relances,
-        SUM(CASE WHEN data->>'callStatus' = 'pas_decroche' THEN 1 ELSE 0 END)::int AS total_pas_decroches,
-        SUM(CASE WHEN data->>'callStatus' = 'decroche'     THEN 1 ELSE 0 END)::int AS total_decroches
-      FROM leads
-      WHERE updated_at BETWEEN $1 AND $2
+        COUNT(*)::int                                            AS total_leads,
+        COALESCE(SUM(${CALL_COUNT_EXPR}), 0)::int               AS total_calls,
+        SUM(CASE WHEN data->>'statutAppel' = 'r1_booke'         THEN 1 ELSE 0 END)::int AS total_r1,
+        SUM(CASE WHEN data->>'statutAppel' = 'a_rappeler'       THEN 1 ELSE 0 END)::int AS total_relances,
+        SUM(CASE WHEN data->>'statutAppel' = 'pas_decroche'     THEN 1 ELSE 0 END)::int AS total_pas_decroches,
+        SUM(CASE WHEN data->>'statutAppel' = 'decroche'         THEN 1 ELSE 0 END)::int AS total_decroches,
+        COUNT(DISTINCT data->>'assignedToId')
+          FILTER (WHERE data->>'assignedToId' IS NOT NULL)::int  AS total_sdrs_actifs
+      FROM prospects
+      WHERE ${ACTIVE_COND}
     `;
     const totalParams: unknown[] = [start.toISOString(), end.toISOString()];
     if (userId) { totalParams.push(userId); totalSql += ` AND data->>'assignedToId' = $${totalParams.length}`; }
@@ -186,6 +189,8 @@ export async function GET(req: NextRequest) {
         relances_count:      Number(r.relances_count),
         decroches_count:     Number(r.decroches_count),
         pas_decroches_count: Number(r.pas_decroches_count),
+        invalides_count:     Number(r.invalides_count),
+        with_notes_count:    Number(r.with_notes_count),
         booking_rate:        calls > 0 ? Math.round((r1 / calls) * 1000) / 10 : 0,
         prev_calls_change:   pctChange(calls, pCalls),
         prev_r1_change:      pctChange(r1, pR1),
@@ -194,17 +199,18 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    const totRow   = totalRes.rows[0] ?? {};
-    const tCalls   = Number(totRow.total_calls) || 0;
-    const tR1      = Number(totRow.total_r1) || 0;
-    const totals   = {
-      total_leads:           Number(totRow.total_leads) || 0,
-      total_calls:           tCalls,
-      total_r1:              tR1,
-      total_relances:        Number(totRow.total_relances) || 0,
-      total_pas_decroches:   Number(totRow.total_pas_decroches) || 0,
-      total_decroches:       Number(totRow.total_decroches) || 0,
-      booking_rate:          tCalls > 0 ? Math.round((tR1 / tCalls) * 1000) / 10 : 0,
+    const totRow = totalRes.rows[0] ?? {};
+    const tCalls = Number(totRow.total_calls) || 0;
+    const tR1    = Number(totRow.total_r1) || 0;
+    const totals = {
+      total_leads:         Number(totRow.total_leads) || 0,
+      total_calls:         tCalls,
+      total_r1:            tR1,
+      total_relances:      Number(totRow.total_relances) || 0,
+      total_pas_decroches: Number(totRow.total_pas_decroches) || 0,
+      total_decroches:     Number(totRow.total_decroches) || 0,
+      total_sdrs_actifs:   Number(totRow.total_sdrs_actifs) || 0,
+      booking_rate:        tCalls > 0 ? Math.round((tR1 / tCalls) * 1000) / 10 : 0,
     };
 
     const chart = chartRes.rows.map((r) => ({

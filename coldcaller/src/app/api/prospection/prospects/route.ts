@@ -11,17 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetProspects, dbGetProspect, dbUpdateProspect, dbDeleteProspect } from "@/lib/db-prospection";
 import { requireAuth } from "@/lib/auth-server";
-import type { StatutAppel, ProspectStatut } from "@/lib/types-prospection";
-
 export const dynamic = "force-dynamic";
-
-/** Statuts qui déclenchent une sync CRM automatique */
-const CRM_TRIGGER_STATUTS: ProspectStatut[] = [
-  "interesse", "pas_interesse", "repondu", "email_envoye", "a_relancer",
-];
-const CRM_TRIGGER_APPELS: StatutAppel[] = [
-  "decroche", "pas_decroche", "mail_envoye", "echange_sans_suite", "r1_booke", "a_rappeler",
-];
 
 export async function GET(req: NextRequest) {
   const { user, error } = requireAuth(req);
@@ -59,10 +49,14 @@ export async function PATCH(req: NextRequest) {
   // 1. Persister le patch en base
   const updated = await dbUpdateProspect(id, patch as any);
 
-  // 2. Auto-sync CRM si action commerciale détectée
+  // 2. Auto-sync CRM dès qu'un appel est enregistré ou qu'un statut pipeline change
+  // — statutAppel positionné (même à non_appele pour reset) → sync
+  // — statut pipeline changé → sync
+  // — notes commerciales ajoutées → sync
   const triggerCrm =
-    (patch.statutAppel && CRM_TRIGGER_APPELS.includes(patch.statutAppel as StatutAppel)) ||
-    (patch.statut      && CRM_TRIGGER_STATUTS.includes(patch.statut as ProspectStatut));
+    patch.statutAppel !== undefined ||
+    patch.statut      !== undefined ||
+    (patch.notesCommercial !== undefined && String(patch.notesCommercial).trim().length > 0);
 
   let crmSynced = false;
   if (triggerCrm && updated) {
