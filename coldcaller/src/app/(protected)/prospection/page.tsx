@@ -75,6 +75,29 @@ const DEPT_LABELS: Record<string, string> = {
   "30":"Gard (30)","42":"Loire (42)","63":"Puy-de-Dôme (63)","57":"Moselle (57)",
 };
 
+// ── Suisse : cantons ──────────────────────────────────────────────────────────
+const CANTONS = [
+  "ALL","GE","VD","NE","FR","VS","JU",
+  "ZH","BE","LU","AG","SG","BS","BL","SO","SH","ZG","SZ","GL","AR","AI","GR","OW","NW","TG","UR","TI",
+];
+const CANTON_LABELS: Record<string, string> = {
+  ALL:"Toute la Suisse",
+  GE:"Genève",VD:"Vaud",NE:"Neuchâtel",FR:"Fribourg",VS:"Valais",JU:"Jura",
+  ZH:"Zurich",BE:"Berne",LU:"Lucerne",AG:"Argovie",SG:"St-Gallen",
+  BS:"Bâle-Ville",BL:"Bâle-Campagne",SO:"Soleure",SH:"Schaffhouse",
+  ZG:"Zoug",SZ:"Schwyz",GL:"Glaris",AR:"Appenzell Rh.-Ext.",AI:"Appenzell Rh.-Int.",
+  GR:"Grisons",OW:"Obwald",NW:"Nidwald",TG:"Thurgovie",UR:"Uri",TI:"Tessin",
+};
+
+// ── Belgique : provinces ──────────────────────────────────────────────────────
+const PROVINCES_BE = ["ALL","BXL","ANT","LGE","HAI","OVL","WVL","VBR","WBR","NAM","LUX","LIM"];
+const PROVINCE_BE_LABELS: Record<string, string> = {
+  ALL:"Toute la Belgique",
+  BXL:"Bruxelles-Capitale",ANT:"Anvers",LGE:"Liège",HAI:"Hainaut",
+  OVL:"Flandre-Orientale",WVL:"Flandre-Occidentale",VBR:"Brabant flamand",
+  WBR:"Brabant wallon",NAM:"Namur",LUX:"Luxembourg",LIM:"Limbourg",
+};
+
 const STATUT_APPEL_ICONS: Record<StatutAppel, typeof PhoneCall> = {
   non_appele:         Clock,
   decroche:           PhoneCall,
@@ -371,6 +394,8 @@ export default function ProspectionPage() {
   const [tranche,       setTranche]       = useState("");
   const [trancheMax,    setTrancheMax]    = useState("");
   const [perPage,       setPerPage]       = useState(50);
+  const [pays,          setPays]          = useState<"FR"|"CH"|"BE">("FR");
+  const [region,        setRegion]        = useState<string>("69"); // dept FR | canton CH | province BE
   const [showSearch,    setShowSearch]    = useState(true);
 
   // ── État ─────────────────────────────────────────────────────────────────
@@ -423,6 +448,7 @@ export default function ProspectionPage() {
         const saved = JSON.parse(raw) as {
           secteurIdx?: number; nafCustom?: string; departement?: string;
           tranche?: string; trancheMax?: string; perPage?: number;
+          pays?: string; region?: string;
           prospects?: Prospect[]; searched?: boolean; showSearch?: boolean;
         };
         if (saved.secteurIdx  !== undefined) setSecteurIdx(saved.secteurIdx);
@@ -431,6 +457,8 @@ export default function ProspectionPage() {
         if (saved.tranche     !== undefined) setTranche(saved.tranche);
         if (saved.trancheMax  !== undefined) setTrancheMax(saved.trancheMax);
         if (saved.perPage     !== undefined) setPerPage(saved.perPage);
+        if (saved.pays        !== undefined) setPays(saved.pays as "FR"|"CH"|"BE");
+        if (saved.region      !== undefined) setRegion(saved.region);
         if (Array.isArray(saved.prospects) && saved.prospects.length > 0) {
           setProspects(saved.prospects);
           setSearched(true);
@@ -453,10 +481,11 @@ export default function ProspectionPage() {
     try {
       localStorage.setItem("coldcaller_prospection_state", JSON.stringify({
         secteurIdx, nafCustom, departement, tranche, trancheMax, perPage,
+        pays, region,
         prospects, searched, showSearch,
       }));
     } catch { /* ignore storage errors */ }
-  }, [hydrated, secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, prospects, searched, showSearch]);
+  }, [hydrated, secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, pays, region, prospects, searched, showSearch]);
 
   // ── Mise à jour optimiste ─────────────────────────────────────────────────
   const updateProspect = useCallback(async (id: string, patch: Partial<Prospect>) => {
@@ -579,12 +608,28 @@ export default function ProspectionPage() {
     const nafCodes = nafCustom
       ? nafCustom.split(",").map((s) => s.trim()).filter(Boolean)
       : secteur.nafCodes;
+    // Mot-clé pour Suisse / Belgique : premier mot du mapsQuery ou du label
+    const keyword = secteur.mapsQuery?.split(" ")[0] ?? secteur.label.split(/[/\s]/)[0] ?? secteur.label;
 
     try {
-      const res  = await fetch("/api/prospection/search", {
+      let apiUrl    = "/api/prospection/search";
+      let apiBody: Record<string, unknown>;
+
+      if (pays === "CH") {
+        apiUrl  = "/api/prospection/search-ch";
+        apiBody = { keyword, secteur: secteur.label, canton: region || "ALL", perPage };
+      } else if (pays === "BE") {
+        apiUrl  = "/api/prospection/search-be";
+        apiBody = { secteur: secteur.label, keyword, province: region || "ALL", perPage };
+      } else {
+        // France — SIRENE
+        apiBody = { nafCodes, secteur: secteur.label, departement: region || departement, trancheMin: tranche || undefined, trancheMax: trancheMax || undefined, perPage, page: 1 };
+      }
+
+      const res  = await fetch(apiUrl, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ nafCodes, secteur: secteur.label, departement, trancheMin: tranche || undefined, trancheMax: trancheMax || undefined, perPage, page: 1 }),
+        body:    JSON.stringify(apiBody),
       });
       const data = await res.json() as { prospects: Prospect[]; total: number; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
@@ -592,7 +637,7 @@ export default function ProspectionPage() {
       setShowSearch(false);
       if (data.prospects.length > 0) enrichAll(data.prospects).catch(() => setEnrichProgress(null));
     } catch (e) { setError(String(e)); } finally { setLoading(false); }
-  }, [secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, enrichAll]);
+  }, [secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, pays, region, enrichAll]);
 
 
   // ── Recherche LinkedIn ────────────────────────────────────────────────────
@@ -755,17 +800,64 @@ export default function ProspectionPage() {
                       {SECTEURS.map((s, i) => <option key={s.label} value={i}>{s.label}</option>)}
                     </select>
                   </div>
+                  {/* ── Pays ─────────────────────────────────────────── */}
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Pays</label>
+                    <div className="flex gap-1.5">
+                      {([["FR","🇫🇷 France"],["CH","🇨🇭 Suisse"],["BE","🇧🇪 Belgique"]] as const).map(([code, label]) => (
+                        <button key={code} type="button"
+                          onClick={() => { setPays(code); setRegion(code === "FR" ? "69" : "ALL"); }}
+                          className={cn(
+                            "flex-1 text-[11px] font-medium py-1.5 rounded-lg border transition-colors",
+                            pays === code
+                              ? "bg-brand-500 text-white border-brand-500"
+                              : "bg-white text-gray-600 border-gray-200 hover:border-brand-300"
+                          )}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── Région (dept / canton / province selon pays) ─── */}
+                  <div>
+                    {pays === "FR" && (
+                      <>
+                        <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Département</label>
+                        <select value={region || departement} onChange={(e) => { setRegion(e.target.value); setDepartement(e.target.value); }} className="select w-full text-xs">
+                          {DEPARTEMENTS.map((d) => <option key={d} value={d}>{DEPT_LABELS[d] ?? d}</option>)}
+                        </select>
+                      </>
+                    )}
+                    {pays === "CH" && (
+                      <>
+                        <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Canton</label>
+                        <select value={region || "ALL"} onChange={(e) => setRegion(e.target.value)} className="select w-full text-xs">
+                          {CANTONS.map((c) => <option key={c} value={c}>{CANTON_LABELS[c] ?? c}</option>)}
+                        </select>
+                      </>
+                    )}
+                    {pays === "BE" && (
+                      <>
+                        <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Province</label>
+                        <select value={region || "ALL"} onChange={(e) => setRegion(e.target.value)} className="select w-full text-xs">
+                          {PROVINCES_BE.map((p) => <option key={p} value={p}>{PROVINCE_BE_LABELS[p] ?? p}</option>)}
+                        </select>
+                      </>
+                    )}
+                  </div>
+
+                  {/* ── NAF (France uniquement) ───────────────────────── */}
+                  {pays === "FR" && (
                   <div>
                     <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Codes NAF (optionnel)</label>
                     <input value={nafCustom} onChange={(e) => setNafCustom(e.target.value)}
                       placeholder="ex: 62.01Z, 70.22Z" className="input w-full text-xs" />
                   </div>
-                  <div>
-                    <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Département</label>
-                    <select value={departement} onChange={(e) => setDepartement(e.target.value)} className="select w-full text-xs">
-                      {DEPARTEMENTS.map((d) => <option key={d} value={d}>{DEPT_LABELS[d] ?? d}</option>)}
-                    </select>
-                  </div>
+                  )}
+
+                  {/* ── Effectifs (France uniquement) ────────────────── */}
+                  {pays === "FR" && (<>
                   <div>
                     <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Effectifs min.</label>
                     <select value={tranche} onChange={(e) => setTranche(e.target.value)} className="select w-full text-xs">
@@ -784,6 +876,15 @@ export default function ProspectionPage() {
                       ))}
                     </select>
                   </div>
+                  </>)}
+
+                  {/* ── Info sources alternatives ─────────────────────── */}
+                  {pays === "CH" && (
+                    <p className="text-[10px] text-gray-400 col-span-2">📋 Source : Zefix (Registre fédéral suisse officiel). Contacts enrichis automatiquement.</p>
+                  )}
+                  {pays === "BE" && (
+                    <p className="text-[10px] text-gray-400 col-span-2">📋 Source : OpenStreetMap Belgique. Téléphones enrichis automatiquement via le site web.</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <button onClick={handleSearch} disabled={loading}

@@ -103,6 +103,8 @@ export type DataSource =
   | "website_scraping"
   | "pattern_email"
   | "pappers"
+  | "zefix"
+  | "openstreetmap"
   | "manuel";
 
 // ── Prospect principal ────────────────────────────────────────────────────────
