@@ -48,6 +48,29 @@ const SECTEURS: Array<{ label: string; nafCodes: string[]; mapsQuery?: string }>
   { label: "Infirmier libéral",         nafCodes: ["86.90A"],                                              mapsQuery: "infirmier libéral cabinet infirmier" },
   { label: "Pharmacie",                 nafCodes: ["47.73Z"],                                              mapsQuery: "pharmacie officine" },
   { label: "Optique / Audiologie",      nafCodes: ["47.78A", "86.90G"],                                   mapsQuery: "opticien audioprothésiste" },
+  // ── Médecine esthétique ───────────────────────────────────────────────────
+  { label: "💉 Médecine esthétique",   nafCodes: ["86.22A", "86.22B"],                                   mapsQuery: "médecine esthétique botox acide hyaluronique" },
+  { label: "🏥 Clinique esthétique",   nafCodes: ["86.10Z", "86.22A"],                                   mapsQuery: "clinique esthétique chirurgie plastique" },
+  { label: "✂️ Chirurgie esthétique",  nafCodes: ["86.22A", "86.10Z"],                                   mapsQuery: "chirurgie esthétique plastique reconstructrice" },
+  { label: "🔦 Centre laser",          nafCodes: ["86.22A", "86.90B"],                                   mapsQuery: "centre laser épilation laser skin" },
+  // ── Dentaire / orthodontie ────────────────────────────────────────────────
+  { label: "🏢 Centre dentaire",       nafCodes: ["86.23Z"],                                              mapsQuery: "centre dentaire dental" },
+  { label: "🦷 Orthodontiste",         nafCodes: ["86.23Z"],                                              mapsQuery: "orthodontiste orthodontie" },
+  { label: "🦷 Implantologue",         nafCodes: ["86.23Z"],                                              mapsQuery: "implantologue implant dentaire" },
+  // ── Centres médicaux privés ───────────────────────────────────────────────
+  { label: "🏥 Centre médical",        nafCodes: ["86.21Z", "86.22A"],                                   mapsQuery: "centre médical maison de santé" },
+  { label: "🏨 Clinique privée",       nafCodes: ["86.10Z"],                                              mapsQuery: "clinique privée polyclinique" },
+  { label: "🩺 Centre de santé",       nafCodes: ["86.21Z", "86.22A", "86.22B"],                          mapsQuery: "centre de santé pôle médical" },
+  // ── Spécialistes premium ──────────────────────────────────────────────────
+  { label: "👩‍⚕️ Dermatologue",       nafCodes: ["86.22A"],                                              mapsQuery: "dermatologue cabinet dermatologie" },
+  { label: "👁️ Ophtalmologue",        nafCodes: ["86.22A"],                                              mapsQuery: "ophtalmologue cabinet ophtalmologie" },
+  { label: "👩‍⚕️ Gynécologue",       nafCodes: ["86.22A"],                                              mapsQuery: "gynécologue cabinet gynécologie" },
+  { label: "🔪 Chirurgien",            nafCodes: ["86.22B", "86.10Z"],                                   mapsQuery: "chirurgien cabinet chirurgie" },
+  // ── Esthétique non médicale ───────────────────────────────────────────────
+  { label: "💅 Centre esthétique",     nafCodes: ["96.02B", "96.04Z"],                                   mapsQuery: "centre esthétique soin du corps" },
+  { label: "🌸 Institut de beauté",    nafCodes: ["96.02B"],                                              mapsQuery: "institut beauté soin visage corps" },
+  { label: "⚖️ Centre minceur",        nafCodes: ["96.04Z", "86.90B"],                                   mapsQuery: "centre minceur amincissement cryolipolyse" },
+  { label: "🧖 Spa / Bien-être",       nafCodes: ["96.04Z", "93.12Z"],                                   mapsQuery: "spa bien-être hammam sauna" },
   { label: "Assurance / Courtage",      nafCodes: ["65.12Z", "66.22Z"],                                   mapsQuery: "courtier assurance" },
   { label: "Transport / Logistique",    nafCodes: ["49.41A", "49.41B", "49.41C", "49.42Z", "52.10A", "52.10B", "52.21Z"], mapsQuery: "transport logistique déménagement" },
   { label: "Transport de personnes",    nafCodes: ["49.32Z", "49.39A", "49.39B", "49.31Z"],  mapsQuery: "taxi vtc transport personnes" },
