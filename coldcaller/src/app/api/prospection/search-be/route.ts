@@ -31,6 +31,8 @@ const SECTOR_OSM_TAGS: Record<string, string[]> = {
   "Avocat / Juridique":        ["office=lawyer"],
   "Architecture":              ["office=architect"],
   "Restaurant / Restauration": ["amenity=restaurant", "amenity=fast_food"],
+  "Établissement de nuit":     ["amenity=nightclub", "amenity=bar", "amenity=pub"],
+  "Plage privée / Beach Club": ["leisure=beach_resort", "amenity=beach", "leisure=swimming_area"],
   "Coiffure / Beauté":         ["shop=hairdresser", "shop=beauty"],
   "Auto / Garage":             ["shop=car_repair", "amenity=car_repair"],
   "Médecin / Santé":           ["amenity=doctors", "healthcare=doctor"],

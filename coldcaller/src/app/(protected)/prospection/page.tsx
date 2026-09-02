@@ -36,6 +36,8 @@ const SECTEURS: Array<{ label: string; nafCodes: string[]; mapsQuery?: string }>
   { label: "Avocat / Juridique",        nafCodes: ["69.10Z"],                                 mapsQuery: "cabinet avocat" },
   { label: "Architecture",              nafCodes: ["71.11Z"],                                 mapsQuery: "cabinet architecte" },
   { label: "Restaurant / Restauration", nafCodes: ["56.10A", "56.10B", "56.21Z", "56.29A"],  mapsQuery: "restaurant" },
+  { label: "Établissement de nuit",      nafCodes: ["56.30Z", "93.29Z"],                       mapsQuery: "boite nuit discothèque nightclub bar" },
+  { label: "Plage privée / Beach Club",  nafCodes: ["93.29Z", "55.20Z", "56.10B"],             mapsQuery: "plage privée beach club lido" },
   { label: "Coiffure / Beauté",         nafCodes: ["96.02A", "96.02B"],                       mapsQuery: "salon coiffure beauté" },
   { label: "Auto / Garage",             nafCodes: ["45.20A", "45.20B", "45.11Z", "45.19Z"],  mapsQuery: "garage automobile réparation" },
   { label: "Médecin / Santé",            nafCodes: ["86.21Z", "86.22A", "86.22B", "86.22C"],              mapsQuery: "cabinet médical docteur" },
