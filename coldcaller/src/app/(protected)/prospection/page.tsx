@@ -7,7 +7,7 @@ import {
   Sparkles, X, ExternalLink, Copy, Star, TrendingUp,
   Target, PhoneCall, PhoneMissed, PhoneOff, MessageSquare,
   Hash, Calendar, Briefcase, Database, Clock, RotateCcw,
-  Search, ChevronRight, Send, FileText, Plus, Trash2, Eye,
+  Search, ChevronRight, Send, FileText, Plus, Trash2, Eye, Smartphone,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
@@ -425,12 +425,19 @@ export default function ProspectionPage() {
   const [contactResult,     setContactResult]     = useState<{ email?: string; phone?: string; socials?: Record<string, string> } | null>(null);
   const [contactError,      setContactError]      = useState<string | null>(null);
 
+  // ── FullEnrich (mobile + email dirigeant) ────────────────────────────────
+  const [feEnriching,  setFeEnriching]  = useState(false);
+  const [feResult,     setFeResult]     = useState<{ phone?: string; email?: string; found: boolean } | null>(null);
+  const [feError,      setFeError]      = useState<string | null>(null);
+
   // Reset LinkedIn + contact state when selected changes
   useEffect(() => {
     setLinkedinResult(null);
     setLinkedinError(null);
     setContactResult(null);
     setContactError(null);
+    setFeResult(null);
+    setFeError(null);
   }, [selected?.id]);
 
   // Notes locales
@@ -641,6 +648,40 @@ export default function ProspectionPage() {
     } catch (e) { setError(String(e)); } finally { setLoading(false); }
   }, [secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, pays, region, enrichAll]);
 
+
+  // ── FullEnrich : mobile + email dirigeant ────────────────────────────────
+  const enrichDirigeant = useCallback(async (p: Prospect) => {
+    setFeEnriching(true);
+    setFeResult(null);
+    setFeError(null);
+    try {
+      const res  = await fetch("/api/prospection/enrich-dirigeant", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          prospectId:         p.id,
+          dirigeantPrincipal: p.dirigeantPrincipal ?? "",
+          nom:                p.nom,
+          ville:              p.ville,
+          linkedinDirigeant:  p.linkedinDirigeant,
+        }),
+      });
+      const data = await res.json() as { ok: boolean; found: boolean; phone?: string; email?: string; message?: string; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
+      setFeResult({ phone: data.phone, email: data.email, found: data.found });
+      if (data.found) {
+        // Mettre à jour localement
+        const updates: Partial<Prospect> = {};
+        if (data.phone) updates.telephoneMobile = data.phone;
+        if (data.email && !p.emailDirigeant) updates.emailDirigeant = data.email;
+        if (Object.keys(updates).length > 0) {
+          setProspects((prev) => prev.map((x) => x.id === p.id ? { ...x, ...updates } : x));
+          setSelected((prev) => prev?.id === p.id ? { ...prev, ...updates } as Prospect : prev);
+        }
+      }
+    } catch (e) { setFeError(String(e)); }
+    finally { setFeEnriching(false); }
+  }, []);
 
   // ── Recherche LinkedIn ────────────────────────────────────────────────────
   const searchLinkedIn = useCallback(async (p: Prospect) => {
@@ -1346,6 +1387,62 @@ export default function ProspectionPage() {
                       <span className="text-gray-400 text-xs italic">Téléphone non trouvé</span>
                     </div>
                   )}
+                  {/* Mobile dirigeant (FullEnrich) */}
+                  {selected.telephoneMobile ? (
+                    <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                      <Smartphone className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                      <a href={`tel:${selected.telephoneMobile.replace(/\s/g,"")}`}
+                        className="font-mono text-green-700 hover:text-green-800 text-xs flex-1 transition-colors font-semibold">
+                        {selected.telephoneMobile}
+                      </a>
+                      <span className="text-[9px] text-green-500 font-medium bg-green-100 px-1.5 py-0.5 rounded">mobile</span>
+                      <CopyBtn text={selected.telephoneMobile} />
+                      <a href={`tel:${selected.telephoneMobile.replace(/\s/g,"")}`}
+                        className="p-1 rounded text-gray-300 hover:text-green-600 transition-colors" title="Appeler">
+                        <PhoneCall className="w-3 h-3" />
+                      </a>
+                    </div>
+                  ) : null}
+
+                  {/* Bouton FullEnrich — mobile + email dirigeant */}
+                  {selected.dirigeantPrincipal && (
+                    <div className="mt-1">
+                      <button
+                        onClick={() => enrichDirigeant(selected)}
+                        disabled={feEnriching}
+                        className="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-lg border border-emerald-300/50 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-all disabled:opacity-50 w-full justify-center">
+                        {feEnriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Smartphone className="w-3 h-3" />}
+                        {feEnriching ? "Recherche FullEnrich…" : selected.telephoneMobile ? "Mettre à jour via FullEnrich" : "📱 Trouver le mobile du dirigeant"}
+                      </button>
+                      {feResult && (
+                        <div className={cn(
+                          "mt-1 rounded-lg px-3 py-2 border text-[10px] space-y-1",
+                          feResult.found ? "bg-emerald-50 border-emerald-200/50" : "bg-gray-50 border-gray-200"
+                        )}>
+                          {feResult.found ? (
+                            <>
+                              {feResult.phone && (
+                                <div className="flex items-center gap-1.5">
+                                  <Smartphone className="w-3 h-3 text-emerald-500 shrink-0" />
+                                  <span className="text-emerald-700 font-medium font-mono">{feResult.phone}</span>
+                                </div>
+                              )}
+                              {feResult.email && (
+                                <div className="flex items-center gap-1.5">
+                                  <Mail className="w-3 h-3 text-emerald-500 shrink-0" />
+                                  <span className="text-emerald-700 font-medium">{feResult.email}</span>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-gray-400 italic">Aucun résultat FullEnrich pour ce dirigeant</span>
+                          )}
+                        </div>
+                      )}
+                      {feError && <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3 shrink-0"/>{feError}</p>}
+                    </div>
+                  )}
+
                   {/* Site + bouton enrichissement Apify */}
                   {selected.siteWeb ? (
                     <>

@@ -146,14 +146,16 @@ export interface Prospect {
   searchSource?:  "sirene" | "google_maps";  // source de la recherche initiale
 
   // ─ Dirigeant(s)
-  dirigeants:          Dirigeant[];
-  dirigeantPrincipal?: string;    // nom complet formaté
-  fonctionDirigeant?:  string;
-  emailDirigeant?:     string;
-  emailSource?:        DataSource;
-  emailVerifie?:       boolean;
-  telephonePro?:       string;
-  linkedinDirigeant?:  string;
+  dirigeants:            Dirigeant[];
+  dirigeantPrincipal?:   string;    // nom complet formaté
+  fonctionDirigeant?:    string;
+  emailDirigeant?:       string;
+  emailSource?:          DataSource;
+  emailVerifie?:         boolean;
+  telephonePro?:         string;    // téléphone pro de l'entreprise
+  telephoneMobile?:      string;    // mobile direct du dirigeant (FullEnrich)
+  linkedinDirigeant?:    string;
+  fullEnrichEnrichedAt?: string;    // date du dernier enrichissement FullEnrich
 
   // ─ Qualification IA
   problematique?:  string;
