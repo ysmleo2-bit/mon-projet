@@ -378,20 +378,18 @@ async function scrapeWebsiteContacts(rawUrl: string): Promise<{
   // Priorité aux liens tel:. Si > 4 numéros regex distincts sans aucun tel:
   // → probablement un site agrégateur → ignorer les regex, ne garder que les tel:
   let phones: string[];
-  if (telLinks.size > 0) {
-    // On prend d'abord les tel: links, puis les regex en complément (si distincts)
-    const combined = new Set<string>([...telLinks]);
-    for (const p of textPhones) {
-      if (!Array.from(telLinks).some((t) => t.replace(/\s/g,"") === p.replace(/\s/g,"")))
-        combined.add(p);
-    }
-    phones = Array.from(combined).slice(0, 3);
-  } else if (textPhones.size <= 4) {
-    // Peu de numéros : probablement le site de l'entreprise
-    phones = Array.from(textPhones).slice(0, 2);
+  const telArr  = Array.from(telLinks);
+  const textArr = Array.from(textPhones);
+  if (telArr.length > 0) {
+    // Liens tel: prioritaires, complétés par regex s'il sont distincts
+    const combined = Array.from(new Set<string>(
+      telArr.concat(textArr.filter((p) => !telArr.some((t) => t.replace(/\s/g,"") === p.replace(/\s/g,""))))
+    ));
+    phones = combined.slice(0, 3);
+  } else if (textArr.length <= 4) {
+    phones = textArr.slice(0, 2);
   } else {
-    // Trop de numéros sans aucun tel: link → agrégateur/annuaire → ignorer
-    console.info(`[scrape] trop de numéros (${textPhones.size}) sans tel: — probablement un agrégateur, ignoré`);
+    console.info(`[scrape] trop de numéros (${textArr.length}) sans tel: — probablement un agrégateur, ignoré`);
     phones = [];
   }
 
