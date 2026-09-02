@@ -455,10 +455,18 @@ export default function ProspectionPage() {
   const [contactResult,     setContactResult]     = useState<{ email?: string; phone?: string; socials?: Record<string, string> } | null>(null);
   const [contactError,      setContactError]      = useState<string | null>(null);
 
-  // ── FullEnrich (mobile + email dirigeant) ────────────────────────────────
-  const [feEnriching,  setFeEnriching]  = useState(false);
+  // ── Waterfall enrichissement (remplace FullEnrich) ──────────────────────
+  const [feEnriching,  setFeEnriching]  = useState(false);  // kept for compat
   const [feResult,     setFeResult]     = useState<{ phone?: string; email?: string; found: boolean } | null>(null);
   const [feError,      setFeError]      = useState<string | null>(null);
+  const [wfEnriching,  setWfEnriching]  = useState(false);
+  const [wfResult,     setWfResult]     = useState<{
+    email?: { value: string; source: string; score: number; reliable: boolean } | null;
+    phone?: { value: string; source: string; score: number; reliable: boolean } | null;
+    site?:      string | null;
+    dirigeant?: string | null;
+  } | null>(null);
+  const [wfError,      setWfError]      = useState<string | null>(null);
 
   // ── Pappers (données financières + enrichissement) ────────────────────────
   const [searchMode,      setSearchMode]      = useState<"sirene"|"pappers">("sirene");
@@ -478,6 +486,8 @@ export default function ProspectionPage() {
     setContactError(null);
     setFeResult(null);
     setFeError(null);
+    setWfResult(null);
+    setWfError(null);
     setPappersResult(null);
     setPappersError(null);
   }, [selected?.id]);
@@ -739,6 +749,50 @@ export default function ProspectionPage() {
       }
     } catch (e) { setFeError(String(e)); }
     finally { setFeEnriching(false); }
+  }, []);
+
+  // ── Waterfall : enrichissement multi-source (EMAIL + TÉL) ───────────────
+  const enrichWaterfall = useCallback(async (p: Prospect) => {
+    setWfEnriching(true);
+    setWfResult(null);
+    setWfError(null);
+    try {
+      const res = await fetch("/api/prospection/enrich-waterfall", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          prospectId:          p.id,
+          siren:               p.siren,
+          nom:                 p.nom,
+          ville:               p.ville,
+          codePostal:          p.codePostal,
+          adresse:             p.adresse,
+          siteWeb:             p.siteWeb,
+          telephonePro:        p.telephonePro,
+          emailDirigeant:      p.emailDirigeant,
+          emailSource:         p.emailSource,
+          dirigeantPrincipal:  p.dirigeantPrincipal,
+          libelleNaf:          p.libelleNaf,
+        }),
+      });
+      const data = await res.json() as {
+        ok: boolean; prospect?: Prospect;
+        waterfall: {
+          email?: { value: string; source: string; score: number; reliable: boolean } | null;
+          phone?: { value: string; source: string; score: number; reliable: boolean } | null;
+          site?: string | null;
+          dirigeant?: string | null;
+        };
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
+      setWfResult(data.waterfall);
+      if (data.prospect) {
+        setProspects((prev) => prev.map((x) => x.id === p.id ? data.prospect! : x));
+        setSelected((prev) => prev?.id === p.id ? data.prospect! : prev);
+      }
+    } catch (e) { setWfError(String(e)); }
+    finally { setWfEnriching(false); }
   }, []);
 
   // ── Pappers : enrichissement financier ───────────────────────────────────
@@ -1578,23 +1632,17 @@ export default function ProspectionPage() {
                   )}
                   {/* Téléphone */}
                   {selected.telephonePro ? (
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                        <Phone className="w-3.5 h-3.5 text-brand-500 shrink-0" />
-                        <a href={`tel:${selected.telephonePro.replace(/\s/g,"")}`}
-                          className="font-mono text-brand-600 hover:text-brand-700 text-xs flex-1 transition-colors font-semibold">
-                          {selected.telephonePro}
-                        </a>
-                        <CopyBtn text={selected.telephonePro} />
-                        <a href={`tel:${selected.telephonePro.replace(/\s/g,"")}`}
-                          className="p-1 rounded text-gray-300 hover:text-green-600 transition-colors" title="Appeler">
-                          <PhoneCall className="w-3 h-3" />
-                        </a>
-                      </div>
-                      <p className="text-[10px] text-amber-600 flex items-center gap-1 px-1">
-                        <AlertCircle className="w-3 h-3 shrink-0" />
-                        Numéro source SIRENE — peut être obsolète. Vérifiez avant d'appeler.
-                      </p>
+                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                      <Phone className="w-3.5 h-3.5 text-brand-500 shrink-0" />
+                      <a href={`tel:${selected.telephonePro.replace(/\s/g,"")}`}
+                        className="font-mono text-brand-600 hover:text-brand-700 text-xs flex-1 transition-colors font-semibold">
+                        {selected.telephonePro}
+                      </a>
+                      <CopyBtn text={selected.telephonePro} />
+                      <a href={`tel:${selected.telephonePro.replace(/\s/g,"")}`}
+                        className="p-1 rounded text-gray-300 hover:text-green-600 transition-colors" title="Appeler">
+                        <PhoneCall className="w-3 h-3" />
+                      </a>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-dashed border-gray-200">
@@ -1619,44 +1667,65 @@ export default function ProspectionPage() {
                     </div>
                   ) : null}
 
-                  {/* Bouton FullEnrich — mobile + email dirigeant */}
-                  {selected.dirigeantPrincipal && (
-                    <div className="mt-1">
-                      <button
-                        onClick={() => enrichDirigeant(selected)}
-                        disabled={feEnriching}
-                        className="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-lg border border-emerald-300/50 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-all disabled:opacity-50 w-full justify-center">
-                        {feEnriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Smartphone className="w-3 h-3" />}
-                        {feEnriching ? "Recherche FullEnrich…" : selected.telephoneMobile ? "Mettre à jour via FullEnrich" : "📱 Trouver le mobile du dirigeant"}
-                      </button>
-                      {feResult && (
-                        <div className={cn(
-                          "mt-1 rounded-lg px-3 py-2 border text-[10px] space-y-1",
-                          feResult.found ? "bg-emerald-50 border-emerald-200/50" : "bg-gray-50 border-gray-200"
-                        )}>
-                          {feResult.found ? (
-                            <>
-                              {feResult.phone && (
-                                <div className="flex items-center gap-1.5">
-                                  <Smartphone className="w-3 h-3 text-emerald-500 shrink-0" />
-                                  <span className="text-emerald-700 font-medium font-mono">{feResult.phone}</span>
-                                </div>
-                              )}
-                              {feResult.email && (
-                                <div className="flex items-center gap-1.5">
-                                  <Mail className="w-3 h-3 text-emerald-500 shrink-0" />
-                                  <span className="text-emerald-700 font-medium">{feResult.email}</span>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-gray-400 italic">Aucun résultat FullEnrich pour ce dirigeant</span>
-                          )}
-                        </div>
-                      )}
-                      {feError && <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3 shrink-0"/>{feError}</p>}
-                    </div>
-                  )}
+                  {/* Bouton Waterfall — enrichissement multi-source sans Apollo/FullEnrich */}
+                  <div className="mt-1">
+                    <button
+                      onClick={() => enrichWaterfall(selected)}
+                      disabled={wfEnriching}
+                      className="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1.5 rounded-lg border border-brand-300/60 text-brand-700 bg-brand-50 hover:bg-brand-100 transition-all disabled:opacity-50 w-full justify-center">
+                      {wfEnriching
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Zap className="w-3 h-3" />}
+                      {wfEnriching
+                        ? "Waterfall en cours…"
+                        : "⚡ Enrichissement Waterfall (email + tél)"}
+                    </button>
+                    {wfResult && (
+                      <div className="mt-1.5 rounded-lg border border-brand-200/50 bg-brand-50/60 px-3 py-2 space-y-1.5">
+                        {wfResult.email ? (
+                          <div className="flex items-center gap-1.5">
+                            <Mail className="w-3 h-3 shrink-0 text-brand-500" />
+                            <span className={cn("text-xs font-mono font-medium flex-1 truncate",
+                              wfResult.email.reliable ? "text-brand-700" : "text-amber-600")}>
+                              {wfResult.email.value}
+                            </span>
+                            <span className={cn("text-[9px] font-medium px-1 py-0.5 rounded",
+                              wfResult.email.reliable
+                                ? "bg-green-100 text-green-600"
+                                : "bg-amber-100 text-amber-600")}>
+                              {wfResult.email.score}% · {wfResult.email.source}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <Mail className="w-3 h-3 shrink-0 text-gray-300" />
+                            <span className="text-[10px] text-gray-400 italic">Email non trouvé</span>
+                          </div>
+                        )}
+                        {wfResult.phone ? (
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="w-3 h-3 shrink-0 text-brand-500" />
+                            <span className="text-xs font-mono font-medium flex-1 text-brand-700">{wfResult.phone.value}</span>
+                            <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-green-100 text-green-600">
+                              {wfResult.phone.score}% · {wfResult.phone.source}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="w-3 h-3 shrink-0 text-gray-300" />
+                            <span className="text-[10px] text-gray-400 italic">Tél non trouvé</span>
+                          </div>
+                        )}
+                        {wfResult.dirigeant && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                            <Target className="w-3 h-3 shrink-0 text-sky-400" />
+                            <span>Dirigeant : <span className="text-gray-700 font-medium">{wfResult.dirigeant}</span></span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {wfError && <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3 shrink-0"/>{wfError}</p>}
+                  </div>
 
                   {/* Site + bouton enrichissement Apify */}
                   {selected.siteWeb ? (
