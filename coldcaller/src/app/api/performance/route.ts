@@ -41,15 +41,34 @@ function periodDates(period: string, from?: string, to?: string): { start: Date;
     const end = new Date(now); end.setHours(23, 59, 59, 999);
     return { start, end };
   }
+  if (period === "last30") {
+    const start = new Date(now);
+    start.setDate(now.getDate() - 30);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(now); end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
   if (period === "month") {
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const end   = new Date(now); end.setHours(23, 59, 59, 999);
     return { start, end };
   }
+  if (period === "quarter") {
+    const qMonth = Math.floor(now.getMonth() / 3) * 3;
+    const start  = new Date(now.getFullYear(), qMonth, 1);
+    const end    = new Date(now); end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+  if (period === "all") {
+    // Tout l'historique : depuis 2020 jusqu'à maintenant
+    return { start: new Date("2020-01-01T00:00:00Z"), end: new Date(now) };
+  }
   if (period === "custom" && from && to) {
     return { start: new Date(from), end: new Date(to + "T23:59:59") };
   }
-  return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: new Date(now) };
+  // Défaut : 30 derniers jours (plus utile que le mois calendaire courant)
+  const start = new Date(now); start.setDate(now.getDate() - 30); start.setHours(0, 0, 0, 0);
+  return { start, end: new Date(now) };
 }
 
 function prevPeriodDates(period: string, from?: string, to?: string): { start: Date; end: Date } {
@@ -65,13 +84,18 @@ const CALL_COUNT_EXPR = `
        THEN 1 ELSE 0 END
 `;
 
-// Condition : prospect actif dans la période = mis à jour dans la période ET attribué ou appelé
+// Condition : prospect actif dans la période.
+// Priorité : dateAppel (date réelle de l'appel) > updated_at (date de dernière modif).
+// Pour la période "all" ($1 = '2020-01-01'), toutes les données remontent.
 const ACTIVE_COND = `
   (
-    updated_at BETWEEN $1 AND $2
-    OR (
+    (
       data->>'dateAppel' IS NOT NULL
       AND (data->>'dateAppel')::timestamptz BETWEEN $1 AND $2
+    )
+    OR (
+      data->>'dateAppel' IS NULL
+      AND updated_at BETWEEN $1 AND $2
     )
   )
 `;
@@ -126,16 +150,19 @@ export async function GET(req: NextRequest) {
         COALESCE(SUM(${CALL_COUNT_EXPR}), 0)::int         AS calls_total,
         SUM(CASE WHEN data->>'statutAppel' = 'r1_booke'   THEN 1 ELSE 0 END)::int AS r1_count
       FROM prospects
-      WHERE updated_at BETWEEN $1 AND $2
+      WHERE ${ACTIVE_COND}
     `;
     const prevParams: unknown[] = [ps.toISOString(), pe.toISOString()];
     if (userId) { prevParams.push(userId); prevSql += ` AND data->>'assignedToId' = $${prevParams.length}`; }
     prevSql += ` GROUP BY COALESCE(data->>'assignedToId', '__unassigned__')`;
 
-    // ── Graphique par jour ─────────────────────────────────────────────────────
+    // ── Graphique par jour : utiliser dateAppel si dispo, sinon updated_at ───────
     let chartSql = `
       SELECT
-        DATE(updated_at)                                   AS day,
+        DATE(COALESCE(
+          NULLIF(data->>'dateAppel', '')::timestamptz,
+          updated_at
+        ))                                                 AS day,
         COUNT(*)::int                                      AS lead_updates,
         COALESCE(SUM(${CALL_COUNT_EXPR}), 0)::int         AS calls_sum,
         SUM(CASE WHEN data->>'statutAppel' = 'r1_booke'   THEN 1 ELSE 0 END)::int AS r1_sum
@@ -144,7 +171,7 @@ export async function GET(req: NextRequest) {
     `;
     const chartParams: unknown[] = [start.toISOString(), end.toISOString()];
     if (userId) { chartParams.push(userId); chartSql += ` AND data->>'assignedToId' = $${chartParams.length}`; }
-    chartSql += " GROUP BY DATE(updated_at) ORDER BY day ASC";
+    chartSql += ` GROUP BY DATE(COALESCE(NULLIF(data->>'dateAppel', '')::timestamptz, updated_at)) ORDER BY day ASC`;
 
     // ── Totaux globaux ─────────────────────────────────────────────────────────
     let totalSql = `

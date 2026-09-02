@@ -41,9 +41,12 @@ interface PublicUser { id: string; name: string; role: string; active: boolean }
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const PERIODS = [
-  { id: "today", label: "Aujourd'hui"   },
-  { id: "week",  label: "Cette semaine" },
-  { id: "month", label: "Ce mois"       },
+  { id: "today",   label: "Aujourd'hui"       },
+  { id: "week",    label: "Cette semaine"     },
+  { id: "last30",  label: "30 derniers jours" },
+  { id: "month",   label: "Ce mois"           },
+  { id: "quarter", label: "Ce trimestre"      },
+  { id: "all",     label: "Tout"              },
 ];
 
 // ── Mini SVG bar chart avec chiffres ─────────────────────────────────────────
@@ -109,7 +112,7 @@ function StatTile({ label, value, sub, icon: Icon, color }: {
 
 // ── Page principale ───────────────────────────────────────────────────────────
 export default function PerformancePage() {
-  const [period,      setPeriod]      = useState("month");
+  const [period,      setPeriod]      = useState("last30");
   const [selectedSdr, setSelectedSdr] = useState("all");
   const [data,        setData]        = useState<PerfData | null>(null);
   const [users,       setUsers]       = useState<PublicUser[]>([]);
