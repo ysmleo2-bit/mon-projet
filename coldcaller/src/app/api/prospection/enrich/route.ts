@@ -34,14 +34,37 @@ function isValidFrPhone(p: string): boolean {
 }
 
 // ── Google Places (ancienne API Maps — Text Search + Details) ────────────────
-// L'API Places v1 ("New") nécessite une activation séparée.
-// L'ancienne API Maps est universellement activée sur la même clé.
+// Flux : Text Search (place_id + name + adresse) → validation nom + ville → Place Details
 //
-// Flux : Text Search (place_id + name) → validation similarité → Place Details (tél + site)
-// Seuil de similarité : 0.25 (Dice sur bigrammes) — suffisant pour les abréviations courantes.
-const PLACES_MIN_SIMILARITY = 0.20;
+// Seuil de similarité relevé à 0.38 (était 0.20) pour éviter les faux positifs.
+// Validation géographique ajoutée : si on a une ville, l'adresse Google doit la contenir.
+const PLACES_MIN_SIMILARITY = 0.38;
 
-async function findViaGooglePlaces(nom: string, ville?: string): Promise<{
+/** Normalise une chaîne pour comparaison ville / adresse */
+function normCity(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[-_]/g, " ").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+}
+
+/** Vérifie qu'une adresse contient la ville attendue (comparaison souple) */
+function cityMatchesAddress(ville: string, address: string, codePostal?: string): boolean {
+  const addrN  = normCity(address);
+  const villeN = normCity(ville);
+
+  // Ville directement dans l'adresse
+  if (addrN.includes(villeN)) return true;
+
+  // Code postal départemental (ex: "69" pour Lyon)
+  if (codePostal && addrN.includes(codePostal.slice(0, 2))) return true;
+
+  // Premiers mots de la ville (utile pour "Saint-Étienne" vs "saint etienne")
+  const villeWords = villeN.split(" ").filter((w) => w.length > 3);
+  if (villeWords.length > 0 && villeWords.every((w) => addrN.includes(w))) return true;
+
+  return false;
+}
+
+async function findViaGooglePlaces(nom: string, ville?: string, codePostal?: string): Promise<{
   siteWeb?: string;
   phone?:   string;
 } | null> {
@@ -50,7 +73,7 @@ async function findViaGooglePlaces(nom: string, ville?: string): Promise<{
 
   const ville_ = ville ?? "";
 
-  // Variantes de requête : du nom complet au nom court (4 mots puis 2 mots)
+  // Variantes de requête : du plus précis au plus court
   const nomCourt = nom.split(/\s+/).slice(0, 4).join(" ");
   const nomTres  = nom.split(/\s+/).slice(0, 2).join(" ");
   const queriesRaw = [
@@ -62,7 +85,7 @@ async function findViaGooglePlaces(nom: string, ville?: string): Promise<{
 
   for (const query of queries) {
     try {
-      // 1. Text Search → place_id + name (pour validation)
+      // 1. Text Search → place_id + name + formatted_address
       const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?`
         + `query=${encodeURIComponent(query)}&language=fr&key=${key}`;
 
@@ -71,57 +94,58 @@ async function findViaGooglePlaces(nom: string, ville?: string): Promise<{
 
       const searchData = await searchRes.json() as {
         status:   string;
-        results?: Array<{ place_id?: string; name?: string }>;
+        results?: Array<{ place_id?: string; name?: string; formatted_address?: string }>;
       };
 
       if (searchData.status !== "OK" || !searchData.results?.length) continue;
 
-      const hit = searchData.results[0];
-      if (!hit.place_id) continue;
+      // Essayer les 3 premiers résultats au lieu du seul premier
+      for (const hit of searchData.results.slice(0, 3)) {
+        if (!hit.place_id) continue;
 
-      // ── Validation : le nom retourné par Places doit ressembler au nom cherché ──
-      // Évite les faux positifs (banque voisine, établissement homonyme…)
-      const placeName = hit.name ?? "";
-      const similarity = diceSimilarity(nom, placeName);
-      if (similarity < PLACES_MIN_SIMILARITY) {
-        console.info(
-          `[places] skip "${placeName}" for "${nom}" — similarity ${similarity.toFixed(2)} < ${PLACES_MIN_SIMILARITY}`
-        );
-        continue;
-      }
-
-      // 2. Place Details → téléphone + site
-      const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?`
-        + `place_id=${hit.place_id}&fields=formatted_phone_number,website&language=fr&key=${key}`;
-
-      const detailRes = await fetch(detailUrl, { signal: AbortSignal.timeout(4_000) });
-      if (!detailRes.ok) continue;
-
-      const detail = await detailRes.json() as {
-        status: string;
-        result?: { formatted_phone_number?: string; website?: string };
-      };
-
-      if (detail.status !== "OK") continue;
-
-      const phone   = detail.result?.formatted_phone_number
-        ? normalizePhone(detail.result.formatted_phone_number)
-        : undefined;
-
-      // ── Validation site web : rejeter les domaines blacklistés ───────────────
-      let siteWeb: string | undefined;
-      if (detail.result?.website) {
-        const raw = detail.result.website.replace(/^https?:\/\//, "").replace(/\/$/, "");
-        if (!isWebsiteBlacklisted(raw)) {
-          siteWeb = raw;
-        } else {
-          console.info(`[places] rejected website "${raw}" for "${nom}" (blacklisted domain)`);
+        // ── Validation 1 : similarité du nom ─────────────────────────────────
+        const placeName  = hit.name ?? "";
+        const similarity = diceSimilarity(nom, placeName);
+        if (similarity < PLACES_MIN_SIMILARITY) {
+          console.info(`[places] skip "${placeName}" for "${nom}" — sim ${similarity.toFixed(2)}`);
+          continue;
         }
+
+        // ── Validation 2 : cohérence géographique ─────────────────────────────
+        // Si on a une ville, l'adresse doit la contenir — évite les faux positifs inter-villes
+        if (ville_ && hit.formatted_address) {
+          if (!cityMatchesAddress(ville_, hit.formatted_address, codePostal)) {
+            console.info(`[places] city mismatch for "${nom}" — wanted "${ville_}", got "${hit.formatted_address}"`);
+            continue;
+          }
+        }
+
+        // 2. Place Details → téléphone + site
+        const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?`
+          + `place_id=${hit.place_id}&fields=formatted_phone_number,website&language=fr&key=${key}`;
+
+        const detailRes = await fetch(detailUrl, { signal: AbortSignal.timeout(4_000) });
+        if (!detailRes.ok) continue;
+
+        const detail = await detailRes.json() as {
+          status: string;
+          result?: { formatted_phone_number?: string; website?: string };
+        };
+
+        if (detail.status !== "OK") continue;
+
+        const phone = detail.result?.formatted_phone_number
+          ? normalizePhone(detail.result.formatted_phone_number)
+          : undefined;
+
+        let siteWeb: string | undefined;
+        if (detail.result?.website) {
+          const raw = detail.result.website.replace(/^https?:\/\//, "").replace(/\/$/, "");
+          if (!isWebsiteBlacklisted(raw)) siteWeb = raw;
+        }
+
+        if (phone || siteWeb) return { phone, siteWeb };
       }
-
-      // Retourner dès qu'on trouve au moins un résultat utile
-      if (phone || siteWeb) return { phone, siteWeb };
-
     } catch { continue; }
   }
 
@@ -264,7 +288,7 @@ async function findViaApifyMaps(nom: string, ville?: string, codePostal?: string
     // Garder celui dont le nom est le plus proche du prospect
     const best = active
       .map((r) => ({ r, score: diceSimilarity(nom, r.title ?? r.name ?? "") }))
-      .filter(({ score }) => score >= 0.15)
+      .filter(({ score }) => score >= 0.32)  // was 0.15 — évite les faux positifs
       .sort((a, b) => b.score - a.score)[0]?.r;
 
     if (!best) return null;
@@ -296,6 +320,8 @@ async function findViaApifyMaps(nom: string, ville?: string, codePostal?: string
 }
 
 // ── Scraping site web (rapide, 1 page principale + contact) ──────────────────
+// Priorité : liens tel: (fiables) > regex texte. Si > 4 numéros distincts trouvés
+// → probable site agrégateur ou annuaire → on ignore les résultats (trop de bruit).
 async function scrapeWebsiteContacts(rawUrl: string): Promise<{
   emails: string[];
   phones: string[];
@@ -309,48 +335,67 @@ async function scrapeWebsiteContacts(rawUrl: string): Promise<{
     "linkedin","instagram","youtube","wixpress","shopify","wordpress","squarespace",
   ];
 
-  const emails = new Set<string>();
-  const phones = new Set<string>();
+  const emails   = new Set<string>();
+  // Deux pools séparés : tel: links (fiables) et regex texte (bruit potentiel)
+  const telLinks = new Set<string>();
+  const textPhones = new Set<string>();
 
-  // Essayer seulement 2 pages pour rester rapide
-  for (const url of [cleanUrl, `${cleanUrl}/contact`]) {
+  for (const url of [cleanUrl, `${cleanUrl}/contact`, `${cleanUrl}/nous-contacter`]) {
     try {
       const res = await fetch(url, {
-        signal:   AbortSignal.timeout(3_000),
-        headers:  { "User-Agent": "Mozilla/5.0 (compatible; ColdCaller/1.0)" },
+        signal:   AbortSignal.timeout(3_500),
+        headers:  { "User-Agent": "Mozilla/5.0 (compatible; ColdCaller/2.0; +https://coldcaller.io)" },
         redirect: "follow",
       });
       if (!res.ok) continue;
       const html = await res.text();
 
-      // Emails
-      const deobfuscated = html.replace(/\[at\]|\(at\)/gi, "@").replace(/\[dot\]|\(dot\)/gi, ".");
-      for (const e of (deobfuscated.match(EMAIL_RE) ?? [])) {
+      // ── Emails ──────────────────────────────────────────────────────────────
+      const deobf = html.replace(/\[at\]|\(at\)/gi, "@").replace(/\[dot\]|\(dot\)/gi, ".");
+      for (const e of (deobf.match(EMAIL_RE) ?? [])) {
         const lower = e.toLowerCase();
-        if (
-          !IGNORE_DOMAINS.some((d) => lower.includes(d)) &&
-          !isEmailBlacklisted(lower) &&
-          lower.length <= 80
-        )
+        if (!IGNORE_DOMAINS.some((d) => lower.includes(d)) && !isEmailBlacklisted(lower) && lower.length <= 80)
           emails.add(lower);
       }
 
-      // Téléphones (texte + liens tel:)
+      // ── Téléphones : liens tel: (PRIORITÉ — très fiables) ──────────────────
+      for (const m of Array.from(html.matchAll(/href="tel:([^"]+)"/gi))) {
+        const n = normalizePhone(m[1].replace(/\s/g, ""));
+        if (isValidFrPhone(n)) telLinks.add(n);
+      }
+
+      // ── Téléphones : regex texte (plus de bruit) ────────────────────────────
       for (const t of (html.match(PHONE_RE) ?? [])) {
         const n = normalizePhone(t);
-        if (isValidFrPhone(n)) phones.add(n);
-      }
-      const telLinks = Array.from(html.matchAll(/href="tel:([^"]+)"/gi));
-      for (const m of telLinks) {
-        const n = normalizePhone(m[1]);
-        if (isValidFrPhone(n)) phones.add(n);
+        if (isValidFrPhone(n)) textPhones.add(n);
       }
 
       if (emails.size > 0) break;
     } catch { continue; }
   }
 
-  return { emails: Array.from(emails), phones: Array.from(phones) };
+  // ── Sélection finale des numéros ────────────────────────────────────────────
+  // Priorité aux liens tel:. Si > 4 numéros regex distincts sans aucun tel:
+  // → probablement un site agrégateur → ignorer les regex, ne garder que les tel:
+  let phones: string[];
+  if (telLinks.size > 0) {
+    // On prend d'abord les tel: links, puis les regex en complément (si distincts)
+    const combined = new Set<string>([...telLinks]);
+    for (const p of textPhones) {
+      if (!Array.from(telLinks).some((t) => t.replace(/\s/g,"") === p.replace(/\s/g,"")))
+        combined.add(p);
+    }
+    phones = Array.from(combined).slice(0, 3);
+  } else if (textPhones.size <= 4) {
+    // Peu de numéros : probablement le site de l'entreprise
+    phones = Array.from(textPhones).slice(0, 2);
+  } else {
+    // Trop de numéros sans aucun tel: link → agrégateur/annuaire → ignorer
+    console.info(`[scrape] trop de numéros (${textPhones.size}) sans tel: — probablement un agrégateur, ignoré`);
+    phones = [];
+  }
+
+  return { emails: Array.from(emails), phones };
 }
 
 // ── Génération patterns d'email ───────────────────────────────────────────────
@@ -394,7 +439,7 @@ export async function POST(req: NextRequest) {
     // ── Phase 1 : Google Places + SIRENE extra en parallèle (max 5s) ──────────
     const [placesResult, sireneExtra] = await Promise.all([
       (!siteWeb || !telephonePro)
-        ? findViaGooglePlaces(nom, ville)
+        ? findViaGooglePlaces(nom, ville, codePostal)  // passe codePostal pour validation géo
         : Promise.resolve(null),
       siren
         ? fetchSireneExtra(siren)

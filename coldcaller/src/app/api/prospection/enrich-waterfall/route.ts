@@ -133,8 +133,21 @@ async function fetchPappersDetail(siren: string): Promise<PappersDetail | null> 
   } catch { return null; }
 }
 
+// ── Validation géographique (ville dans adresse Places) ──────────────────────
+function cityMatchesAddress(ville: string, address: string, codePostal?: string): boolean {
+  const norm   = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[-_]/g, " ").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+  const addrN  = norm(address);
+  const villeN = norm(ville);
+  if (addrN.includes(villeN)) return true;
+  if (codePostal && addrN.includes(codePostal.slice(0, 2))) return true;
+  const words = villeN.split(" ").filter((w) => w.length > 3);
+  return words.length > 0 && words.every((w) => addrN.includes(w));
+}
+
 // ── Google Places API ─────────────────────────────────────────────────────────
-async function fetchGooglePlaces(nom: string, ville?: string): Promise<{
+async function fetchGooglePlaces(nom: string, ville?: string, codePostal?: string): Promise<{
   phone?: string; site?: string;
 } | null> {
   const key = process.env.GOOGLE_MAPS_API_KEY;
@@ -147,11 +160,24 @@ async function fetchGooglePlaces(nom: string, ville?: string): Promise<{
       { signal: AbortSignal.timeout(5_000) }
     );
     if (!searchRes.ok) return null;
-    const sd = await searchRes.json() as { status: string; results?: Array<{ place_id?: string; name?: string }> };
-    if (sd.status !== "OK" || !sd.results?.[0]?.place_id) return null;
+    const sd = await searchRes.json() as {
+      status: string;
+      results?: Array<{ place_id?: string; name?: string; formatted_address?: string }>;
+    };
+    if (sd.status !== "OK" || !sd.results?.length) return null;
 
-    const hit = sd.results[0];
-    if (diceSimilarity(nom, hit.name ?? "") < 0.20) return null;
+    // Essayer les 3 premiers résultats avec validation nom + ville
+    let hit: typeof sd.results[0] | undefined;
+    for (const candidate of sd.results.slice(0, 3)) {
+      if (!candidate.place_id) continue;
+      if (diceSimilarity(nom, candidate.name ?? "") < 0.38) continue;
+      if (ville && candidate.formatted_address) {
+        if (!cityMatchesAddress(ville, candidate.formatted_address, codePostal)) continue;
+      }
+      hit = candidate;
+      break;
+    }
+    if (!hit) return null;
 
     const detailRes = await fetch(
       `https://maps.googleapis.com/maps/api/place/details/json?place_id=${hit.place_id}&fields=formatted_phone_number,website&language=fr&key=${key}`,
@@ -211,14 +237,15 @@ async function scrapeWebsite(rawUrl: string): Promise<{
   const EMAIL_RE = /\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b/g;
   const PHONE_RE = /(?:(?:\+33|0033|0)[1-9])(?:[\s.\-]?\d{2}){4}/g;
 
-  const emails = new Set<string>();
-  const phones = new Set<string>();
+  const emails     = new Set<string>();
+  const telLinksP  = new Set<string>();   // liens tel: — priorité haute
+  const textPhones = new Set<string>();   // regex texte — plus de bruit
 
   for (const url of [cleanUrl, `${cleanUrl}/contact`, `${cleanUrl}/nous-contacter`]) {
     try {
       const res = await fetch(url, {
         signal: AbortSignal.timeout(3_500),
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; ColdCaller/2.0)" },
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; ColdCaller/2.0; +https://coldcaller.io)" },
         redirect: "follow",
       });
       if (!res.ok) continue;
@@ -230,19 +257,31 @@ async function scrapeWebsite(rawUrl: string): Promise<{
         if (!isBlacklistedEmail(lower) && lower.length <= 80 && lower.includes("."))
           emails.add(lower);
       }
+      // Liens tel: — fiables
+      for (const m of Array.from(html.matchAll(/href="tel:([^"]+)"/gi))) {
+        const n = normalizePhone(m[1].replace(/\s/g,""));
+        if (isValidPhone(n)) telLinksP.add(n);
+      }
+      // Regex texte — plus de bruit
       for (const t of (html.match(PHONE_RE) ?? [])) {
         const n = normalizePhone(t);
-        if (isValidPhone(n)) phones.add(n);
-      }
-      for (const m of Array.from(html.matchAll(/href="tel:([^"]+)"/gi))) {
-        const n = normalizePhone(m[1]);
-        if (isValidPhone(n)) phones.add(n);
+        if (isValidPhone(n)) textPhones.add(n);
       }
       if (emails.size > 0) break;
     } catch { continue; }
   }
 
-  return { emails: Array.from(emails), phones: Array.from(phones) };
+  // Sélection : tel: prioritaire ; si trop de regex sans tel: → agrégateur → ignorer
+  let phones: string[];
+  if (telLinksP.size > 0) {
+    phones = Array.from(telLinksP).slice(0, 3);
+  } else if (textPhones.size <= 4) {
+    phones = Array.from(textPhones).slice(0, 2);
+  } else {
+    phones = [];  // trop de numéros → site agrégateur → ignorer
+  }
+
+  return { emails: Array.from(emails), phones };
 }
 
 // ── Patterns email dirigeant ──────────────────────────────────────────────────
@@ -344,7 +383,7 @@ export async function POST(req: NextRequest) {
   const needSite  = !siteWeb;
 
   const [placesRes, sireneRes] = await Promise.all([
-    (needPhone || needSite) ? fetchGooglePlaces(nom, ville) : Promise.resolve(null),
+    (needPhone || needSite) ? fetchGooglePlaces(nom, ville, codePostal) : Promise.resolve(null),
     (needPhone || needSite || !dirResult) ? fetchSireneExtra(cleanSiren) : Promise.resolve(null),
   ]);
 
