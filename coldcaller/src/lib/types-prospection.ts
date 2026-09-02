@@ -129,6 +129,13 @@ export interface Prospect {
   // ─ Taille & finances
   trancheEffectifs?: string;  // "00", "01", "02"…"53"
   dateCreation?:     string;
+  chiffreAffaires?:  number;   // CA annuel en € (Pappers)
+  chiffreAffairesAnnee?: string; // année du CA
+  resultatNet?:      number;   // résultat net en € (Pappers)
+  capitalSocial?:    number;   // capital social en € (Pappers)
+  effectifsReels?:   number;   // effectifs réels (Pappers)
+  formeJuridique?:   string;   // SAS, SARL, etc.
+  pappersEnrichedAt?: string;  // date du dernier enrichissement Pappers
 
   // ─ Présence digitale
   siteWeb?:            string;

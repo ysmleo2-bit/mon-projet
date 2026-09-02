@@ -131,6 +131,13 @@ function AppelBadge({ statut }: { statut?: StatutAppel }) {
   );
 }
 
+/** Formate un montant en M€ / k€ */
+function formatMontant(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1)}M€`;
+  if (v >= 1_000)     return `${Math.round(v / 1_000)}k€`;
+  return `${v}€`;
+}
+
 function EmailSourceIcon({ source }: { source?: string }) {
   if (!source) return null;
   if (source === "website_scraping") return <span title="Trouvé sur le site"><CheckCircle className="w-3 h-3 text-green-400 shrink-0" /></span>;
@@ -430,6 +437,16 @@ export default function ProspectionPage() {
   const [feResult,     setFeResult]     = useState<{ phone?: string; email?: string; found: boolean } | null>(null);
   const [feError,      setFeError]      = useState<string | null>(null);
 
+  // ── Pappers (données financières + enrichissement) ────────────────────────
+  const [searchMode,      setSearchMode]      = useState<"sirene"|"pappers">("sirene");
+  const [pappersEnriching, setPappersEnriching] = useState(false);
+  const [pappersResult,   setPappersResult]   = useState<{
+    chiffreAffaires?: number; chiffreAffairesAnnee?: string;
+    resultatNet?: number; capitalSocial?: number; effectifsReels?: number;
+    formeJuridique?: string; enrichDetails: string[]; found: boolean;
+  } | null>(null);
+  const [pappersError,    setPappersError]    = useState<string | null>(null);
+
   // Reset LinkedIn + contact state when selected changes
   useEffect(() => {
     setLinkedinResult(null);
@@ -438,6 +455,8 @@ export default function ProspectionPage() {
     setContactError(null);
     setFeResult(null);
     setFeError(null);
+    setPappersResult(null);
+    setPappersError(null);
   }, [selected?.id]);
 
   // Notes locales
@@ -630,6 +649,10 @@ export default function ProspectionPage() {
       } else if (pays === "BE") {
         apiUrl  = "/api/prospection/search-be";
         apiBody = { secteur: secteur.label, keyword, province: region || "ALL", perPage };
+      } else if (searchMode === "pappers") {
+        // France — Pappers (CA + classement commercial)
+        apiUrl  = "/api/prospection/search-pappers";
+        apiBody = { nafCodes, secteur: secteur.label, departement: region || departement, perPage };
       } else {
         // France — SIRENE
         apiBody = { nafCodes, secteur: secteur.label, departement: region || departement, trancheMin: tranche || undefined, trancheMax: trancheMax || undefined, perPage, page: 1 };
@@ -646,7 +669,7 @@ export default function ProspectionPage() {
       setShowSearch(false);
       if (data.prospects.length > 0) enrichAll(data.prospects).catch(() => setEnrichProgress(null));
     } catch (e) { setError(String(e)); } finally { setLoading(false); }
-  }, [secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, pays, region, enrichAll]);
+  }, [secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, pays, region, searchMode, enrichAll]);
 
 
   // ── FullEnrich : mobile + email dirigeant ────────────────────────────────
@@ -681,6 +704,59 @@ export default function ProspectionPage() {
       }
     } catch (e) { setFeError(String(e)); }
     finally { setFeEnriching(false); }
+  }, []);
+
+  // ── Pappers : enrichissement financier ───────────────────────────────────
+  const enrichPappers = useCallback(async (p: Prospect) => {
+    setPappersEnriching(true);
+    setPappersResult(null);
+    setPappersError(null);
+    try {
+      const res  = await fetch("/api/prospection/enrich-pappers", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ prospectId: p.id, siren: p.siren }),
+      });
+      const data = await res.json() as {
+        ok: boolean; found: boolean;
+        chiffreAffaires?: number; chiffreAffairesAnnee?: string;
+        resultatNet?: number; capitalSocial?: number; effectifsReels?: number;
+        formeJuridique?: string; enrichDetails: string[];
+        dirigeantPrincipal?: string; email?: string; telephone?: string;
+        siteWeb?: string; error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
+      setPappersResult({
+        chiffreAffaires:      data.chiffreAffaires,
+        chiffreAffairesAnnee: data.chiffreAffairesAnnee,
+        resultatNet:          data.resultatNet,
+        capitalSocial:        data.capitalSocial,
+        effectifsReels:       data.effectifsReels,
+        formeJuridique:       data.formeJuridique,
+        enrichDetails:        data.enrichDetails ?? [],
+        found:                data.found,
+      });
+      if (data.found) {
+        const updates: Partial<Prospect> = { pappersEnrichedAt: new Date().toISOString() };
+        if (data.chiffreAffaires)      updates.chiffreAffaires      = data.chiffreAffaires;
+        if (data.chiffreAffairesAnnee) updates.chiffreAffairesAnnee = data.chiffreAffairesAnnee;
+        if (data.resultatNet)          updates.resultatNet           = data.resultatNet;
+        if (data.capitalSocial)        updates.capitalSocial         = data.capitalSocial;
+        if (data.effectifsReels)       updates.effectifsReels        = data.effectifsReels;
+        if (data.formeJuridique)       updates.formeJuridique        = data.formeJuridique;
+        if (data.dirigeantPrincipal)   updates.dirigeantPrincipal    = data.dirigeantPrincipal;
+        if (data.email && !p.emailDirigeant) {
+          updates.emailDirigeant = data.email;
+          updates.emailSource    = "pappers";
+          updates.emailVerifie   = true;
+        }
+        if (data.telephone && !p.telephonePro) updates.telephonePro = data.telephone;
+        if (data.siteWeb   && !p.siteWeb)      updates.siteWeb      = data.siteWeb;
+        setProspects((prev) => prev.map((x) => x.id === p.id ? { ...x, ...updates } : x));
+        setSelected((prev)  => prev?.id === p.id ? { ...prev, ...updates } as Prospect : prev);
+      }
+    } catch (e) { setPappersError(String(e)); }
+    finally { setPappersEnriching(false); }
   }, []);
 
   // ── Recherche LinkedIn ────────────────────────────────────────────────────
@@ -928,6 +1004,39 @@ export default function ProspectionPage() {
                   {pays === "BE" && (
                     <p className="text-[10px] text-gray-400 col-span-2">📋 Source : OpenStreetMap Belgique. Téléphones enrichis automatiquement via le site web.</p>
                   )}
+                  {/* ── Sélecteur source France ──────────────────────── */}
+                  {pays === "FR" && (
+                    <div className="col-span-2">
+                      <label className="text-[10px] text-gray-500 font-semibold mb-1.5 block uppercase tracking-wider">Source de données</label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setSearchMode("sirene")}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-medium transition-all",
+                            searchMode === "sirene"
+                              ? "bg-brand-50 border-brand-300 text-brand-700"
+                              : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                          )}>
+                          🏛️ SIRENE (gratuit)
+                        </button>
+                        <button
+                          onClick={() => setSearchMode("pappers")}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-medium transition-all",
+                            searchMode === "pappers"
+                              ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+                              : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                          )}>
+                          📊 Pappers (CA + classement)
+                        </button>
+                        {searchMode === "pappers" && (
+                          <span className="text-[10px] text-emerald-600 italic">
+                            Résultats triés par CA décroissant · Nécessite PAPPERS_API_KEY
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <button onClick={handleSearch} disabled={loading}
@@ -998,6 +1107,7 @@ export default function ProspectionPage() {
                   <tr>
                     <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Entreprise</th>
                     <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Dirigeant</th>
+                    <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">CA</th>
                     <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Site</th>
                     <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Email</th>
                     <th className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Tél.</th>
@@ -1041,6 +1151,15 @@ export default function ProspectionPage() {
                             ? <><div className="text-gray-700 truncate max-w-[140px]">{p.dirigeantPrincipal}</div>
                                <div className="text-gray-400 text-[10px]">{roleBadge(p.fonctionDirigeant)}</div></>
                             : <span className="text-gray-200">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5 whitespace-nowrap">
+                          {p.chiffreAffaires ? (
+                            <span className="font-mono text-emerald-700 font-semibold text-[10px] bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded" title={`CA ${p.chiffreAffairesAnnee ?? ""}`}>
+                              {formatMontant(p.chiffreAffaires)}
+                            </span>
+                          ) : p.capitalSocial ? (
+                            <span className="font-mono text-gray-500 text-[10px]" title="Capital social">cap. {formatMontant(p.capitalSocial)}</span>
+                          ) : <span className="text-gray-200">—</span>}
                         </td>
                         <td className="px-4 py-2.5 whitespace-nowrap">
                           {isEnriching && !p.siteWeb
@@ -1254,14 +1373,68 @@ export default function ProspectionPage() {
 
               {/* ── Fiche entreprise ── */}
               <div className="px-5 py-4 border-b border-gray-100">
-                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-3">Fiche entreprise</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Fiche entreprise</p>
+                  {/* Bouton Pappers (SIREN français uniquement) */}
+                  {/^\d{9}$/.test(selected.siren.replace("prospect-", "")) && (
+                    <button
+                      onClick={() => enrichPappers(selected)}
+                      disabled={pappersEnriching}
+                      className="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-lg border border-emerald-300/60 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-all disabled:opacity-50">
+                      {pappersEnriching
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <TrendingUp className="w-3 h-3" />}
+                      {pappersEnriching ? "Pappers…" : selected.pappersEnrichedAt ? "↻ Pappers" : "Données Pappers"}
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <InfoRow icon={Hash}     label="SIREN"          value={selected.siren}   copy />
                   {selected.siret && <InfoRow icon={Hash} label="SIRET (siège)" value={selected.siret} copy />}
                   <InfoRow icon={Briefcase} label="Activité"       value={selected.libelleNaf ? `${selected.libelleNaf} (${selected.codeNaf})` : selected.codeNaf} />
+                  {selected.formeJuridique && <InfoRow icon={Briefcase} label="Forme" value={selected.formeJuridique} />}
                   {selected.adresse && <InfoRow icon={Building2}   label="Adresse"          value={[selected.adresse, selected.codePostal, selected.ville].filter(Boolean).join(", ")} />}
                   {selected.trancheEffectifs && <InfoRow icon={Users} label="Effectifs" value={TRANCHES_EFFECTIFS[selected.trancheEffectifs] ?? selected.trancheEffectifs} />}
+                  {selected.effectifsReels && <InfoRow icon={Users} label="Effectifs réels" value={`${selected.effectifsReels} salariés (Pappers)`} />}
                   {selected.dateCreation && <InfoRow icon={Calendar} label="Création" value={selected.dateCreation.slice(0, 4)} />}
+                  {/* ── Financiers Pappers ───────────────────────── */}
+                  {selected.chiffreAffaires && (
+                    <div className="flex items-center justify-between py-1 border-t border-gray-100 mt-1">
+                      <span className="text-[10px] text-gray-500 font-medium">
+                        CA {selected.chiffreAffairesAnnee ?? ""}
+                      </span>
+                      <span className="font-mono text-emerald-700 font-bold text-xs">
+                        {formatMontant(selected.chiffreAffaires)}
+                      </span>
+                    </div>
+                  )}
+                  {selected.resultatNet !== undefined && selected.resultatNet !== null && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-500 font-medium">Résultat net</span>
+                      <span className={cn("font-mono text-xs font-semibold", selected.resultatNet >= 0 ? "text-emerald-600" : "text-red-500")}>
+                        {selected.resultatNet >= 0 ? "+" : ""}{formatMontant(Math.abs(selected.resultatNet))}
+                      </span>
+                    </div>
+                  )}
+                  {selected.capitalSocial && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-500 font-medium">Capital social</span>
+                      <span className="font-mono text-gray-600 text-xs">{formatMontant(selected.capitalSocial)}</span>
+                    </div>
+                  )}
+                  {/* Résultat enrichissement Pappers */}
+                  {pappersResult && (
+                    <div className={cn(
+                      "mt-1 rounded-lg px-3 py-2 border text-[10px]",
+                      pappersResult.found ? "bg-emerald-50 border-emerald-200/50" : "bg-gray-50 border-gray-200"
+                    )}>
+                      {pappersResult.found && pappersResult.enrichDetails.length > 0
+                        ? <span className="text-emerald-700">{pappersResult.enrichDetails.join(" · ")}</span>
+                        : <span className="text-gray-400 italic">Aucune donnée financière dans Pappers</span>
+                      }
+                    </div>
+                  )}
+                  {pappersError && <p className="text-[10px] text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3 shrink-0"/>{pappersError}</p>}
                 </div>
               </div>
 
