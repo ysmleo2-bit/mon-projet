@@ -663,11 +663,23 @@ export default function ProspectionPage() {
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(apiBody),
       });
-      const data = await res.json() as { prospects: Prospect[]; total: number; error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
+      const data = await res.json() as { prospects: Prospect[]; total: number; error?: string; message?: string };
+      if (!res.ok) {
+        // Si Pappers non configuré → basculer automatiquement en SIRENE
+        if (res.status === 503 && searchMode === "pappers") {
+          setSearchMode("sirene");
+          throw new Error("PAPPERS_API_KEY non configurée — basculement automatique sur SIRENE. Relancez la recherche.");
+        }
+        throw new Error(data.error ?? data.message ?? "Erreur serveur");
+      }
       setProspects(data.prospects);
-      setShowSearch(false);
-      if (data.prospects.length > 0) enrichAll(data.prospects).catch(() => setEnrichProgress(null));
+      // Ne fermer le panneau que si on a des résultats
+      if (data.prospects.length > 0) {
+        setShowSearch(false);
+        enrichAll(data.prospects).catch(() => setEnrichProgress(null));
+      } else {
+        setError("Aucun résultat trouvé. Essayez un autre département, secteur ou source de données.");
+      }
     } catch (e) { setError(String(e)); } finally { setLoading(false); }
   }, [secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, pays, region, searchMode, enrichAll]);
 
@@ -1219,10 +1231,17 @@ export default function ProspectionPage() {
             )}
 
             {searched && !loading && prospects.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-48 text-center">
-                <Users className="w-8 h-8 text-gray-200 mb-3" />
-                <p className="text-gray-400 text-sm">Aucun prospect trouvé.</p>
-                <p className="text-gray-300 text-xs mt-1">Essayez un autre département ou secteur.</p>
+              <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
+                <Users className="w-8 h-8 text-gray-200" />
+                <div>
+                  <p className="text-gray-400 text-sm font-medium">Aucun résultat pour cette recherche.</p>
+                  <p className="text-gray-300 text-xs mt-1">Changez de département, de secteur ou de source.</p>
+                </div>
+                <button
+                  onClick={() => { setShowSearch(true); setSearched(false); }}
+                  className="flex items-center gap-2 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-xs font-medium rounded-lg transition-all">
+                  <Search className="w-3.5 h-3.5" /> Nouvelle recherche
+                </button>
               </div>
             )}
             {!searched && (
