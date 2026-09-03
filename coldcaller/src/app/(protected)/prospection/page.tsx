@@ -20,7 +20,9 @@ import {
 } from "@/lib/types-prospection";
 
 // ── Secteurs → codes NAF ──────────────────────────────────────────────────────
-const SECTEURS: Array<{ label: string; nafCodes: string[]; mapsQuery?: string }> = [
+// pappersKeyword : filtre textuel optionnel (param "q" Pappers) pour réduire
+// le bruit sur les codes NAF génériques (ex. 56.30Z = bars + boîtes de nuit).
+const SECTEURS: Array<{ label: string; nafCodes: string[]; mapsQuery?: string; pappersKeyword?: string }> = [
   { label: "Plomberie / Chauffage",     nafCodes: ["43.22A", "43.22C"],                       mapsQuery: "plombier chauffagiste" },
   { label: "Électricité",               nafCodes: ["43.21A", "43.21B"],                       mapsQuery: "électricien" },
   { label: "Maçonnerie / BTP",          nafCodes: ["43.99C", "41.20A", "43.12A", "43.99B"],   mapsQuery: "maçon entreprise btp" },
@@ -36,7 +38,10 @@ const SECTEURS: Array<{ label: string; nafCodes: string[]; mapsQuery?: string }>
   { label: "Avocat / Juridique",        nafCodes: ["69.10Z"],                                 mapsQuery: "cabinet avocat" },
   { label: "Architecture",              nafCodes: ["71.11Z"],                                 mapsQuery: "cabinet architecte" },
   { label: "Restaurant / Restauration", nafCodes: ["56.10A", "56.10B", "56.21Z", "56.29A"],  mapsQuery: "restaurant" },
-  { label: "Établissement de nuit",      nafCodes: ["56.30Z", "93.29Z"],                       mapsQuery: "boite nuit discothèque nightclub bar" },
+  { label: "Établissement de nuit",      nafCodes: ["56.30Z", "93.29Z"],                       mapsQuery: "boite nuit discothèque nightclub bar",
+    // 56.30Z = "Débits de boissons" inclut bars ET clubs — le keyword
+    // cible uniquement les boîtes de nuit / discothèques dans Pappers.
+    pappersKeyword: "discothèque" },
   { label: "Plage privée / Beach Club",  nafCodes: ["93.29Z", "55.20Z", "56.10B"],             mapsQuery: "plage privée beach club lido" },
   { label: "Coiffure / Beauté",         nafCodes: ["96.02A", "96.02B"],                       mapsQuery: "salon coiffure beauté" },
   { label: "Auto / Garage",             nafCodes: ["45.20A", "45.20B", "45.11Z", "45.19Z"],  mapsQuery: "garage automobile réparation" },
@@ -685,7 +690,15 @@ export default function ProspectionPage() {
       } else if (searchMode === "pappers") {
         // France — Pappers (CA + classement commercial)
         apiUrl  = "/api/prospection/search-pappers";
-        apiBody = { nafCodes, secteur: secteur.label, departement: region || departement, perPage };
+        // pappersKeyword : filtre textuel pour les NAF génériques (ex. 56.30Z
+        // couvre bars + boîtes de nuit → keyword "discothèque" cible les clubs)
+        apiBody = {
+          nafCodes,
+          secteur:    secteur.label,
+          departement: region || departement,
+          perPage,
+          ...(secteur.pappersKeyword && !nafCustom ? { keyword: secteur.pappersKeyword } : {}),
+        };
       } else {
         // France — SIRENE
         apiBody = { nafCodes, secteur: secteur.label, departement: region || departement, trancheMin: tranche || undefined, trancheMax: trancheMax || undefined, perPage, page: 1 };

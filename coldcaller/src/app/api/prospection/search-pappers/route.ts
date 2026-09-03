@@ -166,6 +166,7 @@ function pappersToProspect(
 async function searchPappers(params: {
   nafCodes:     string[];
   departement?: string;
+  keyword?:     string;   // filtre textuel sur nom d'entreprise (param Pappers: q)
   parPage:      number;
   page:         number;
 }): Promise<PappersResultat[]> {
@@ -184,6 +185,10 @@ async function searchPappers(params: {
     qs.set("code_naf", params.nafCodes.join(","));
   }
   if (params.departement) qs.set("departement", params.departement);
+  // Filtre textuel : réduit le bruit pour les secteurs à code NAF générique
+  // (ex. 56.30Z = "Débits de boissons" couvre bars ET boîtes de nuit — le
+  // keyword "discothèque" cible uniquement les établissements de nuit réels)
+  if (params.keyword)     qs.set("q", params.keyword);
 
   try {
     const res = await fetch(
@@ -219,6 +224,7 @@ export async function POST(req: NextRequest) {
     nafCodes?:    string[];
     secteur?:     string;
     departement?: string;
+    keyword?:     string;   // filtre textuel optionnel sur nom d'entreprise
     perPage?:     number;
   };
 
@@ -226,6 +232,7 @@ export async function POST(req: NextRequest) {
     nafCodes    = [],
     secteur     = "",
     departement,
+    keyword,
     perPage     = 50,
   } = body;
 
@@ -236,8 +243,8 @@ export async function POST(req: NextRequest) {
   try {
     // Fetch 2 pages en parallèle (max 50 × 2 = 100)
     const pages = await Promise.all([
-      searchPappers({ nafCodes, departement, parPage: 50, page: 1 }),
-      searchPappers({ nafCodes, departement, parPage: 50, page: 2 }),
+      searchPappers({ nafCodes, departement, keyword, parPage: 50, page: 1 }),
+      searchPappers({ nafCodes, departement, keyword, parPage: 50, page: 2 }),
     ]);
     const allRaw = pages.flat();
 
