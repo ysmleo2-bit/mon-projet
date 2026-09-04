@@ -36,9 +36,20 @@ function isValidFrPhone(p: string): boolean {
 // ── Google Places (ancienne API Maps — Text Search + Details) ────────────────
 // Flux : Text Search (place_id + name + adresse) → validation nom + ville → Place Details
 //
-// Seuil de similarité relevé à 0.38 (était 0.20) pour éviter les faux positifs.
-// Validation géographique ajoutée : si on a une ville, l'adresse Google doit la contenir.
-const PLACES_MIN_SIMILARITY = 0.38;
+// Seuils de similarité :
+//   - Requêtes nom d'entreprise : 0.20 (validation géographique est le vrai garde-fou)
+//   - Requêtes spécialité / dirigeant : 0.08 (la ville est le seul critère pertinent)
+// La validation géographique (cityMatchesAddress) prévient les faux positifs inter-villes.
+const PLACES_MIN_SIMILARITY      = 0.20;   // requêtes nom
+const PLACES_MIN_SIM_SPECIALTY   = 0.08;   // requêtes spécialité / dirigeant
+
+// Formes juridiques à retirer du nom avant recherche Google
+// (ex. "SELARL ORTHODONTIE BREST" → "ORTHODONTIE BREST")
+const LEGAL_FORM_RE = /^(SELARL|SELAS|SELAFA|SELCA|SCPAS|SCP|SCM|SPFPL|SPAS|SARL|SAS|SA\b|SCI|EIRL|EURL|GIE|GCS|SC\b|SNC|EARL|GE\b|SEP\b|SNE\b|EURL|SASU|SARLU|SCP|STEP)\s+/i;
+
+function stripLegalForm(s: string): string {
+  return s.replace(LEGAL_FORM_RE, "").trim();
+}
 
 /** Normalise une chaîne pour comparaison ville / adresse */
 function normCity(s: string): string {
@@ -64,26 +75,80 @@ function cityMatchesAddress(ville: string, address: string, codePostal?: string)
   return false;
 }
 
-async function findViaGooglePlaces(nom: string, ville?: string, codePostal?: string): Promise<{
-  siteWeb?: string;
-  phone?:   string;
-} | null> {
+// ── Requête Places + récupération du téléphone/site ──────────────────────────
+async function fetchPlaceDetails(
+  placeId: string,
+  key: string
+): Promise<{ phone?: string; siteWeb?: string } | null> {
+  try {
+    const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?`
+      + `place_id=${placeId}&fields=formatted_phone_number,website&language=fr&key=${key}`;
+    const res = await fetch(detailUrl, { signal: AbortSignal.timeout(4_000) });
+    if (!res.ok) return null;
+    const detail = await res.json() as {
+      status: string;
+      result?: { formatted_phone_number?: string; website?: string };
+    };
+    if (detail.status !== "OK") return null;
+    const phone = detail.result?.formatted_phone_number
+      ? normalizePhone(detail.result.formatted_phone_number)
+      : undefined;
+    let siteWeb: string | undefined;
+    if (detail.result?.website) {
+      const raw = detail.result.website.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      if (!isWebsiteBlacklisted(raw)) siteWeb = raw;
+    }
+    return (phone || siteWeb) ? { phone, siteWeb } : null;
+  } catch { return null; }
+}
+
+async function findViaGooglePlaces(
+  nom:        string,
+  ville?:     string,
+  codePostal?: string,
+  secteur?:   string,   // spécialité pour requêtes de secours (ex. "orthodontiste")
+  dirigeant?: string    // nom du dirigeant pour requêtes ciblées
+): Promise<{ siteWeb?: string; phone?: string } | null> {
   const key = process.env.GOOGLE_MAPS_API_KEY;
   if (!key) return null;
 
   const ville_ = ville ?? "";
 
-  // Variantes de requête : du plus précis au plus court
-  const nomCourt = nom.split(/\s+/).slice(0, 4).join(" ");
-  const nomTres  = nom.split(/\s+/).slice(0, 2).join(" ");
-  const queriesRaw = [
-    `${nom} ${ville_} France`,
-    `${nomCourt} ${ville_} France`,
-    `${nomTres} ${ville_} France`,
-  ];
-  const queries = queriesRaw.filter((q, i) => queriesRaw.indexOf(q) === i);
+  // ── Variantes du nom d'entreprise ────────────────────────────────────────
+  const nomStripped = stripLegalForm(nom);  // retire SELARL, SCP, SAS, etc.
+  const nomCourt    = nom.split(/\s+/).slice(0, 4).join(" ");
 
-  for (const query of queries) {
+  // Requêtes nom : du plus précis au plus court — déduplication par valeur unique
+  type PlacesQuery = { q: string; minSim: number };
+  const nameQueries: PlacesQuery[] = Array.from(
+    new Map<string, PlacesQuery>(
+      [
+        `${nom} ${ville_} France`,
+        nomCourt !== nom      ? `${nomCourt} ${ville_} France`    : null,
+        nomStripped !== nom   ? `${nomStripped} ${ville_} France`  : null,
+      ]
+        .filter((s): s is string => s !== null)
+        .map((q) => [q, { q, minSim: PLACES_MIN_SIMILARITY }])
+    ).values()
+  );
+
+  // Requêtes de secours : spécialité + dirigeant (threshold très bas, ville est la garde)
+  const specialtyQueries: PlacesQuery[] = [];
+  if (ville_) {
+    if (dirigeant && secteur) {
+      specialtyQueries.push({ q: `${dirigeant} ${secteur} ${ville_}`,  minSim: PLACES_MIN_SIM_SPECIALTY });
+    }
+    if (secteur) {
+      specialtyQueries.push({ q: `${secteur} ${ville_} France`,        minSim: PLACES_MIN_SIM_SPECIALTY });
+    }
+    if (dirigeant) {
+      specialtyQueries.push({ q: `${dirigeant} ${ville_} France`,      minSim: PLACES_MIN_SIM_SPECIALTY });
+    }
+  }
+
+  const allQueries = [...nameQueries, ...specialtyQueries];
+
+  for (const { q: query, minSim } of allQueries) {
     try {
       // 1. Text Search → place_id + name + formatted_address
       const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?`
@@ -99,52 +164,32 @@ async function findViaGooglePlaces(nom: string, ville?: string, codePostal?: str
 
       if (searchData.status !== "OK" || !searchData.results?.length) continue;
 
-      // Essayer les 3 premiers résultats au lieu du seul premier
+      // Essayer les 3 premiers résultats
       for (const hit of searchData.results.slice(0, 3)) {
         if (!hit.place_id) continue;
 
         // ── Validation 1 : similarité du nom ─────────────────────────────────
         const placeName  = hit.name ?? "";
         const similarity = diceSimilarity(nom, placeName);
-        if (similarity < PLACES_MIN_SIMILARITY) {
-          console.info(`[places] skip "${placeName}" for "${nom}" — sim ${similarity.toFixed(2)}`);
+        if (similarity < minSim) {
+          console.info(`[places] skip "${placeName}" for "${nom}" (q="${query}") — sim ${similarity.toFixed(2)} < ${minSim}`);
           continue;
         }
 
-        // ── Validation 2 : cohérence géographique ─────────────────────────────
-        // Si on a une ville, l'adresse doit la contenir — évite les faux positifs inter-villes
+        // ── Validation 2 : cohérence géographique (obligatoire si ville connue) ──
         if (ville_ && hit.formatted_address) {
           if (!cityMatchesAddress(ville_, hit.formatted_address, codePostal)) {
-            console.info(`[places] city mismatch for "${nom}" — wanted "${ville_}", got "${hit.formatted_address}"`);
+            console.info(`[places] city mismatch — wanted "${ville_}", got "${hit.formatted_address}"`);
             continue;
           }
         }
 
         // 2. Place Details → téléphone + site
-        const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?`
-          + `place_id=${hit.place_id}&fields=formatted_phone_number,website&language=fr&key=${key}`;
-
-        const detailRes = await fetch(detailUrl, { signal: AbortSignal.timeout(4_000) });
-        if (!detailRes.ok) continue;
-
-        const detail = await detailRes.json() as {
-          status: string;
-          result?: { formatted_phone_number?: string; website?: string };
-        };
-
-        if (detail.status !== "OK") continue;
-
-        const phone = detail.result?.formatted_phone_number
-          ? normalizePhone(detail.result.formatted_phone_number)
-          : undefined;
-
-        let siteWeb: string | undefined;
-        if (detail.result?.website) {
-          const raw = detail.result.website.replace(/^https?:\/\//, "").replace(/\/$/, "");
-          if (!isWebsiteBlacklisted(raw)) siteWeb = raw;
+        const result = await fetchPlaceDetails(hit.place_id, key);
+        if (result) {
+          console.info(`[places] found via "${query}" — "${placeName}" sim=${similarity.toFixed(2)}`);
+          return result;
         }
-
-        if (phone || siteWeb) return { phone, siteWeb };
       }
     } catch { continue; }
   }
@@ -423,10 +468,15 @@ export async function POST(req: NextRequest) {
     telephonePro?:       string;
     dirigeantPrincipal?: string;
     libelleNaf?:         string;
+    secteur?:            string;   // spécialité pour requêtes Google Places de secours
   };
 
-  const { prospectId, siren, nom, ville, adresse, codePostal, dirigeantPrincipal, libelleNaf } = body;
+  const { prospectId, siren, nom, ville, adresse, codePostal, dirigeantPrincipal, libelleNaf, secteur } = body;
   let { siteWeb, telephonePro } = body;
+
+  // Dériver une étiquette de spécialité utile pour les requêtes Google Places
+  // Privilégie le libellé secteur (ex. "orthodontiste") sur le libellé NAF (ex. "Pratique dentaire")
+  const specialtyQuery = secteur || libelleNaf;
 
   const now     = new Date().toISOString();
   const actions: ProspectAction[] = [];
@@ -437,7 +487,7 @@ export async function POST(req: NextRequest) {
     // ── Phase 1 : Google Places + SIRENE extra en parallèle (max 5s) ──────────
     const [placesResult, sireneExtra] = await Promise.all([
       (!siteWeb || !telephonePro)
-        ? findViaGooglePlaces(nom, ville, codePostal)  // passe codePostal pour validation géo
+        ? findViaGooglePlaces(nom, ville, codePostal, specialtyQuery, dirigeantPrincipal)
         : Promise.resolve(null),
       siren
         ? fetchSireneExtra(siren)

@@ -59,9 +59,14 @@ const SECTEURS: Array<{ label: string; nafCodes: string[]; mapsQuery?: string; p
   { label: "✂️ Chirurgie esthétique",  nafCodes: ["86.22A", "86.10Z"],                                   mapsQuery: "chirurgie esthétique plastique reconstructrice" },
   { label: "🔦 Centre laser",          nafCodes: ["86.22A", "86.90B"],                                   mapsQuery: "centre laser épilation laser skin" },
   // ── Dentaire / orthodontie ────────────────────────────────────────────────
-  { label: "🏢 Centre dentaire",       nafCodes: ["86.23Z"],                                              mapsQuery: "centre dentaire dental" },
-  { label: "🦷 Orthodontiste",         nafCodes: ["86.23Z"],                                              mapsQuery: "orthodontiste orthodontie" },
-  { label: "🦷 Implantologue",         nafCodes: ["86.23Z"],                                              mapsQuery: "implantologue implant dentaire" },
+  // Les 3 secteurs suivants partagent le code NAF 86.23Z (Pratique dentaire).
+  // pappersKeyword filtre par nom d'entreprise pour distinguer les spécialités.
+  { label: "🏢 Centre dentaire",       nafCodes: ["86.23Z"],                                              mapsQuery: "centre dentaire dental",
+    pappersKeyword: "centre dentaire" },
+  { label: "🦷 Orthodontiste",         nafCodes: ["86.23Z"],                                              mapsQuery: "orthodontiste orthodontie",
+    pappersKeyword: "orthodonti" },
+  { label: "🦷 Implantologue",         nafCodes: ["86.23Z"],                                              mapsQuery: "implantologue implant dentaire",
+    pappersKeyword: "implant" },
   // ── Centres médicaux privés ───────────────────────────────────────────────
   { label: "🏥 Centre médical",        nafCodes: ["86.21Z", "86.22A"],                                   mapsQuery: "centre médical maison de santé" },
   { label: "🏨 Clinique privée",       nafCodes: ["86.10Z"],                                              mapsQuery: "clinique privée polyclinique" },
@@ -591,6 +596,9 @@ export default function ProspectionPage() {
           telephonePro:        p.telephonePro,
           dirigeantPrincipal:  p.dirigeantPrincipal,
           libelleNaf:          p.libelleNaf,
+          // Secteur envoyé pour les requêtes Google Places de secours
+          // (ex. "orthodontiste" → recherche "orthodontiste Brest France" si le nom SIREN ne matche pas)
+          secteur:             p.secteur,
         }),
       });
       const data = await res.json() as { prospect?: Prospect };

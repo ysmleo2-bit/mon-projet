@@ -241,10 +241,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Fetch 2 pages en parallèle (max 50 × 2 = 100)
+    // Fetch 4 pages en parallèle (max 50 × 4 = 200)
+    // Nécessaire pour les secteurs à forte densité (médical, artisanat) où
+    // le tri par CA ne garantit pas de couvrir tous les cabinets locaux.
     const pages = await Promise.all([
       searchPappers({ nafCodes, departement, keyword, parPage: 50, page: 1 }),
       searchPappers({ nafCodes, departement, keyword, parPage: 50, page: 2 }),
+      searchPappers({ nafCodes, departement, keyword, parPage: 50, page: 3 }),
+      searchPappers({ nafCodes, departement, keyword, parPage: 50, page: 4 }),
     ]);
     const allRaw = pages.flat();
 
