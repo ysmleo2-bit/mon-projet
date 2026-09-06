@@ -742,11 +742,12 @@ export default function ProspectionPage() {
       if (data.prospects.length > 0) {
         setShowSearch(false);
         enrichAll(data.prospects).catch(() => setEnrichProgress(null));
+        dorkAll(data.prospects).catch(() => setDorkProgress(null));
       } else {
         setError("Aucun résultat trouvé. Essayez un autre département, secteur ou source de données.");
       }
     } catch (e) { setError(String(e)); } finally { setLoading(false); }
-  }, [secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, pays, region, searchMode, enrichAll]);
+  }, [secteurIdx, nafCustom, departement, tranche, trancheMax, perPage, pays, region, searchMode, enrichAll, dorkAll]);
 
 
   // ── FullEnrich : mobile + email dirigeant ────────────────────────────────
