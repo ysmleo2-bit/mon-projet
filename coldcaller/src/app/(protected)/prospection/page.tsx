@@ -432,7 +432,7 @@ export default function ProspectionPage() {
   // ── Formulaire ───────────────────────────────────────────────────────────
   const [secteurIdx,    setSecteurIdx]    = useState(0);
   const [nafCustom,     setNafCustom]     = useState("");
-  const [departement,   setDepartement]   = useState("69");
+  const [departement,   setDepartement]   = useState("");
   const [tranche,       setTranche]       = useState("");
   const [trancheMax,    setTrancheMax]    = useState("");
   const [perPage,       setPerPage]       = useState(50);
@@ -707,16 +707,19 @@ export default function ProspectionPage() {
         apiUrl  = "/api/prospection/search-pappers";
         // pappersKeyword : filtre textuel pour les NAF génériques (ex. 56.30Z
         // couvre bars + boîtes de nuit → keyword "discothèque" cible les clubs)
+        // Département : undefined = Toute la France (pas de filtre)
+        const dept = (region || departement) || undefined;
         apiBody = {
           nafCodes,
           secteur:    secteur.label,
-          departement: region || departement,
+          departement: dept,
           perPage,
           ...(secteur.pappersKeyword && !nafCustom ? { keyword: secteur.pappersKeyword } : {}),
         };
       } else {
         // France — SIRENE
-        apiBody = { nafCodes, secteur: secteur.label, departement: region || departement, trancheMin: tranche || undefined, trancheMax: trancheMax || undefined, perPage, page: 1 };
+        const dept = (region || departement) || undefined;
+        apiBody = { nafCodes, secteur: secteur.label, departement: dept, trancheMin: tranche || undefined, trancheMax: trancheMax || undefined, perPage, page: 1 };
       }
 
       const res  = await fetch(apiUrl, {
@@ -1124,6 +1127,7 @@ export default function ProspectionPage() {
                       <>
                         <label className="text-[10px] text-gray-500 font-semibold mb-1 block uppercase tracking-wider">Département</label>
                         <select value={region || departement} onChange={(e) => { setRegion(e.target.value); setDepartement(e.target.value); }} className="select w-full text-xs">
+                          <option value="">🇫🇷 Toute la France</option>
                           {DEPARTEMENTS.map((d) => <option key={d} value={d}>{DEPT_LABELS[d] ?? d}</option>)}
                         </select>
                       </>
