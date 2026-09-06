@@ -136,6 +136,7 @@ export interface Prospect {
   effectifsReels?:   number;   // effectifs réels (Pappers)
   formeJuridique?:   string;   // SAS, SARL, etc.
   pappersEnrichedAt?: string;  // date du dernier enrichissement Pappers
+  dorkEnrichedAt?:   string;   // date du dernier enrichissement Google Dork (06/07)
 
   // ─ Présence digitale
   siteWeb?:            string;

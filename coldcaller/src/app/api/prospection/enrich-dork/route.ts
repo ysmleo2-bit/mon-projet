@@ -133,12 +133,17 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Construction des requêtes dork ───────────────────────────────────────────
-  // Principe : chaque requête cible les deux préfixes mobiles FR (+33 6 et +33 7)
-  // Ordre du plus précis (dirigeant + ville) au plus large (nom société + ville)
+  // Économie de crédits Serper : seulement 2 groupes max (4 requêtes max/prospect)
+  // On garde uniquement les requêtes géo-ciblées (ville) qui sont les plus précises.
+  // Les variantes secteur sont abandonnées — trop larges, trop chères en crédits.
+  //
+  // Ordre :
+  //  1. "[dirigeant]" "[ville]" "+33 6" / "+33 7"   ← 2 requêtes max
+  //  2. "[nom société]" "[ville]" "+33 6" / "+33 7"  ← 2 requêtes max (fallback)
+  // Total worst-case : 4 requêtes/prospect (vs 8 avant)
 
-  const ville_   = esc(ville   ?? "");
-  const secteur_ = esc(secteur ?? "");
-  const nom_     = esc(nom);
+  const ville_ = esc(ville ?? "");
+  const nom_   = esc(nom);
 
   // Prénom + nom du dirigeant (si dispo)
   const dirig = dirigeantPrincipal ? esc(dirigeantPrincipal) : "";
@@ -149,27 +154,17 @@ export async function POST(req: NextRequest) {
     `${base} "+33 7"`,
   ];
 
-  // Pile de requêtes prioritaires (déduplication + filtrage vides)
+  // Pile de requêtes — uniquement les variantes géo (ville)
   const queryGroups: Array<string[]> = [];
 
-  // 1. Dirigeant + ville (le plus ciblé)
+  // 1. Dirigeant + ville (le plus ciblé — max 2 requêtes)
   if (dirig && ville_) {
     queryGroups.push(mkQueries(`"${dirig}" "${ville_}"`));
   }
 
-  // 2. Dirigeant + secteur (utile si dirigeant publie son 06 sur forums métier)
-  if (dirig && secteur_) {
-    queryGroups.push(mkQueries(`"${dirig}" "${secteur_}"`));
-  }
-
-  // 3. Nom société + ville
+  // 2. Nom société + ville (fallback — max 2 requêtes)
   if (ville_) {
     queryGroups.push(mkQueries(`"${nom_}" "${ville_}"`));
-  }
-
-  // 4. Nom société seul + secteur (fallback)
-  if (secteur_) {
-    queryGroups.push(mkQueries(`"${nom_}" "${secteur_}"`));
   }
 
   // ── Exécution waterfall : s'arrêter dès le premier mobile trouvé ────────────

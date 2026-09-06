@@ -684,11 +684,16 @@ export default function ProspectionPage() {
   // ── Google Dork en masse — cherche le 06/07 sur TOUS les prospects sans mobile
   // (déclaré avant handleSearch pour éviter une référence directe en avant)
   const dorkAll = useCallback(async (list: Prospect[]) => {
-    // Uniquement les prospects qui n'ont pas encore de mobile
+    // Économie de crédits Serper :
+    //  - Ignorer les prospects déjà dorkés (dorkEnrichedAt présent)
+    //  - Ignorer les prospects sans ville connue (requête trop générique, taux d'échec ~100%)
+    //  - Ignorer les prospects qui ont déjà un 06/07
     const targets = list.filter((p) => {
+      if (p.dorkEnrichedAt) return false;                         // déjà traité
+      if (!p.ville) return false;                                  // ville requise
       const mob = (p.telephoneMobile ?? "").replace(/\s/g, "");
       const pro = (p.telephonePro    ?? "").replace(/\s/g, "");
-      return !/^0[67]/.test(mob) && !/^0[67]/.test(pro);
+      return !/^0[67]/.test(mob) && !/^0[67]/.test(pro);         // pas encore de mobile
     });
     if (!targets.length) return;
 
@@ -711,11 +716,15 @@ export default function ProspectionPage() {
             }),
           });
           const data = await res.json() as { ok: boolean; found: boolean; mobile?: string };
-          if (data.found && data.mobile) {
-            setProspects((prev) => prev.map((x) =>
-              x.id === p.id ? { ...x, telephoneMobile: data.mobile! } : x
-            ));
-          }
+          // Marquer dorkEnrichedAt dans tous les cas (trouvé ou non) pour éviter
+          // de re-dorker le même prospect lors des prochaines recherches → économie crédits
+          const now = new Date().toISOString();
+          setProspects((prev) => prev.map((x) => {
+            if (x.id !== p.id) return x;
+            return data.found && data.mobile
+              ? { ...x, telephoneMobile: data.mobile!, dorkEnrichedAt: now }
+              : { ...x, dorkEnrichedAt: now };
+          }));
         } catch { /* silencieux */ }
       }));
       setDorkProgress({ done: Math.min(i + BATCH, targets.length), total: targets.length });
