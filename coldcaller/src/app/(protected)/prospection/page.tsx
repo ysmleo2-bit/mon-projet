@@ -475,6 +475,7 @@ export default function ProspectionPage() {
   const [dorkEnriching, setDorkEnriching] = useState(false);
   const [dorkResult,    setDorkResult]    = useState<{ mobile?: string; query?: string } | null>(null);
   const [dorkError,     setDorkError]     = useState<string | null>(null);
+  const [dorkProgress,  setDorkProgress]  = useState<{ done: number; total: number } | null>(null);
   const [wfResult,     setWfResult]     = useState<{
     email?: { value: string; source: string; score: number; reliable: boolean } | null;
     phone?: { value: string; source: string; score: number; reliable: boolean } | null;
@@ -866,6 +867,47 @@ export default function ProspectionPage() {
     finally { setDorkEnriching(false); }
   }, []);
 
+  // ── Google Dork en masse — cherche le 06/07 sur TOUS les prospects sans mobile
+  const dorkAll = useCallback(async (list: Prospect[]) => {
+    // Uniquement les prospects qui n'ont pas encore de mobile
+    const targets = list.filter((p) => {
+      const mob = (p.telephoneMobile ?? "").replace(/\s/g, "");
+      const pro = (p.telephonePro    ?? "").replace(/\s/g, "");
+      return !/^0[67]/.test(mob) && !/^0[67]/.test(pro);
+    });
+    if (!targets.length) return;
+
+    const BATCH = 3; // 3 requêtes Serper en parallèle max
+    setDorkProgress({ done: 0, total: targets.length });
+
+    for (let i = 0; i < targets.length; i += BATCH) {
+      const batch = targets.slice(i, i + BATCH);
+      await Promise.all(batch.map(async (p) => {
+        try {
+          const res = await fetch("/api/prospection/enrich-dork", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({
+              prospectId:         p.id,
+              nom:                p.nom,
+              ville:              p.ville,
+              secteur:            p.secteur,
+              dirigeantPrincipal: p.dirigeantPrincipal,
+            }),
+          });
+          const data = await res.json() as { ok: boolean; found: boolean; mobile?: string };
+          if (data.found && data.mobile) {
+            setProspects((prev) => prev.map((x) =>
+              x.id === p.id ? { ...x, telephoneMobile: data.mobile! } : x
+            ));
+          }
+        } catch { /* silencieux */ }
+      }));
+      setDorkProgress({ done: Math.min(i + BATCH, targets.length), total: targets.length });
+    }
+    setDorkProgress(null);
+  }, []);
+
   // ── Pappers : enrichissement financier ───────────────────────────────────
   const enrichPappers = useCallback(async (p: Prospect) => {
     setPappersEnriching(true);
@@ -1014,10 +1056,16 @@ export default function ProspectionPage() {
   }, [prospects]);
 
   // ── Dérivés ───────────────────────────────────────────────────────────────
-  const withEmail = prospects.filter((p) => p.emailDirigeant).length;
-  const withSite  = prospects.filter((p) => p.siteWeb).length;
-  const withTel   = prospects.filter((p) => p.telephonePro).length;
-  const appeles   = prospects.filter((p) => p.statutAppel && p.statutAppel !== "non_appele").length;
+  const withEmail  = prospects.filter((p) => p.emailDirigeant).length;
+  const withSite   = prospects.filter((p) => p.siteWeb).length;
+  const withTel    = prospects.filter((p) => p.telephonePro).length;
+  const appeles    = prospects.filter((p) => p.statutAppel && p.statutAppel !== "non_appele").length;
+  // Mobiles : 06 ou 07 dans telephoneMobile OU telephonePro
+  const withMobile = prospects.filter((p) => {
+    const mob = (p.telephoneMobile ?? "").replace(/\s/g, "");
+    const pro = (p.telephonePro    ?? "").replace(/\s/g, "");
+    return /^0[67]/.test(mob) || /^0[67]/.test(pro);
+  }).length;
 
   // ── Classement par qualité du numéro ─────────────────────────────────────
   // 0 → 06 (mobile direct dirigeant — bypasse la secrétaire)
@@ -1247,13 +1295,14 @@ export default function ProspectionPage() {
           {/* ── Stats + progress ── */}
           {searched && !loading && prospects.length > 0 && (
             <div className="shrink-0 px-6 py-3 border-b border-gray-200 bg-white space-y-2">
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-6 gap-2">
                 {[
-                  { label: "Prospects",  value: prospects.length, icon: Users,     color: "text-gray-600" },
-                  { label: "Avec site",  value: withSite,         icon: Globe,     color: "text-sky-500" },
-                  { label: "Avec email", value: withEmail,        icon: Mail,      color: "text-violet-500" },
-                  { label: "Avec tél.",  value: withTel,          icon: Phone,     color: "text-brand-500" },
-                  { label: "Appelés",    value: appeles,          icon: PhoneCall, color: "text-green-500" },
+                  { label: "Prospects",  value: prospects.length, icon: Users,       color: "text-gray-600" },
+                  { label: "Avec site",  value: withSite,         icon: Globe,       color: "text-sky-500" },
+                  { label: "Avec email", value: withEmail,        icon: Mail,        color: "text-violet-500" },
+                  { label: "Avec tél.",  value: withTel,          icon: Phone,       color: "text-brand-500" },
+                  { label: "06 / 07",    value: withMobile,       icon: Smartphone,  color: "text-green-500" },
+                  { label: "Appelés",    value: appeles,          icon: PhoneCall,   color: "text-emerald-600" },
                 ].map(({ label, value, icon: Icon, color }) => (
                   <div key={label} className="bg-white border border-gray-200 rounded-lg p-2.5 flex items-center gap-2 shadow-sm">
                     <Icon className={cn("w-4 h-4 shrink-0", color)} />
@@ -1279,6 +1328,37 @@ export default function ProspectionPage() {
                   </div>
                   <button onClick={() => setEnrichProgress(null)} className="text-gray-300 hover:text-gray-600"><X className="w-3 h-3" /></button>
                 </div>
+              )}
+
+              {/* Barre de progression Google Dork en masse */}
+              {dorkProgress ? (
+                <div className="flex items-center gap-3 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 shadow-sm">
+                  <Smartphone className="w-3.5 h-3.5 text-violet-500 animate-pulse shrink-0" />
+                  <div className="flex-1">
+                    <div className="flex justify-between text-[10px] text-violet-500 mb-1">
+                      <span>Google Dork 06/07 en cours…</span>
+                      <span className="text-violet-700 font-semibold">{dorkProgress.done}/{dorkProgress.total}</span>
+                    </div>
+                    <div className="h-1 bg-violet-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-violet-500 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.round((dorkProgress.done / dorkProgress.total) * 100)}%` }} />
+                    </div>
+                  </div>
+                  <button onClick={() => setDorkProgress(null)} className="text-violet-300 hover:text-violet-600"><X className="w-3 h-3" /></button>
+                </div>
+              ) : prospects.length > 0 && (
+                <button
+                  onClick={() => dorkAll(prospects)}
+                  disabled={!!dorkProgress}
+                  className="flex items-center gap-2 text-[11px] font-medium px-3 py-2 rounded-lg border border-violet-300/60 text-violet-700 bg-violet-50 hover:bg-violet-100 transition-all disabled:opacity-50 w-full justify-center">
+                  <Smartphone className="w-3.5 h-3.5" />
+                  📱 Google Dork tout — chercher les 06/07 sur tous les prospects sans mobile
+                  {withMobile > 0 && (
+                    <span className="ml-1 text-[10px] bg-violet-100 text-violet-500 px-1.5 py-0.5 rounded font-semibold">
+                      {withMobile} déjà trouvés
+                    </span>
+                  )}
+                </button>
               )}
             </div>
           )}
