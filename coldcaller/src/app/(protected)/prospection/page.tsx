@@ -470,6 +470,11 @@ export default function ProspectionPage() {
   const [feResult,     setFeResult]     = useState<{ phone?: string; email?: string; found: boolean } | null>(null);
   const [feError,      setFeError]      = useState<string | null>(null);
   const [wfEnriching,  setWfEnriching]  = useState(false);
+
+  // ── Google Dork — recherche mobile dirigeant via Google ──────────────────
+  const [dorkEnriching, setDorkEnriching] = useState(false);
+  const [dorkResult,    setDorkResult]    = useState<{ mobile?: string; query?: string } | null>(null);
+  const [dorkError,     setDorkError]     = useState<string | null>(null);
   const [wfResult,     setWfResult]     = useState<{
     email?: { value: string; source: string; score: number; reliable: boolean } | null;
     phone?: { value: string; source: string; score: number; reliable: boolean } | null;
@@ -498,6 +503,8 @@ export default function ProspectionPage() {
     setFeError(null);
     setWfResult(null);
     setWfError(null);
+    setDorkResult(null);
+    setDorkError(null);
     setPappersResult(null);
     setPappersError(null);
   }, [selected?.id]);
@@ -814,6 +821,46 @@ export default function ProspectionPage() {
       }
     } catch (e) { setWfError(String(e)); }
     finally { setWfEnriching(false); }
+  }, []);
+
+  // ── Google Dork — recherche mobile dirigeant ─────────────────────────────
+  // Principe : "terrassement" "besançon" "+33 6" → Google retourne des pages
+  // où le dirigeant a publié son 06 (devis, Leboncoin, forums métier, etc.)
+  const enrichDork = useCallback(async (p: Prospect) => {
+    setDorkEnriching(true);
+    setDorkResult(null);
+    setDorkError(null);
+    try {
+      const res = await fetch("/api/prospection/enrich-dork", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          prospectId:          p.id,
+          nom:                 p.nom,
+          ville:               p.ville,
+          secteur:             p.secteur,
+          dirigeantPrincipal:  p.dirigeantPrincipal,
+        }),
+      });
+      const data = await res.json() as {
+        ok: boolean; found: boolean;
+        mobile?: string; query?: string; message?: string; error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? data.message ?? "Erreur serveur");
+      if (data.found && data.mobile) {
+        setDorkResult({ mobile: data.mobile, query: data.query });
+        // Mise à jour locale du prospect
+        setProspects((prev) => prev.map((x) =>
+          x.id === p.id ? { ...x, telephoneMobile: data.mobile! } : x
+        ));
+        setSelected((prev) =>
+          prev?.id === p.id ? { ...prev, telephoneMobile: data.mobile! } : prev
+        );
+      } else {
+        setDorkResult({});  // trouvé = false → on affiche "non trouvé"
+      }
+    } catch (e) { setDorkError(String(e)); }
+    finally { setDorkEnriching(false); }
   }, []);
 
   // ── Pappers : enrichissement financier ───────────────────────────────────
@@ -1746,6 +1793,51 @@ export default function ProspectionPage() {
                       </div>
                     )}
                     {wfError && <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3 shrink-0"/>{wfError}</p>}
+                  </div>
+
+                  {/* Bouton Google Dork — mobile dirigeant */}
+                  <div className="mt-1">
+                    <button
+                      onClick={() => enrichDork(selected)}
+                      disabled={dorkEnriching}
+                      className="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1.5 rounded-lg border border-violet-300/60 text-violet-700 bg-violet-50 hover:bg-violet-100 transition-all disabled:opacity-50 w-full justify-center">
+                      {dorkEnriching
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Smartphone className="w-3 h-3" />}
+                      {dorkEnriching
+                        ? "Recherche Google en cours…"
+                        : "📱 Google Dork — mobile dirigeant"}
+                    </button>
+                    {dorkResult !== null && (
+                      <div className={cn("mt-1 rounded-lg border px-3 py-2",
+                        dorkResult.mobile
+                          ? "border-violet-200/60 bg-violet-50/60"
+                          : "border-gray-200 bg-gray-50")}>
+                        {dorkResult.mobile ? (
+                          <div className="flex items-center gap-1.5">
+                            <Smartphone className="w-3 h-3 shrink-0 text-violet-500" />
+                            <a href={`tel:${dorkResult.mobile.replace(/\s/g,"")}`}
+                              className="text-xs font-mono font-semibold text-violet-700 flex-1">
+                              {dorkResult.mobile}
+                            </a>
+                            <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-violet-100 text-violet-600">
+                              Google dork
+                            </span>
+                            <CopyBtn text={dorkResult.mobile} />
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-gray-400 italic">Mobile non trouvé via Google dork</p>
+                        )}
+                      </div>
+                    )}
+                    {dorkError && (
+                      <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0"/>
+                        {dorkError.includes("SERPER_API_KEY")
+                          ? "⚙️ SERPER_API_KEY manquante — ajoutez-la dans Vercel (gratuit sur serper.dev)"
+                          : dorkError}
+                      </p>
+                    )}
                   </div>
 
                   {/* Site + bouton enrichissement Apify */}
