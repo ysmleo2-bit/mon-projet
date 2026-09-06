@@ -681,6 +681,48 @@ export default function ProspectionPage() {
     } catch (e) { setError(String(e)); } finally { setIsSyncing(false); }
   }, [updateProspect]);
 
+  // ── Google Dork en masse — cherche le 06/07 sur TOUS les prospects sans mobile
+  // (déclaré avant handleSearch pour éviter une référence directe en avant)
+  const dorkAll = useCallback(async (list: Prospect[]) => {
+    // Uniquement les prospects qui n'ont pas encore de mobile
+    const targets = list.filter((p) => {
+      const mob = (p.telephoneMobile ?? "").replace(/\s/g, "");
+      const pro = (p.telephonePro    ?? "").replace(/\s/g, "");
+      return !/^0[67]/.test(mob) && !/^0[67]/.test(pro);
+    });
+    if (!targets.length) return;
+
+    const BATCH = 3; // 3 requêtes Serper en parallèle max
+    setDorkProgress({ done: 0, total: targets.length });
+
+    for (let i = 0; i < targets.length; i += BATCH) {
+      const batch = targets.slice(i, i + BATCH);
+      await Promise.all(batch.map(async (p) => {
+        try {
+          const res = await fetch("/api/prospection/enrich-dork", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({
+              prospectId:         p.id,
+              nom:                p.nom,
+              ville:              p.ville,
+              secteur:            p.secteur,
+              dirigeantPrincipal: p.dirigeantPrincipal,
+            }),
+          });
+          const data = await res.json() as { ok: boolean; found: boolean; mobile?: string };
+          if (data.found && data.mobile) {
+            setProspects((prev) => prev.map((x) =>
+              x.id === p.id ? { ...x, telephoneMobile: data.mobile! } : x
+            ));
+          }
+        } catch { /* silencieux */ }
+      }));
+      setDorkProgress({ done: Math.min(i + BATCH, targets.length), total: targets.length });
+    }
+    setDorkProgress(null);
+  }, []);
+
   // ── Recherche SIRENE ─────────────────────────────────────────────────────
   const handleSearch = useCallback(async () => {
     setLoading(true); setSearched(true); setError(null);
@@ -866,47 +908,6 @@ export default function ProspectionPage() {
       }
     } catch (e) { setDorkError(String(e)); }
     finally { setDorkEnriching(false); }
-  }, []);
-
-  // ── Google Dork en masse — cherche le 06/07 sur TOUS les prospects sans mobile
-  const dorkAll = useCallback(async (list: Prospect[]) => {
-    // Uniquement les prospects qui n'ont pas encore de mobile
-    const targets = list.filter((p) => {
-      const mob = (p.telephoneMobile ?? "").replace(/\s/g, "");
-      const pro = (p.telephonePro    ?? "").replace(/\s/g, "");
-      return !/^0[67]/.test(mob) && !/^0[67]/.test(pro);
-    });
-    if (!targets.length) return;
-
-    const BATCH = 3; // 3 requêtes Serper en parallèle max
-    setDorkProgress({ done: 0, total: targets.length });
-
-    for (let i = 0; i < targets.length; i += BATCH) {
-      const batch = targets.slice(i, i + BATCH);
-      await Promise.all(batch.map(async (p) => {
-        try {
-          const res = await fetch("/api/prospection/enrich-dork", {
-            method:  "POST",
-            headers: { "Content-Type": "application/json" },
-            body:    JSON.stringify({
-              prospectId:         p.id,
-              nom:                p.nom,
-              ville:              p.ville,
-              secteur:            p.secteur,
-              dirigeantPrincipal: p.dirigeantPrincipal,
-            }),
-          });
-          const data = await res.json() as { ok: boolean; found: boolean; mobile?: string };
-          if (data.found && data.mobile) {
-            setProspects((prev) => prev.map((x) =>
-              x.id === p.id ? { ...x, telephoneMobile: data.mobile! } : x
-            ));
-          }
-        } catch { /* silencieux */ }
-      }));
-      setDorkProgress({ done: Math.min(i + BATCH, targets.length), total: targets.length });
-    }
-    setDorkProgress(null);
   }, []);
 
   // ── Pappers : enrichissement financier ───────────────────────────────────
