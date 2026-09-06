@@ -1332,36 +1332,7 @@ export default function ProspectionPage() {
                 </div>
               )}
 
-              {/* Barre de progression Google Dork en masse */}
-              {dorkProgress ? (
-                <div className="flex items-center gap-3 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 shadow-sm">
-                  <Smartphone className="w-3.5 h-3.5 text-violet-500 animate-pulse shrink-0" />
-                  <div className="flex-1">
-                    <div className="flex justify-between text-[10px] text-violet-500 mb-1">
-                      <span>Google Dork 06/07 en cours…</span>
-                      <span className="text-violet-700 font-semibold">{dorkProgress.done}/{dorkProgress.total}</span>
-                    </div>
-                    <div className="h-1 bg-violet-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-violet-500 rounded-full transition-all duration-300"
-                        style={{ width: `${Math.round((dorkProgress.done / dorkProgress.total) * 100)}%` }} />
-                    </div>
-                  </div>
-                  <button onClick={() => setDorkProgress(null)} className="text-violet-300 hover:text-violet-600"><X className="w-3 h-3" /></button>
-                </div>
-              ) : prospects.length > 0 && (
-                <button
-                  onClick={() => dorkAll(prospects)}
-                  disabled={!!dorkProgress}
-                  className="flex items-center gap-2 text-[11px] font-medium px-3 py-2 rounded-lg border border-violet-300/60 text-violet-700 bg-violet-50 hover:bg-violet-100 transition-all disabled:opacity-50 w-full justify-center">
-                  <Smartphone className="w-3.5 h-3.5" />
-                  📱 Google Dork tout — chercher les 06/07 sur tous les prospects sans mobile
-                  {withMobile > 0 && (
-                    <span className="ml-1 text-[10px] bg-violet-100 text-violet-500 px-1.5 py-0.5 rounded font-semibold">
-                      {withMobile} déjà trouvés
-                    </span>
-                  )}
-                </button>
-              )}
+              {/* Le dork 06/07 tourne silencieusement dans le moteur de recherche — pas d'UI séparée */}
             </div>
           )}
 
