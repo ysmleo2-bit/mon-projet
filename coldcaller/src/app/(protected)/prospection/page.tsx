@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import {
   Loader2, Zap, Download, Users, Mail, Building2,
   Phone, Globe, CheckCircle, AlertCircle, RefreshCw,
@@ -1016,6 +1016,29 @@ export default function ProspectionPage() {
   const withTel   = prospects.filter((p) => p.telephonePro).length;
   const appeles   = prospects.filter((p) => p.statutAppel && p.statutAppel !== "non_appele").length;
 
+  // ── Classement par qualité du numéro ─────────────────────────────────────
+  // 0 → 06 (mobile direct dirigeant — bypasse la secrétaire)
+  // 1 → 07 (mobile)
+  // 2 → fixe (01-05, 08, 09)
+  // 3 → aucun numéro
+  const phoneRank = (p: Prospect): number => {
+    // Vérifier d'abord telephoneMobile (champ dédié au mobile dirigeant)
+    const mob = (p.telephoneMobile ?? "").replace(/\s/g, "");
+    if (/^06/.test(mob)) return 0;
+    if (/^07/.test(mob)) return 1;
+    // Puis telephonePro
+    const pro = (p.telephonePro ?? "").replace(/\s/g, "");
+    if (/^06/.test(pro)) return 0;
+    if (/^07/.test(pro)) return 1;
+    if (/^0[12345]/.test(pro) || /^0[89]/.test(pro)) return 2;
+    return 3;
+  };
+
+  const sortedProspects = useMemo(
+    () => [...prospects].sort((a, b) => phoneRank(a) - phoneRank(b)),
+    [prospects]  // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   // ── Copy all contact info ─────────────────────────────────────────────────
   const copyContactCard = (p: Prospect) => {
     const lines = [
@@ -1276,7 +1299,7 @@ export default function ProspectionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {prospects.map((p) => {
+                  {sortedProspects.map((p) => {
                     const isEnriching  = enriching.has(p.id);
                     const isDoNotCall  = p.statut === "pas_interesse";
                     const hasNotes     = !!(p.notesCommercial?.trim());
