@@ -1096,10 +1096,10 @@ export default function ProspectionPage() {
     return 3;
   };
 
-  const sortedProspects = useMemo(
-    () => [...prospects].sort((a, b) => phoneRank(a) - phoneRank(b)),
-    [prospects]  // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  // Tri direct à chaque rendu — pas de useMemo pour éviter les stales
+  // quand plusieurs setProspects s'enchaînent (enrichissement en parallèle).
+  // Coût : négligeable pour ≤200 prospects.
+  const sortedProspects = [...prospects].sort((a, b) => phoneRank(a) - phoneRank(b));
 
   // ── Copy all contact info ─────────────────────────────────────────────────
   const copyContactCard = (p: Prospect) => {
