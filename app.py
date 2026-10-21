@@ -45,6 +45,23 @@ app.config["SESSION_COOKIE_SECURE"] = (
     or os.environ.get("PRODUCTION") == "1"
 )
 
+# ── En-têtes de sécurité ─────────────────────────────────────────────────────
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self';"
+    )
+    return response
+
+
 # ── Rate-limiting login (in-memory, par IP) ──────────────────────────────────
 _login_attempts: dict = {}   # { ip: [timestamp, ...] }
 _RATE_LOCK = threading.Lock()
@@ -96,6 +113,7 @@ from training_simulator import (
     get_prospect_reply,
     evaluate_session,
     sim_stats_eleve,
+    sim_score_evolution,
     load_sim_sessions,
     save_sim_session,
     update_sim_session,
@@ -688,6 +706,24 @@ def results():
     return render_template("results.html", result=result, niv_info=niv_info)
 
 
+@app.route("/results/<session_id>")
+@login_required
+def session_result(session_id):
+    if not _SESSION_ID_RE.match(session_id):
+        return redirect(url_for("index"))
+    sim_sessions = load_sim_sessions()
+    result = next((s for s in sim_sessions if s["id"] == session_id), None)
+    if not result:
+        return redirect(url_for("index"))
+    user_id = session.get("user_id")
+    if not session.get("coach_logged_in") and result.get("eleve_id") != user_id:
+        return redirect(url_for("index"))
+    if result.get("status") == "pending":
+        return render_template("waiting.html", session_id=session_id)
+    niv_info = NIVEAUX.get(result.get("niveau_difficulte", 1), NIVEAUX[1])
+    return render_template("results.html", result=result, niv_info=niv_info)
+
+
 @app.route("/api/result-status/<session_id>")
 @login_required
 def api_result_status(session_id):
@@ -844,6 +880,8 @@ def student_dashboard():
     else:
         scores_moy = {c: 0 for c in criteres}
 
+    evolution = sim_score_evolution(sim_sessions, user_id)
+
     return render_template(
         "dashboard.html",
         stats=stats,
@@ -851,6 +889,7 @@ def student_dashboard():
         scores_moy=scores_moy,
         niveaux=NIVEAUX,
         user_nom=session.get("user_nom", ""),
+        score_evolution=evolution,
     )
 
 

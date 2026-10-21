@@ -506,22 +506,55 @@ def update_sim_session(session_id: str, updated: dict) -> None:
 
 
 def sim_stats_eleve(sim_sessions: list[dict], eleve_id: str) -> dict:
-    ss = [s for s in sim_sessions if s["eleve_id"] == eleve_id]
+    ss = [s for s in sim_sessions if s["eleve_id"] == eleve_id
+          and s.get("status") != "pending"]
+    ss = sorted(ss, key=lambda x: (x.get("date", ""), x.get("heure", "")))
     if not ss:
         return {"nb": 0, "score_moy": 0, "meilleur": 0, "progression": 0,
-                "rdv_pct": 0, "niv_moy": 0}
+                "rdv_pct": 0, "niv_moy": 0, "trend": "stable"}
     scores = [s["scores"]["global"] for s in ss]
     rdv_ok = sum(1 for s in ss if s.get("rdv_pose"))
     niveaux = [s.get("niveau_difficulte", 1) for s in ss]
-    prog    = scores[-1] - scores[0] if len(scores) > 1 else 0
+    # Progression : compare first half vs second half (more reliable than first-last)
+    n = len(scores)
+    if n == 1:
+        prog = 0
+        trend = "stable"
+    elif n == 2:
+        prog = scores[-1] - scores[0]
+        trend = "up" if prog > 3 else ("down" if prog < -3 else "stable")
+    else:
+        mid = n // 2
+        early_avg = sum(scores[:mid]) / mid
+        recent_avg = sum(scores[n - mid:]) / mid
+        prog = round(recent_avg - early_avg)
+        trend = "up" if prog > 3 else ("down" if prog < -3 else "stable")
     return {
-        "nb":          len(ss),
-        "score_moy":   round(sum(scores) / len(scores)),
+        "nb":          n,
+        "score_moy":   round(sum(scores) / n),
         "meilleur":    max(scores),
         "progression": prog,
-        "rdv_pct":     round(rdv_ok / len(ss) * 100),
-        "niv_moy":     round(sum(niveaux) / len(niveaux), 1),
+        "rdv_pct":     round(rdv_ok / n * 100),
+        "niv_moy":     round(sum(niveaux) / n, 1),
+        "trend":       trend,
     }
+
+
+def sim_score_evolution(sim_sessions: list[dict], eleve_id: str) -> list[dict]:
+    """Returns chronological list of completed sessions for chart rendering."""
+    ss = [s for s in sim_sessions if s["eleve_id"] == eleve_id
+          and s.get("status") != "pending"]
+    ss = sorted(ss, key=lambda x: (x.get("date", ""), x.get("heure", "")))
+    return [
+        {
+            "date":   s.get("date", ""),
+            "score":  s["scores"]["global"],
+            "niche":  s.get("niche", ""),
+            "niveau": s.get("niveau_difficulte", 1),
+            "rdv":    s.get("rdv_pose", False),
+        }
+        for s in ss
+    ]
 
 
 # ── Helpers affichage ────────────────────────────────────────────────────────
@@ -1080,16 +1113,25 @@ def evaluate_session(client, conversation: list[dict], eleve_nom: str,
     prompt = build_eval_prompt(conversation, eleve_nom, niche, niveau, persona, traffic, awareness)
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=5000,
+        max_tokens=8000,
         messages=[{"role": "user", "content": prompt}],
     )
     raw = response.content[0].text.strip()
     log.info(f"eval raw length={len(raw)} stop_reason={response.stop_reason}")
     if response.stop_reason == "max_tokens":
         log.warning("Réponse tronquée — tentative d'extraction partielle")
-    json_match = re.search(r'\{[\s\S]*\}', raw)
-    if json_match:
-        raw = json_match.group(0)
+    # Extract JSON: find outermost { } using brace counting (handles nested objects)
+    start = raw.find('{')
+    if start != -1:
+        depth = 0
+        for i, ch in enumerate(raw[start:], start):
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    raw = raw[start:i + 1]
+                    break
     try:
         return json.loads(raw)
     except json.JSONDecodeError as e:
