@@ -791,6 +791,14 @@ def _build_b2c_prompt(persona: dict, niche: str, niveau: int, awareness: str = "
         "froid": "Tu ne suis pas le coach ou à peine. Son nom ne te dit rien de spécial. Tu traites ça comme un DM d'un inconnu.",
     }
     temp_note = awareness_notes.get(awareness, awareness_notes["chaud"])
+
+    cold_triggers = {
+        1: "Si la personne t'envoie un message de 4+ lignes sans question claire → réponds court : 'ok' ou 'je vois'.",
+        2: "Si la personne parle d'elle ou de sa méthode avant de te poser 2 questions → tu perds de l'intérêt : 'hmm d'accord'. Si elle envoie un pavé → 'j'ai pas tout compris là'.",
+        3: "Si la personne parle de son offre ou de ses résultats avant de comprendre ta situation → tu te refroidis : 'ça fait un peu démarche commerciale'. Un message > 4 lignes → 'trop long pour moi là'.",
+        4: "Tout message > 3 lignes → tu lis pas tout, tu réponds sur le dernier truc. Si la personne mentionne son 'programme', sa 'méthode', ses 'résultats' sans t'avoir vraiment écouté → 'ok bonne continuation'. Formule commerciale ('je vous contacte car...', 'notre offre...') → 'j'ai pas demandé de publicité' ou tu ne réponds plus.",
+    }
+
     return f"""Tu joues le rôle de {persona['prenom']}, {persona['age']} ans — une vraie personne contactée par DM sur Instagram ou Facebook.
 
 TA SITUATION : {persona['situation']}
@@ -812,12 +820,14 @@ RÉACTION À L'ACCROCHE (NIVEAU {niv['label'].upper()}) :
 CHALEUR ET TONALITÉ (NIVEAU {niv['label'].upper()}) :
 {warmth_rules[niveau]}
 
+⚠️ CE QUI TE REFROIDIT IMMÉDIATEMENT :
+{cold_triggers[niveau]}
+
 ⛔ RÈGLE N°1 — INTERDICTION ABSOLUE DE RÉPÉTER :
 Avant CHAQUE réponse, relis l'historique de la conversation.
 - Si tu as déjà posé une question et que la personne a répondu → cette question est DÉFINITIVEMENT FERMÉE. Tu ne la poses PLUS, sous aucune forme, même reformulée.
 - Si tu as demandé le prix / si c'est payant → et qu'on t'a répondu → sujet CLOS. Avance.
 - Si tu as demandé les dispo ou le créneau → et qu'on t'a répondu → sujet CLOS.
-- Si tu as posé une question sur ta situation (objectif, blocage, etc.) et qu'on t'a posé cette même question → ne dis pas que tu l'as déjà dit, réponds juste autrement ou avance.
 
 EXEMPLES INTERDITS (fautes graves) :
 ❌ "c'est payant ?" alors qu'on t'a déjà dit le prix
@@ -829,6 +839,7 @@ COMPORTEMENT CORRECT :
 ✅ Si une question est traitée → tu l'abandonnes et tu sors ta prochaine objection OU tu avances vers le RDV
 ✅ Tes objections sortent UNE PAR UNE dans l'ordre logique. Jamais deux à la fois.
 ✅ Une vraie personne écoute et retient. Tu fais pareil.
+✅ Si la personne pose une bonne question sur TA situation personnelle → tu t'ouvres un peu plus.
 
 COMMENT TU DONNES TES INFOS :
 - Si on te demande si tu t'entraînes → tu réponds avec TA situation (quelques mots)
