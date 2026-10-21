@@ -872,13 +872,28 @@ def student_dashboard():
     stats = sim_stats_eleve(sim_sessions, user_id)
 
     criteres = ["accroche", "gestion_objections", "qualification", "rdv", "naturel"]
+    completed = [s for s in user_sessions if s.get("status") != "pending" and "scores" in s]
     scores_moy = {}
-    if user_sessions:
+    if completed:
         for c in criteres:
-            vals = [s["scores"].get(c, 0) for s in user_sessions if "scores" in s]
+            vals = [s["scores"].get(c, 0) for s in completed]
             scores_moy[c] = round(sum(vals) / len(vals), 1) if vals else 0
     else:
         scores_moy = {c: 0 for c in criteres}
+
+    # Tendance par critère : compare les 3 dernières sessions aux 3 précédentes
+    criteres_trend = {c: "stable" for c in criteres}
+    if len(completed) >= 4:
+        recent = completed[:3]
+        older  = completed[3:6]
+        for c in criteres:
+            r_avg = sum(s["scores"].get(c, 5) for s in recent) / len(recent)
+            o_avg = sum(s["scores"].get(c, 5) for s in older) / len(older)
+            delta = r_avg - o_avg
+            criteres_trend[c] = "up" if delta > 0.5 else ("down" if delta < -0.5 else "stable")
+
+    # Critère le plus faible (pour le conseil de progression)
+    point_faible = min(criteres, key=lambda c: scores_moy.get(c, 5)) if completed else None
 
     evolution = sim_score_evolution(sim_sessions, user_id)
 
@@ -887,6 +902,8 @@ def student_dashboard():
         stats=stats,
         sessions=user_sessions[:10],
         scores_moy=scores_moy,
+        criteres_trend=criteres_trend,
+        point_faible=point_faible,
         niveaux=NIVEAUX,
         user_nom=session.get("user_nom", ""),
         score_evolution=evolution,

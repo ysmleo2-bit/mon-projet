@@ -137,8 +137,14 @@
     <div class="scores-grid" style="margin-top:1rem">
       {% for key, label, icon in criteres %}
       {% set val = scores_moy[key] %}
+      {% set trend = criteres_trend.get(key, 'stable') if criteres_trend is defined else 'stable' %}
       <div class="score-row">
-        <div class="score-row-label">{{ icon }} {{ label }}</div>
+        <div class="score-row-label">
+          {{ icon }} {{ label }}
+          {% if trend == 'up' %}<span class="trend-badge trend-up" title="En progression">↑</span>{% endif %}
+          {% if trend == 'down' %}<span class="trend-badge trend-down" title="En baisse">↓</span>{% endif %}
+          {% if key == point_faible %}<span class="trend-badge trend-weak" title="Point à travailler">⚠</span>{% endif %}
+        </div>
         <div class="score-bar-wrap">
           <div class="score-bar-fill" style="width:{{ (val * 10)|int }}%; background:{{ (val * 10) | score_color }}"></div>
         </div>
@@ -146,6 +152,12 @@
       </div>
       {% endfor %}
     </div>
+    {% if point_faible %}
+    {% set noms = {'accroche': 'l\'accroche', 'gestion_objections': 'la gestion des objections', 'qualification': 'la qualification', 'rdv': 'la prise de RDV', 'naturel': 'le naturel'} %}
+    <div class="point-faible-conseil">
+      🎯 Concentre-toi sur <strong>{{ noms.get(point_faible, point_faible) }}</strong> lors de ta prochaine session — c'est ton critère le plus faible.
+    </div>
+    {% endif %}
   </div>
 
   <!-- ── Sessions récentes ──────────────────────────────── -->
