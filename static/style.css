@@ -555,8 +555,23 @@ a:hover { text-decoration: underline; }
 }
 .sessions-table td { padding: .6rem .75rem; border-bottom: 1px solid rgba(255,255,255,.05); }
 .sessions-table tr:last-child td { border-bottom: none; }
-.sessions-table tr:hover td { background: rgba(255,255,255,.02); }
+.sessions-table tr:hover td { background: rgba(255,255,255,.04); }
+.sessions-table-clickable tbody tr { cursor: default; }
+.btn-table-view {
+  display: inline-block;
+  padding: .25rem .6rem;
+  border-radius: 6px;
+  font-size: .78rem;
+  font-weight: 600;
+  background: rgba(99,102,241,.15);
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.btn-table-view:hover { background: rgba(99,102,241,.3); }
 .link-detail { font-size: .8rem; color: var(--accent); }
+.chart-wrap canvas { display: block; width: 100% !important; }
 
 /* Session detail */
 .session-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
