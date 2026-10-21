@@ -148,16 +148,6 @@
     </div>
   </div>
 
-  <!-- ── Progression ───────────────────────────────────── -->
-  {% if score_evolution and score_evolution | length > 1 %}
-  <div class="card" style="margin-bottom:1.5rem">
-    <h2 class="section-title">Progression</h2>
-    <div class="chart-wrap" id="progressChart" style="position:relative; height:160px; margin-top:1rem">
-      <canvas id="progressCanvas"></canvas>
-    </div>
-  </div>
-  {% endif %}
-
   <!-- ── Sessions récentes ──────────────────────────────── -->
   <div class="card">
     <h2 class="section-title">Mes dernières sessions</h2>
@@ -220,90 +210,4 @@
 
 </div>
 
-{% if score_evolution and score_evolution | length > 1 %}
-<script>
-(function() {
-  const data = {{ score_evolution | tojson }};
-  const canvas = document.getElementById("progressCanvas");
-  if (!canvas) return;
-  const wrap = canvas.parentElement;
-  const W = wrap.offsetWidth || 600;
-  const H = 160;
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext("2d");
-  const PAD = { top: 16, right: 24, bottom: 32, left: 36 };
-  const scores = data.map(d => d.score);
-  const minS = Math.max(0, Math.min(...scores) - 10);
-  const maxS = Math.min(100, Math.max(...scores) + 10);
-  const plotW = W - PAD.left - PAD.right;
-  const plotH = H - PAD.top - PAD.bottom;
-  const n = data.length;
-
-  function xPos(i) { return PAD.left + (i / (n - 1)) * plotW; }
-  function yPos(v) { return PAD.top + plotH - ((v - minS) / (maxS - minS)) * plotH; }
-
-  // Grille légère
-  ctx.strokeStyle = "rgba(128,128,128,0.15)";
-  ctx.lineWidth = 1;
-  [0, 25, 50, 75, 100].forEach(g => {
-    if (g < minS || g > maxS) return;
-    const y = yPos(g);
-    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
-    ctx.fillStyle = "var(--text-muted, #999)";
-    ctx.font = "10px sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText(g, PAD.left - 4, y + 3);
-  });
-
-  // Gradient fill
-  const grad = ctx.createLinearGradient(0, PAD.top, 0, H - PAD.bottom);
-  grad.addColorStop(0, "rgba(99,102,241,0.25)");
-  grad.addColorStop(1, "rgba(99,102,241,0)");
-  ctx.beginPath();
-  ctx.moveTo(xPos(0), yPos(scores[0]));
-  for (let i = 1; i < n; i++) ctx.lineTo(xPos(i), yPos(scores[i]));
-  ctx.lineTo(xPos(n - 1), H - PAD.bottom);
-  ctx.lineTo(xPos(0), H - PAD.bottom);
-  ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  // Ligne principale
-  ctx.beginPath();
-  ctx.strokeStyle = "#6366f1";
-  ctx.lineWidth = 2.5;
-  ctx.lineJoin = "round";
-  ctx.moveTo(xPos(0), yPos(scores[0]));
-  for (let i = 1; i < n; i++) ctx.lineTo(xPos(i), yPos(scores[i]));
-  ctx.stroke();
-
-  // Points + labels
-  data.forEach((d, i) => {
-    const x = xPos(i), y = yPos(d.score);
-    ctx.beginPath();
-    ctx.arc(x, y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = d.rdv ? "#22c55e" : "#6366f1";
-    ctx.fill();
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    if (n <= 12) {
-      ctx.fillStyle = "var(--text-muted, #999)";
-      ctx.font = "9px sans-serif";
-      ctx.textAlign = "center";
-      const label = d.date ? d.date.slice(5) : "";
-      ctx.fillText(label, x, H - PAD.bottom + 12);
-    }
-  });
-
-  // Label final
-  const lastX = xPos(n - 1), lastY = yPos(scores[n - 1]);
-  ctx.fillStyle = "#6366f1";
-  ctx.font = "bold 11px sans-serif";
-  ctx.textAlign = scores[n-1] > scores[0] ? "right" : "left";
-  ctx.fillText(scores[n-1] + "/100", lastX + (scores[n-1] > scores[0] ? -8 : 8), lastY - 8);
-})();
-</script>
-{% endif %}
 {% endblock %}
