@@ -1,59 +1,70 @@
 {% extends "base.html" %}
-{% block title %}Choisir ton entraînement — Setting Training{% endblock %}
+{% block title %}Nouvelle simulation — Setting Training{% endblock %}
 
 {% block content %}
-<div class="page-center">
-  <div class="card setup-card">
-    <div class="setup-header">
-      <h1>Simulateur Setting</h1>
-      <p>Entraîne-toi à prospecter un contact simulé par IA.<br>Reçois une évaluation détaillée à la fin.</p>
-    </div>
+<div class="setup-page">
 
-    <form action="{{ url_for('start_session') }}" method="POST" class="setup-form">
+  <!-- ── Hero ──────────────────────────────────────────────── -->
+  <div class="setup-hero">
+    <div class="setup-pill">✦ Simulateur IA</div>
+    <h1 class="setup-title">Configure ton entraînement</h1>
+    <p class="setup-subtitle">
+      Affronte un prospect simulé par IA et reçois<br>
+      une évaluation complète de ta performance.
+    </p>
+  </div>
 
-      <!-- Sélection niche -->
-      <div class="form-section">
-        <label class="form-label">Quelle niche ?</label>
-        <div class="niche-grid">
-          {% set niche_icons = {
-            'trading':            '📈',
-            'coaching_sportif':   '💪',
-            'coach_relationnel':  '❤️',
-            'sante':              '🏥',
-            'immobilier':         '🏠',
-            'ecommerce':          '🛒',
-            'saas':               '💻',
-            'investissement':     '💰',
-            'coach_business':     '🚀'
-          } %}
-          {% set niche_labels = {
-            'trading':            'Trading',
-            'coaching_sportif':   'Coaching Sportif',
-            'coach_relationnel':  'Coach Relationnel',
-            'sante':              'Santé',
-            'immobilier':         'Immobilier',
-            'ecommerce':          'E-commerce',
-            'saas':               'SaaS',
-            'investissement':     'Investissement',
-            'coach_business':     'Coach Business'
-          } %}
+  <!-- ── Formulaire ────────────────────────────────────────── -->
+  <div class="setup-body">
+    <form action="{{ url_for('start_session') }}" method="POST">
+
+      <!-- Étape 1 : Niche ──────────────────────────────────── -->
+      <div class="setup-step">
+        <div class="setup-step-header">
+          <span class="step-num">1</span>
+          <div>
+            <div class="step-title">Quelle niche ?</div>
+            <div class="step-sub">Le secteur du coach que tu représentes</div>
+          </div>
+        </div>
+
+        {% set niche_meta = {
+          'trading':           ['📈', 'Trading',           'Clients investisseurs'],
+          'coaching_sportif':  ['💪', 'Coaching Sportif',  'Transformation physique'],
+          'coach_relationnel': ['❤️', 'Coach Relationnel', 'Développement perso'],
+          'sante':             ['🏥', 'Santé',             'Bien-être & santé'],
+          'immobilier':        ['🏠', 'Immobilier',        'Patrimoine & rentabilité'],
+          'ecommerce':         ['🛒', 'E-commerce',        'Commerce en ligne'],
+          'saas':              ['💻', 'SaaS',              'Logiciels & tech'],
+          'investissement':    ['💰', 'Investissement',    'Finances & crypto'],
+          'coach_business':    ['🚀', 'Coach Business',    'Entrepreneurs & CEO'],
+        } %}
+        <div class="niche-grid setup-niche-grid">
           {% for n in niches %}
+          {% set meta = niche_meta.get(n, ['🎯', n|capitalize, '']) %}
           <label class="niche-card">
             <input type="radio" name="niche" value="{{ n }}" required
               {% if loop.first %}checked{% endif %}>
             <div class="niche-card-inner">
-              <span class="niche-icon">{{ niche_icons.get(n, '🎯') }}</span>
-              <span class="niche-name">{{ niche_labels.get(n, n|capitalize) }}</span>
+              <span class="niche-icon">{{ meta[0] }}</span>
+              <span class="niche-name">{{ meta[1] }}</span>
+              <span class="niche-desc">{{ meta[2] }}</span>
             </div>
           </label>
           {% endfor %}
         </div>
       </div>
 
-      <!-- Sélection niveau d'awareness -->
-      <div class="form-section">
-        <label class="form-label">Niveau d'Awareness</label>
-        <div class="niche-grid traffic-grid-3">
+      <!-- Étape 2 : Awareness ─────────────────────────────── -->
+      <div class="setup-step">
+        <div class="setup-step-header">
+          <span class="step-num">2</span>
+          <div>
+            <div class="step-title">Niveau d'awareness</div>
+            <div class="step-sub">Conscience du prospect vis-à-vis de son problème</div>
+          </div>
+        </div>
+        <div class="niche-grid setup-awareness-grid">
           {% for key, info in awareness_types.items() %}
           <label class="niche-card">
             <input type="radio" name="awareness" value="{{ key }}"
@@ -67,10 +78,16 @@
         </div>
       </div>
 
-      <!-- Sélection type de trafic -->
-      <div class="form-section">
-        <label class="form-label">Type de trafic</label>
-        <div class="niche-grid traffic-grid-2">
+      <!-- Étape 3 : Trafic ────────────────────────────────── -->
+      <div class="setup-step">
+        <div class="setup-step-header">
+          <span class="step-num">3</span>
+          <div>
+            <div class="step-title">Type de trafic</div>
+            <div class="step-sub">Origine du contact à setter</div>
+          </div>
+        </div>
+        <div class="niche-grid setup-traffic-grid">
           {% for key, info in traffic_types.items() %}
           <label class="niche-card">
             <input type="radio" name="traffic" value="{{ key }}"
@@ -84,9 +101,15 @@
         </div>
       </div>
 
-      <!-- Sélection niveau -->
-      <div class="form-section">
-        <label class="form-label">Niveau de difficulté</label>
+      <!-- Étape 4 : Difficulté ────────────────────────────── -->
+      <div class="setup-step">
+        <div class="setup-step-header">
+          <span class="step-num">4</span>
+          <div>
+            <div class="step-title">Niveau de difficulté</div>
+            <div class="step-sub">Résistance et réactivité du prospect simulé</div>
+          </div>
+        </div>
         <div class="level-grid">
           {% for num, info in niveaux.items() %}
           <label class="level-card level-{{ num }}">
@@ -102,9 +125,14 @@
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-lg">
-        Commencer la simulation
-      </button>
+      <!-- CTA ─────────────────────────────────────────────── -->
+      <div class="setup-cta">
+        <button type="submit" class="btn btn-primary setup-submit-btn">
+          Lancer la simulation →
+        </button>
+        <p class="setup-cta-hint">La session démarre immédiatement · évaluation IA à la fin</p>
+      </div>
+
     </form>
   </div>
 </div>
